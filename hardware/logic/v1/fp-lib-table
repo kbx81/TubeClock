@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name TubeClock)(type KiCad)(uri /Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/hardware/kicad_libs/TubeClock/TubeClock.pretty)(options "")(descr ""))
+  (lib (name TouchPads)(type KiCad)(uri /Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/hardware/kicad_libs/TubeClock/TouchPads.pretty)(options "")(descr ""))
+)

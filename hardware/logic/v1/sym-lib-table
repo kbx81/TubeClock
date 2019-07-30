@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name TubeClock)(type Legacy)(uri /Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/hardware/kicad_libs/TubeClock/TubeClock.lib)(options "")(descr ""))
+  (lib (name win)(type Legacy)(uri /Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/hardware/kicad_libs/TubeClock/win.lib)(options "")(descr ""))
+  (lib (name Maxim)(type Legacy)(uri /Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/hardware/kicad_libs/TubeClock/Maxim.lib)(options "")(descr ""))
+)

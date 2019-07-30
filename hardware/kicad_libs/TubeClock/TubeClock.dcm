@@ -1,0 +1,69 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP B39162B4327P810
+D 1582.4MHz SAW filter, SMD 1109
+K SAW filter
+F https://en.rf360jv.com/inf/40/ds/ae/B4327.pdf
+$ENDCMP
+#
+$CMP BD6220F
+D H-Bridge driver, 1A, Low Voltage, PWM input, WSON-8
+K half bridge driver
+F http://www.ti.com/lit/ds/symlink/drv8837c.pdf
+$ENDCMP
+#
+$CMP BGA824N6
+D Silicon Germanium Low Noise Amplifier for Global Navigation Satellite Systems
+K LNA low noise amplifier RF
+F https://www.infineon.com/dgdl/Infineon-BGA824N6-DS-v03_00-en.pdf?fileId=db3a30433f764301013f7b53cdd02721
+$ENDCMP
+#
+$CMP LD1117ADT-TR_TO-252-2
+D 1A Low Dropout regulator, positive, 1.25+ V adjustable output, DPAK
+K linear regulator ldo adjustable positive
+F https://www.st.com/resource/en/datasheet/cd00002116.pdf
+$ENDCMP
+#
+$CMP SAFFB1G58KA0F0A
+D Murata 1575.42/1602MHz SAW filter, SMD 1109
+K SAW filter
+F https://www.murata.com/~/media/webrenewal/support/library/catalog/products/filter/rf/p73e.ashx?la=en
+$ENDCMP
+#
+$CMP SAFFB1G96FN0F0A
+D Murata 1960MHz SAW filter, SMD 1109
+K SAW filter
+F https://www.murata.com/~/media/webrenewal/support/library/catalog/products/filter/rf/p73e.ashx?la=en
+$ENDCMP
+#
+$CMP SAFFB2G14FA0F0A
+D Murata 2140MHz SAW filter, SMD 1109
+K SAW filter
+F https://www.murata.com/~/media/webrenewal/support/library/catalog/products/filter/rf/p73e.ashx?la=en
+$ENDCMP
+#
+$CMP SAFFB881MFL0F0A
+D Murata 881.5MHz SAW filter, SMD 1109
+K SAW filter
+F https://www.murata.com/~/media/webrenewal/support/library/catalog/products/filter/rf/p73e.ashx?la=en
+$ENDCMP
+#
+$CMP SAFFB942MFM0F0A
+D Murata 942.5MHz SAW filter, SMD 1109
+K SAW filter
+F https://www.murata.com/~/media/webrenewal/support/library/catalog/products/filter/rf/p73e.ashx?la=en
+$ENDCMP
+#
+$CMP TPS22943
+D High side, power distribution switch, 1.4V-5.5V, 1.8A, SOT23-5 package
+K high-side power distribution switch
+F http://www.ti.com/lit/ds/symlink/tps22929d.pdf
+$ENDCMP
+#
+$CMP Teseo-LIV3F
+D Tiny GNSS module
+K GPS, GNSS, module
+F https://www.st.com/resource/en/datasheet/teseo-liv3f.pdf
+$ENDCMP
+#
+#End Doc Library

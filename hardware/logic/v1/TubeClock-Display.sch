@@ -1,0 +1,137 @@
+EESchema Schematic File Version 4
+LIBS:TubeClock-cache
+EELAYER 29 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 4 6
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+Text HLabel 5500 4200 0    60   Input ~ 0
+SPI1_NSS_DISP
+Text HLabel 6100 4200 2    60   Input ~ 0
+SPI1_SCK
+Text HLabel 5500 4300 0    60   Input ~ 0
+SPI1_MOSI
+Text HLabel 5500 4100 0    60   Input ~ 0
+BLANK
+Text HLabel 6100 4300 2    60   Output ~ 0
+SPI1_MISO_DISP
+$Comp
+L Connector_Generic:Conn_02x06_Odd_Even J4
+U 1 1 5CFD2C1E
+P 5750 4000
+F 0 "J4" H 5800 4417 50  0000 C CNN
+F 1 "Conn_02x06_Odd_Even" H 5800 4326 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_2x06_P2.54mm_Vertical" H 5750 4000 50  0001 C CNN
+F 3 "~" H 5750 4000 50  0001 C CNN
+	1    5750 4000
+	1    0    0    -1  
+$EndComp
+$Comp
+L TubeClock:+V_HV #PWR048
+U 1 1 5CFF709B
+P 6250 3700
+F 0 "#PWR048" H 6250 3550 50  0001 C CNN
+F 1 "+V_HV" H 6250 3850 50  0000 C CNN
+F 2 "" H 6250 3700 50  0001 C CNN
+F 3 "" H 6250 3700 50  0001 C CNN
+	1    6250 3700
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6050 3800 6250 3800
+Wire Wire Line
+	6250 3800 6250 3700
+$Comp
+L power:GND #PWR050
+U 1 1 5D019D59
+P 4750 4400
+F 0 "#PWR050" H 4750 4150 50  0001 C CNN
+F 1 "GND" H 4750 4250 50  0000 C CNN
+F 2 "" H 4750 4400 50  0001 C CNN
+F 3 "" H 4750 4400 50  0001 C CNN
+	1    4750 4400
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:GND #PWR051
+U 1 1 5D01A505
+P 6900 4400
+F 0 "#PWR051" H 6900 4150 50  0001 C CNN
+F 1 "GND" H 6900 4250 50  0000 C CNN
+F 2 "" H 6900 4400 50  0001 C CNN
+F 3 "" H 6900 4400 50  0001 C CNN
+	1    6900 4400
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6050 3900 6900 3900
+Wire Wire Line
+	6900 3900 6900 4100
+Wire Wire Line
+	5550 3800 4750 3800
+Wire Wire Line
+	4750 3800 4750 4000
+$Comp
+L TubeClock:+V_IN #PWR?
+U 1 1 5D03BC67
+P 5300 3700
+AR Path="/5D03BC67" Ref="#PWR?"  Part="1" 
+AR Path="/5A04077E/5D03BC67" Ref="#PWR?"  Part="1" 
+AR Path="/5C854791/5D03BC67" Ref="#PWR?"  Part="1" 
+AR Path="/5C87272D/5D03BC67" Ref="#PWR047"  Part="1" 
+F 0 "#PWR047" H 5300 3550 50  0001 C CNN
+F 1 "+V_IN" H 5300 3850 50  0000 C CNN
+F 2 "" H 5300 3700 50  0001 C CNN
+F 3 "" H 5300 3700 50  0001 C CNN
+	1    5300 3700
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	5550 3900 5300 3900
+Wire Wire Line
+	5300 3900 5300 3700
+Wire Wire Line
+	5550 4000 4750 4000
+Connection ~ 4750 4000
+Wire Wire Line
+	4750 4000 4750 4400
+$Comp
+L power:+3.3V #PWR049
+U 1 1 5D05EB93
+P 6500 3700
+F 0 "#PWR049" H 6500 3550 50  0001 C CNN
+F 1 "+3.3V" H 6500 3850 50  0000 C CNN
+F 2 "" H 6500 3700 50  0001 C CNN
+F 3 "" H 6500 3700 50  0001 C CNN
+	1    6500 3700
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	6050 4000 6500 4000
+Wire Wire Line
+	6500 4000 6500 3700
+Wire Wire Line
+	6050 4100 6900 4100
+Connection ~ 6900 4100
+Wire Wire Line
+	6900 4100 6900 4400
+Wire Wire Line
+	5500 4100 5550 4100
+Wire Wire Line
+	5500 4200 5550 4200
+Wire Wire Line
+	5500 4300 5550 4300
+Wire Wire Line
+	6050 4300 6100 4300
+Wire Wire Line
+	6050 4200 6100 4200
+$EndSCHEMATC
