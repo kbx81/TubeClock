@@ -16,68 +16,55 @@ I have to start by giving credit where credit is due. The
  this project; visually, it is cleaner, it reduces the number of parts and, as a
  result, it reduces the cost.
 
-That said, the world probably doesn't need another (binary) clock. There are
+That said, the world probably doesn't need another tube clock. There are
  plenty of them--all different shapes and sizes--so why build another one?
 
-This project was started with two main goals in mind: I wanted a "simple"
- project I could use to help me get back into the world of electronics. The
- second goal I had in mind was to build up my comfort level with C and C++ -- I
- knew the language(s) but was never terribly comfortable with them. Building
- this helped me to achieve both of those goals and then some -- and I am quite
- happy with the result!
+Last year, I built this lovely
+ [binary clock](https://github.com/kbx81/RGBBinaryClock). Some ten-plus years
+ ago I had built some IN-18 nixie clocks. Earlier this year (2019) one of them
+ became a little troublesome. I fixed it but, in the interim, became motivated
+ to build my own. As I already had a wonderful foundation for some clock
+ hardware, this seemed a natural progression. Overall I'm quite happy with the
+ results if I may say so myself. :)
 
-_But why a clock?_
+_Sooo...another nixie clock? What's special about it?_
 
-It's fun to make LEDs blink. It's fun to play with microcontrollers. It's fun
- to build stuff. But a blinking LED or two or three isn't very meaningful. Nor
- is a nice microcontroller that just toggles a GPIO pin. If you're going to
- build something, why not make it at least modestly useful? And why not build it
- in a unique way that's neat to look at and/or watch?
+First, I brought the touchkey design over from the binary clock. That seemed
+ like a no-brainer. Still, it needed more...flair. Soooo...let's get the time
+ from GPS -- either a soldered-on LIV3F module or a more friendly
+ [module](https://www.adafruit.com/product/746) from
+ [Adafruit](https://www.adafruit.com). How about an infrared remote control so
+ you can turn off the display from across the room while you're watching a
+ movie? Or rather, if you don't want to do that, it'll still do that cool
+ display-dimming thing that I did with the
+ [binary clock](https://github.com/kbx81/RGBBinaryClock). These tubes can be
+ pretty bright in a dark room. :)
 
-The idea for this came from an old electronics kit I put together probably
- around twenty or so years ago (and it still works today!). I liked the kit but
- it was somehow lacking. Probably the most obvious problem was that, in a dark
- bedroom, the display was too bright. It was a simple, 12-hour-only binary
- clock, built on 4000-series CMOS logic. Now, there's nothing wrong with that,
- but...it's 2018 now. Let's take it up a notch or ten.
+Also, just like the binary clock, it can do more than just tell the time --
+ it'll tell you the date and temperature, too! There is even a timer/counter
+ mode. What's more, you can choose the format for it all: the clock can display
+ in a 12 or 24 hour format, the temperature can display in degrees Celsius or
+ degrees Fahrenheit, and (most importantly) you are able to choose the formats
+ you prefer and they can be changed easily at any time.
 
-## How do you take a binary clock up a notch (or ten)?
+As mentioned above, it has a phototransistor which is used to determine the
+ amount of ambient light around it and the display will dim smoothly as the
+ light level around it diminishes. This is great if you want to keep it near you
+ at night while you sleep.
 
-First, you can add some color. A lot of color. In fact, you can pick the colors
- you want it to use...up to eight times over. This binary clock has the ability
- to gradually shift colors over the course of each day. Bits can even fade in
- and out as they change. It's all about the eye candy in this regard.
-
-Second, it can do more than just tell the time -- it'll tell you the date and
- temperature, too! There is even a timer/counter mode. What's more, you can
- choose the format for it all: the clock can display in a 12 or 24 hour format,
- the temperature can display in degrees Celsius or degrees Fahrenheit, and (most
- importantly) it can display all of these values in either binary-coded decimal
- (BCD) or good old-fashioned binary. You get to choose the formats you prefer
- and they can be changed easily at any time.
-
-Next, the display brightness issue had to be addressed -- it has a
- phototransistor which is used to determine the amount of ambient light around
- it and the display will dim as the light level around it diminishes. This is
- great if you want to keep it near you at night while you sleep.
-
-Another cool bit is that it uses capacitive sense touch keys for buttons; the
- kit it is based on had mechanical, fixed-function buttons. If you haven't seen
- or used capsense technology before, you'll find it's pretty cool and adds a
- little extra uniqueness to the clock, too.
-
-A CR2032 coin-cell battery back-up can be installed to keep the time valid in
- the event that the board loses power. Version 4 of the hardware also includes a
- super capacitor, eliminating the need for the battery; even so, both can be
- installed, adding flexibility to the build.
+A CR2032 coin-cell battery backup can be installed to keep the time valid in
+ the event that the board loses power; there is also a super capacitor,
+ eliminating the need for the battery; even so, both can be installed, adding
+ flexibility to the build.
 
 Finally--and one could argue that no clock is complete without one--it has an
  alarm! The alarm can be set to beep at any of the eight times the user sets.
  There is also an hourly chime that one can enable which will beep out each hour
  in binary using high and/or low pitch tones...so you can hear the time when
  you're in another room! The display can be configured to blink when an alarm
- occurs. Version 4 of the clock also includes extra pin headers, some pins of
- which can be used as inputs to trigger the alarm from an external device.
+ occurs. Finally, unused microcontroller pins from the STM32 are brought out to
+ a pin header, some pins of which can be used as inputs to trigger the alarm
+ from an external device -- or connect other hardware of your own!
 
 ## Great, but what makes it tick?
 
@@ -85,45 +72,42 @@ The "brain" is an STM32F072 microcontroller. This MCU alone has everything
  that's necessary to have a functional time clock -- even a temperature sensor
  as a bonus. Still, it might not be quite as accurate as some of us would like.
  For those folks, there are footprints for some additional ICs to improve the
- accuracy of the time and/or temperature sensing.
-
-Version 2 boards have footprints for I2C devices:
-* A Maxim DS3231
-* An LM75 (or compatible)
-* A Microchip MCP9808
-
-Version 3+ boards have footprints for SPI devices:
+ accuracy of the time and/or temperature sensing:
 * A Maxim DS3234
-* An LM74
 * A Maxim DS1722
+* A LM74
+* A LIV3F GPS module (and associated antenna front end with several 0402 parts!)
+* A header for an Adafruit [module](https://www.adafruit.com/product/746)
 
-Why footprints for both temperature sensors and the RTCs? The DS323x is somewhat
+Why footprints for both temperature sensors and the RTCs? The DS3234 is somewhat
  expensive and it's possible that one might want more accurate temperature
  sensing abilities but isn't as concerned with the accuracy of the clock. It
- should be noted that the DS323x devices have temperature sensors built in and
- the application will use this sensor if a DS323x is installed but one of the
+ should be noted that the DS3234 devices have temperature sensors built in and
+ the application will use this sensor if a DS3234 is installed but one of the
  other external temperature sensors is not.
 
-Beyond the MCU itself, the board has 25 RGB LEDs on it; 24 of them form the main
- display and they are connected to TLC5947 (pre-v4) or TLC5951 (v4+)
- constant-current PWM drivers. The MCU uses its SPI1 to communicate with these
- drivers. The remaining RGB LED is used as a "status" LED and it is connected
- (through FET drivers) to GPIO pins on the MCU. These pins double as timer
- output channels, meaning they can also generate a PWM signal, enabling the
- dimming of the status LED elements, as well.
+Beyond the MCU itself, the display boards have up to three (depending on the
+ tubes/board) HV5622 high-voltage driver ICs on them to light up the beautiful
+ tubes. The MCU uses its SPI1 to communicate with these drivers. There is a
+ single RGB LED is used as a "status" LED and it is connected (through FET
+ drivers) to GPIO pins on the MCU. These pins double as timer output channels,
+ meaning they can also generate a PWM signal, enabling the dimming of the status
+ LED elements, as well.
 
 The beeper is connected (also through a FET driver) to yet another GPIO pin
  that doubles as a timer output channel; this enables the beeper to generate a
  wide range of tones or even play a tune!
 
-The phototransistor is connected to the MCU's ADC channel zero.
+The phototransistor is connected to the MCU's ADC channel ten.
 
 Two USARTs are exposed via pin headers on the right side of the board: USART1
  is brought out on a standard six pin header as is commonly found on many
- devices while USART2 is connected to an RS-485 line driver enabling
- communication on an RS-485 bus. Through this interface, the application is able
- to receive a DMX-512 signal so the LEDs can each be individually controlled
- from an entertainment lighting console (or other application that speaks this
+ devices; it is also connected to the optional GPS module (solder jumpers allow
+ easy disconnection of the module should it be necessary for troubleshooting).
+ USART2 is connected to an RS-485 line driver enabling communication on an
+ RS-485 bus. Through this interface, the application is able to receive a
+ DMX-512 signal so the tubes can each be individually controlled from an
+ entertainment lighting console (or other application that speaks this
  protocol), enabling another whole realm of possibilities...
 
 ## How do I get or build one?
