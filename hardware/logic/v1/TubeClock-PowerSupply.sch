@@ -149,7 +149,7 @@ F 0 "F1" V 5500 1100 50  0000 C CNN
 F 1 "~500mA" V 5700 1100 50  0000 C CNN
 F 2 "Fuse:Fuse_2920_7451Metric" H 5650 900 50  0001 L CNN
 F 3 "http://m.littelfuse.com/~/media/electronics/datasheets/resettable_ptcs/littelfuse_ptc_2920l_datasheet.pdf.pdf" H 5600 1100 50  0001 C CNN
-F 4 "2920L185DR" V 5600 1100 60  0001 C CNN "Part Number"
+F 4 "2920L050DR" V 5600 1100 60  0001 C CNN "Part Number"
 	1    5600 1100
 	0    1    1    0   
 $EndComp
@@ -184,7 +184,7 @@ F 0 "U2" H 7750 3500 50  0000 C CNN
 F 1 "LD1117S33TR" H 7350 3900 50  0000 L CNN
 F 2 "Package_TO_SOT_SMD:TO-252-2" H 7600 3950 50  0001 C CNN
 F 3 "http://www.st.com/content/ccc/resource/technical/document/datasheet/a5/c3/3f/c9/2b/15/40/49/CD00002116.pdf/files/CD00002116.pdf/jcr:content/translations/en.CD00002116.pdf" H 7700 3500 50  0001 C CNN
-F 4 "LD1117ADT33TR" H 7600 3750 60  0001 C CNN "Part Number"
+F 4 "LD1117S33TR" H 7600 3750 60  0001 C CNN "Part Number"
 	1    7600 3750
 	1    0    0    -1  
 $EndComp
