@@ -32,4 +32,4 @@ For IN-12 and IN-18 tubes, use machine pin sockets suggested above. Since IN-14 
 
 *U4 is not present on IN-18 display boards. On the other boards, it is not required if you don't care about the lovely decimal points in the smaller tubes. :) **Bridge the solder jumper if U4 is *not* installed** on these boards.
 
-R11 through R23 are additional series resistors for tube decimal points. They are not present on IN-18 boards and are otherwise not necessary if decimal points will not be used.
+R12 through R23 are additional series resistors for tube decimal points. They are not present on IN-18 boards and are otherwise not necessary if decimal points will not be used.
