@@ -199,13 +199,13 @@ This jumper determines if the 32.768 kHz oscillator or the DS3234's 32.768 kHz
 #### USART 1/USB VBUS jumpers
 **SB3, SB4**
 
-These jumpers are on version 4+ boards and allow some configuration of which
- USART1 pin on the MCU is connected to the six-pin serial header. Because the
- processor expects USB VBUS on PA9, if you plan to use the USB port, SB4 should
- be bridged and SB3 should be bridged to put PB6 on the on the six-pin header.
- If you do not want/need to use the USB port and wish to flash the MCU via the
- six-pin header, SB4 must be left **open** and SB3 should be bridged to put PA9
- on the six-pin header.
+These jumpers allow the configuration of which USART1 pin on the MCU is
+ connected to the six-pin serial header. Because the processor's USB hardware
+ expects USB VBUS on PA9, if you plan to use the USB port, SB4 should be bridged
+ and SB3 should be bridged to put PB6 on the on the six-pin header. If you do
+ not want/need to use the USB port and wish to flash the MCU via the six-pin
+ header, SB4 must be left **open** and SB3 should be bridged to put PA9 on the
+ six-pin header.
 
 #### Reset Supervisor jumper
 **SB5**
@@ -256,7 +256,7 @@ Generally, it will suffice to check a few key areas for shorts. Since these are
  checking the power pins around the STM32 processor. All of its Vcc and ground
  pins are right next to each other so this is the best place to look first.
 * **Check for shorts on the display pin header.** Note that there are multiple
- ground pinns on this header so they will naturally appear to be shorted. It is
+ ground pins on this header so they will naturally appear to be shorted. It is
  important to check for shorts between the pins that supply the various voltages
  to the display board (3.3, 12, and 170 volts). Shorts between any of these pins
  will be disastrous!
@@ -270,13 +270,13 @@ Once you've confirmed everything above looks good, it should be reasonably safe
  soldering-related issues that could be affecting the clock's operation.
 
 After you power on your board for the first time--and if nothing blows
- up--you'll need to flash the firmware onto the STM32 MCU. The board has USB
- interface that may be used for this purpose, in addition to the SWD connection
- (P1) or the serial interface on J5. Either way, you'll need an appropriate
- adapter and/or cable to do so. You can find the source, compiled binary files
- and flashing instructions in the `src` folder one level up in the repo's
- hierarchy. With the right tools in hand, this can be done in a couple of
- minutes.
+ up--you'll need to flash the firmware onto the STM32 MCU. Use either the USB
+ interface, the SWD connection on P1, or the serial interface on J5. You'll need
+ an appropriate adapter and/or cable to do so. You will find the source code and
+ flashing instructions in the `src` folder one level up in the repo's hierarchy.
+ The `bin` directory contains complied binary files for folks who do not wish to
+ compile the source code. With the right tools in hand, this can be done in a
+ couple of minutes.
 
 If you're having trouble flashing the MCU, please see the next section.
 
@@ -296,16 +296,17 @@ If you're having trouble flashing the MCU, check these items first:
  data lines between the port you're using (six-pin serial, USB, or SWD) and the
  processor. Perhaps there is another nasty solder bridge somewhere that's
  shorting one or more of the lines to Vcc, ground, or another adjacent pin. If
- you're using the USB interface on a version 4+ board, take a close look at D5
- and the physical USB port itself, as well.
+ you're using the USB interface, take a close look at D5 and the physical USB
+ port itself, as well. The pins on the USB connector are prone to bridging.
 
 If you flashed the MCU and it's now doing...something...but it doesn't seem
  right, here are some more common symptoms and how to fix them:
 
-* **Status LED blinks orange/off but the main display is blank or flickers
+* **Status LED blinks orange/off but the tubes are blank or flickering
  erratically.** This is indicative of some soldering problem on the SPI1 pins
  of the MCU or on one or more of the HV5622 drivers. Take a close look at these
- pins and rework them as necessary.
+ pins and rework them as necessary. Also be sure the socket on the display board
+ is seated sufficiently onto the logic board's display pin header.
 * **One or more of the touch keys don't work.** Check the 1K resistors that sit
  between the touch keys and the MCU as well as the 47 nF sense capacitors.
  Again, also check the relevant pins on the MCU itself for shorts to adjacent
