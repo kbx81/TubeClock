@@ -127,6 +127,10 @@ static const uint32_t cMaximumIdleCount = 120000;
 //
 static const uint8_t cMinimumIntensityMultiplier = 10;
 
+// DST offset in seconds
+//
+static const int16_t cDstOffsetSeconds = 60 * 60;
+
 // Idle cycle counter
 //
 volatile static auto _idleCounter = cMaximumIdleCount;
@@ -191,9 +195,8 @@ void initialize()
     Hardware::setStatusLed(RgbLed());
   }
 
-  _currentTime = Hardware::dateTime();
-  // Update DST start and end dates and times based on RTC
-  isDst(_currentTime);
+  // _currentTime = Hardware::getDateTime();
+  _currentTime = Application::dateTime();
 
   AlarmHandler::initialize();
 
@@ -212,6 +215,44 @@ void initialize()
   {
     setOperatingMode(OperatingMode::OperatingModeFixedDisplay);
   }
+}
+
+
+DateTime dateTime()
+{
+  if (_currentTime.second() != Hardware::dateTime().second())
+  {
+    _currentTime = Hardware::dateTime();
+
+    if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
+        && (isDst(_currentTime) == true))
+    {
+      _currentTime = _currentTime.addSeconds(cDstOffsetSeconds);
+    }
+  }
+  return _currentTime;
+}
+
+
+void setDateTime(const DateTime &now)
+{
+  _currentTime = now;
+
+  if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
+      && (isDst(now) == true))
+  {
+    Hardware::setDateTime(_currentTime.addSeconds(cDstOffsetSeconds));
+  }
+  else
+  {
+    Hardware::setDateTime(_currentTime);
+  }
+}
+
+
+int32_t temperature(const bool fahrenheit, const bool bcd)
+{
+  return Hardware::temperature(fahrenheit, bcd);
 }
 
 
@@ -323,11 +364,11 @@ void refreshSettings()
 {
   int16_t timeZoneOffsetInMinutes = (_settings.getRawSetting(Settings::Setting::TimeZone) - 56) * 15;
 
-  if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
-      && (isDst(_currentTime) == true))
-  {
-    timeZoneOffsetInMinutes += 60;
-  }
+  // if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
+  //     && (isDst(_currentTime) == true))
+  // {
+  //   timeZoneOffsetInMinutes += 60;
+  // }
 
   // Update hardware things
   Hardware::setVolume(_settings.getRawSetting(Settings::Setting::BeeperVolume));
@@ -407,19 +448,19 @@ bool isDst(const DateTime &currentTime)
 //
 void _refreshDst()
 {
-  _currentTime = Hardware::dateTime();
-
-  if ((_currentTime >= _dstEnd) && (_dstState == DstState::Spring))
-  {
-    _dstState = DstState::Fall;
-    Hardware::setDstState(isDst(_currentTime), true);
-  }
-
-  if ((_currentTime >= _dstStart) && (_dstState == DstState::Reset))
-  {
-    _dstState = DstState::Spring;
-    Hardware::setDstState(isDst(_currentTime), true);
-  }
+  // _currentTime = Hardware::getDateTime();
+  //
+  // if ((_currentTime >= _dstEnd) && (_dstState == DstState::Spring))
+  // {
+  //   _dstState = DstState::Fall;
+  //   Hardware::setDstState(isDst(_currentTime), true);
+  // }
+  //
+  // if ((_currentTime >= _dstStart) && (_dstState == DstState::Reset))
+  // {
+  //   _dstState = DstState::Spring;
+  //   Hardware::setDstState(isDst(_currentTime), true);
+  // }
 }
 
 
@@ -519,10 +560,10 @@ void loop()
     Hardware::refresh();
 
     // Check up on DST and adjust the time if enabled based on settings
-    if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
-    {
-      _refreshDst();
-    }
+    // if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
+    // {
+    //   _refreshDst();
+    // }
     // We control the master display intensity only if DMX-512 is NOT active
     if (_externalControlMode != ExternalControl::Dmx512ExtControlEnum)
     {

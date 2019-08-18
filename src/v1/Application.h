@@ -21,6 +21,7 @@
 
 #include <cstdint>
 
+#include "DateTime.h"
 #include "Display.h"
 #include "Settings.h"
 #include "View.h"
@@ -136,6 +137,18 @@ namespace Application {
   /// @brief Initialize the application
   ///
   void initialize();
+
+  /// @brief Gets the application's date & time, adjusted for time zone and DST
+  ///
+  DateTime dateTime();
+
+  /// @brief Set the date/time
+  ///
+  void setDateTime(const DateTime &now);
+
+  /// @brief Returns the temperature based on hardware
+  ///  (in fahrenheit if fahrenheit == true; in BCD if bcd == true)
+  int32_t  temperature(const bool fahrenheit, const bool bcd = false);
 
   /// @brief Get a mode's display number
   /// @param mode Desired mode to get the display number for

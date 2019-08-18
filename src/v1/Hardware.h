@@ -23,7 +23,6 @@
 #include "DateTime.h"
 #include "Display.h"
 #include "RgbLed.h"
-#include "SpiMaster.h"
 
 #ifndef HARDWARE_VERSION
   #error HARDWARE_VERSION must be defined with a value of 1
@@ -57,6 +56,15 @@ namespace Hardware {
     DS323x
   };
 
+  /// @brief SPI1 peripherals
+  ///
+  enum SpiPeripheral : uint8_t {
+    None,
+    HvDrivers,
+    Rtc,
+    TempSensor
+  };
+
   /// @brief Type of temperature sensor connected, if any
   ///
   enum TempSensorType : uint8_t {
@@ -72,14 +80,14 @@ namespace Hardware {
 
   /// @brief Structure defining SPI transfer requests
   ///
-  // struct SpiTransferReq {
-  //   SpiPeripheral peripheral;
-  //   uint8_t *bufferIn;
-  //   uint8_t *bufferOut;
-  //   uint16_t length;
-  //   bool use16BitXfers;
-  //   volatile HwReqAck state;
-  // };
+  struct SpiTransferReq {
+    SpiPeripheral peripheral;
+    uint8_t *bufferIn;
+    uint8_t *bufferOut;
+    uint16_t length;
+    bool use16BitXfers;
+    volatile HwReqAck state;
+  };
 
 
   /// @brief Hardware version to build for
@@ -251,29 +259,17 @@ namespace Hardware {
   /// @return false if failure (the USART was busy)
   HwReqAck writeSerial(const uint32_t usart, const uint32_t length, const char* data);
 
-  /// @brief Returns the active/selected SPI peripheral
-  ///
-  // SpiPeripheral spiGetSelectedPeripheral();
-
-  /// @brief Toggle SPI MISO between display drivers and the other peripherals and activate the appropriate CS/CE line
-  /// @return HwReqAck::HwReqOk if request was successful (SPI not busy)
-  // HwReqAck spiSelectPeripheral(const SpiPeripheral peripheral);
-
   /// @brief Queues up a transfer via SPI via DMA
   /// @return HwReqAck state of transfer request
-  // HwReqAck spiTransferRequest(Spi::SpiTransferReq* request);
+  HwReqAck spiTransferRequest(SpiTransferReq* request);
 
   /// @brief Transfers data in/out through the SPI via DMA
   /// @return HwReqAck state of transfer request
-  // HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length, const bool use16BitXfers);
+  HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length, const bool use16BitXfers);
 
   /// @brief Permits checking the status of the SPI; returns true if busy
   ///
-  // bool     spiIsBusy();
-
-  /// @brief Get pointer to SPI instance
-  /// @return pointer to SpiMaster object
-  SpiMaster* getSpiMaster();
+  bool     spiIsBusy();
 
   /// @brief Sets the given status LED to the given intensity/RgbLed
   ///

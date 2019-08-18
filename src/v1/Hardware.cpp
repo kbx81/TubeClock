@@ -325,7 +325,7 @@ static bool _externalRtcConnected = false;
 
 // inverts NSS state during SPI transfers (for DS1722) if true
 //
-// static bool _invertCsForTemperatureSensor = false;
+static bool _invertCsForTemperatureSensor = false;
 
 // state of the HV SHUTDOWN pin
 //
@@ -1498,10 +1498,10 @@ void setDisplayHardwareBlanking(const bool blankingState)
 }
 
 
-bool dstState()
-{
-  return RTC_CR & RTC_CR_BKP;
-}
+// bool dstState()
+// {
+//   return RTC_CR & RTC_CR_BKP;
+// }
 
 
 DateTime dateTime()
@@ -1650,53 +1650,53 @@ uint16_t voltageVddA()
 }
 
 
-void setDstState(const bool enableDst, const bool adjustRtcHardware)
-{
-  // number of seconds in an hour
-  int16_t rtcAdjustment = 3600;
-  // bit to set in RTC_CR to adjust the STM32's internal RTC
-  uint32_t rtcDstAdjustBit = 0;
-  // get the current state of the hardware into dstHwState
-  bool dstHwState = RTC_CR & RTC_CR_BKP;
-  // if the new state and the hardware state are not the same...
-  if (enableDst != dstHwState)
-  {
-    // get ready to toggle the BKP bit...
-    pwr_disable_backup_domain_write_protect();
-    rtc_unlock();
-
-    if (enableDst == true)
-    {
-      RTC_CR |= RTC_CR_BKP;
-
-      rtcDstAdjustBit = RTC_CR_ADD1H;
-    }
-    else
-    {
-      RTC_CR &= ~RTC_CR_BKP;
-
-      rtcDstAdjustBit = RTC_CR_SUB1H;
-
-      rtcAdjustment *= -1;
-    }
-
-    if (adjustRtcHardware == true)
-    {
-      RTC_CR |= rtcDstAdjustBit;
-
-      if (_externalRtcConnected == true)
-      {
-        DS3234::setDateTime(_currentDateTime.addSeconds(rtcAdjustment));
-      }
-
-      DisplayManager::doubleBlink();
-    }
-
-    rtc_lock();
-    rtc_wait_for_synchro();
-    pwr_enable_backup_domain_write_protect();
-  }
-}
+// void setDstState(const bool enableDst, const bool adjustRtcHardware)
+// {
+//   // number of seconds in an hour
+//   int16_t rtcAdjustment = 3600;
+//   // bit to set in RTC_CR to adjust the STM32's internal RTC
+//   uint32_t rtcDstAdjustBit = 0;
+//   // get the current state of the hardware into dstHwState
+//   bool dstHwState = RTC_CR & RTC_CR_BKP;
+//   // if the new state and the hardware state are not the same...
+//   if (enableDst != dstHwState)
+//   {
+//     // get ready to toggle the BKP bit...
+//     pwr_disable_backup_domain_write_protect();
+//     rtc_unlock();
+//
+//     if (enableDst == true)
+//     {
+//       RTC_CR |= RTC_CR_BKP;
+//
+//       rtcDstAdjustBit = RTC_CR_ADD1H;
+//     }
+//     else
+//     {
+//       RTC_CR &= ~RTC_CR_BKP;
+//
+//       rtcDstAdjustBit = RTC_CR_SUB1H;
+//
+//       rtcAdjustment *= -1;
+//     }
+//
+//     if (adjustRtcHardware == true)
+//     {
+//       RTC_CR |= rtcDstAdjustBit;
+//
+//       if (_externalRtcConnected == true)
+//       {
+//         DS3234::setDateTime(_currentDateTime.addSeconds(rtcAdjustment));
+//       }
+//
+//       DisplayManager::doubleBlink();
+//     }
+//
+//     rtc_lock();
+//     rtc_wait_for_synchro();
+//     pwr_enable_backup_domain_write_protect();
+//   }
+// }
 
 
 void setFlickerReduction(const uint16_t value)
