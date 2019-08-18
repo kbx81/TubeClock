@@ -191,7 +191,7 @@ void initialize()
     Hardware::setStatusLed(RgbLed());
   }
 
-  _currentTime = Hardware::getDateTime();
+  _currentTime = Hardware::dateTime();
   // Update DST start and end dates and times based on RTC
   isDst(_currentTime);
 
@@ -407,7 +407,7 @@ bool isDst(const DateTime &currentTime)
 //
 void _refreshDst()
 {
-  _currentTime = Hardware::getDateTime();
+  _currentTime = Hardware::dateTime();
 
   if ((_currentTime >= _dstEnd) && (_dstState == DstState::Spring))
   {

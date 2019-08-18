@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstdint>
+#include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/dma.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/syscfg.h>
@@ -30,13 +31,14 @@ namespace kbxTubeClock {
 
 namespace Hardware {
 
-  // USART Tx and Rx ports & pins
+  // USART Tx and Rx ports, pins, & IRQs
   //
   // static const auto cUsart1Port = GPIOA;
   static const auto cUsart1RxPort = GPIOA;
   static const auto cUsart1RxPin  = GPIO10;
   static const auto cUsart1TxPort = GPIOB;
   static const auto cUsart1TxPin  = GPIO6;
+  static const auto cUsart1Irq    = NVIC_USART1_IRQ;
 
   static const auto cUsart2Port   = GPIOA;
   // static const auto cUsart2RxPort = GPIOA;
@@ -45,6 +47,7 @@ namespace Hardware {
   static const auto cUsart2TxPin  = GPIO2;
   // static const auto cUsart2DePort = GPIOA;
   static const auto cUsart2DePin  = GPIO1;
+  static const auto cUsart2Irq    = NVIC_USART2_IRQ;
 
   // external alarm input port(s) & pins
   //
@@ -73,22 +76,29 @@ namespace Hardware {
   static const auto cLed1PwmOc   = TIM_OC2;
   static const auto cLed2PwmOc   = TIM_OC3;
 
+  // timer used for tube display PWM generation and associated IRQ
+  //
+  static const auto cTubePwmTimer    = TIM2;
+  static const auto cTubePwmTimerIrq = NVIC_TIM2_IRQ;
+
   // phototransistor I/O port, pin, and ADC channel
   //
   static const auto cPhototransistorPort = GPIOC;
   static const auto cPhototransistorPin  = GPIO0;
   static const uint8_t cPhototransistorChannel = 10;
 
-  // IR demodulator I/O port & pin
+  // IR demodulator I/O port, pin, and timer
   //
-  static const auto cIrPort = GPIOB;
-  static const auto cIrPin  = GPIO15;
-  static const auto cIrTimer = TIM7;
+  static const auto cIrPort     = GPIOB;
+  static const auto cIrPin      = GPIO15;
+  static const auto cIrTimer    = TIM7;
+  static const auto cIrTimerIrq = NVIC_TIM7_IRQ;
 
-  // Pulse-Per-Second (SQW) I/O port & pin
+  // Pulse-Per-Second (SQW) I/O port, pin, & IRQ
   //
   static const auto cPpsPort = GPIOC;
   static const auto cPpsPin  = GPIO13;
+  static const auto cPpsIrq  = NVIC_EXTI4_15_IRQ;
 
   // I2C ports & pins
   //
@@ -139,6 +149,11 @@ namespace Hardware {
                                         SYSCFG_CFGR1_USART1_TX_DMA_RMP |
                                         SYSCFG_CFGR1_USART2_DMA_RMP;
 
+  // DMA interrupts we use
+  //
+  static const auto cDmaIrqSpi1   = NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ;
+  static const auto cDmaIrqUsarts = NVIC_DMA1_CHANNEL4_7_DMA2_CHANNEL3_5_IRQ;
+
   // number of TSC channels we're using
   //
   static const uint8_t cTscChannelCount = 6;
@@ -146,6 +161,10 @@ namespace Hardware {
   // number of TSC channels we're using per group
   //
   static const uint8_t cTscChannelsPerGroup = 3;
+
+  // TSC IRQ
+  //
+  static const uint8_t cTscIrq = NVIC_TSC_IRQ;
 
   // touch sense controller I/O groups
   //

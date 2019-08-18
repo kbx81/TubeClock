@@ -54,6 +54,7 @@
 #include "InfraredRemote.h"
 #include "LM74.h"
 #include "RgbLed.h"
+#include "SpiMaster.h"
 
 #if HARDWARE_VERSION == 1
   #include "Hardware_v1.h"
@@ -151,6 +152,18 @@ static const uint8_t cTscSamplesToAverage = 32;
 //
 static const int32_t cVddCalibrationVoltage = 3300;
 
+// SPI interface initialization objects
+//
+static const SpiMaster::SpiMasterParams _spiMasterParams = {
+  SPI1,                             // spi
+  DMA1,                             // dmaController
+  cSpi1RxDmaChannel,                // channelRx
+  cSpi1TxDmaChannel                 // channelTx
+};
+
+// SPI interface initialization objects
+//
+static SpiMaster _spiMaster;
 
 // tracks which array element the next sample is to be written to
 //
@@ -239,11 +252,15 @@ static uint32_t _onTimeSecondsCounter = 0;
 
 // tracks what the SPI MISO is set to
 //
-volatile static SpiPeripheral _spiActivePeripheral = SpiPeripheral::None;
+// volatile static Spi::SpiPeripheral _spiActivePeripheral = Spi::SpiPeripheral::None;
 
 // the next transfer the SPI needs to do
 //
-volatile static SpiTransferReq* _spiXferQueue[4] = { nullptr, nullptr, nullptr, nullptr };
+// volatile static Spi::SpiTransferReq* _spiXferQueue[4] = { nullptr, nullptr, nullptr, nullptr };
+
+// SpiMaster object for SPI
+//
+volatile static SpiMaster _spi1;
 
 // provides a way to calibrate the temperature indication
 //
@@ -308,7 +325,7 @@ static bool _externalRtcConnected = false;
 
 // inverts NSS state during SPI transfers (for DS1722) if true
 //
-static bool _invertCsForTemperatureSensor = false;
+// static bool _invertCsForTemperatureSensor = false;
 
 // state of the HV SHUTDOWN pin
 //
@@ -581,31 +598,32 @@ void _i2cRecover()
 
 void _nvicSetup()
 {
+  // DMA interrupts
   // nvic_set_priority(NVIC_ADC_COMP_IRQ, 0);
 	// nvic_enable_irq(NVIC_ADC_COMP_IRQ);
   // nvic_set_priority(NVIC_DMA1_CHANNEL1_IRQ, 0);
 	// nvic_enable_irq(NVIC_DMA1_CHANNEL1_IRQ);
-  nvic_set_priority(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ, 0);
-	nvic_enable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
-  nvic_set_priority(NVIC_DMA1_CHANNEL4_7_DMA2_CHANNEL3_5_IRQ, 0);
-	nvic_enable_irq(NVIC_DMA1_CHANNEL4_7_DMA2_CHANNEL3_5_IRQ);
-
-  nvic_set_priority(NVIC_EXTI4_15_IRQ, 64);
-	nvic_enable_irq(NVIC_EXTI4_15_IRQ);
-
-  nvic_set_priority(NVIC_TIM2_IRQ, 64);
-	nvic_enable_irq(NVIC_TIM2_IRQ);
-
-  nvic_set_priority(NVIC_TIM7_IRQ, 128);
-	nvic_enable_irq(NVIC_TIM7_IRQ);
-
-  nvic_set_priority(NVIC_TSC_IRQ, 128);
-  nvic_enable_irq(NVIC_TSC_IRQ);
-
-  nvic_set_priority(NVIC_USART1_IRQ, 64);
-	nvic_enable_irq(NVIC_USART1_IRQ);
-  nvic_set_priority(NVIC_USART2_IRQ, 64);
-	nvic_enable_irq(NVIC_USART2_IRQ);
+  nvic_set_priority(cDmaIrqSpi1, 0);
+	nvic_enable_irq(cDmaIrqSpi1);
+  nvic_set_priority(cDmaIrqUsarts, 0);
+	nvic_enable_irq(cDmaIrqUsarts);
+  // EXTI interrupts -- PPS and IR sensor inputs
+  nvic_set_priority(cPpsIrq, 64);
+	nvic_enable_irq(cPpsIrq);
+  // PWM timer interrupt (triggers refresh of tubes)
+  nvic_set_priority(cTubePwmTimerIrq, 64);
+	nvic_enable_irq(cTubePwmTimerIrq);
+  // IR interrupt (overflow = timeout)
+  nvic_set_priority(cIrTimerIrq, 128);
+	nvic_enable_irq(cIrTimerIrq);
+  // TSC interrupt
+  nvic_set_priority(cTscIrq, 128);
+  nvic_enable_irq(cTscIrq);
+  // USART interrupts
+  nvic_set_priority(cUsart1Irq, 64);
+	nvic_enable_irq(cUsart1Irq);
+  nvic_set_priority(cUsart2Irq, 64);
+	nvic_enable_irq(cUsart2Irq);
 }
 
 
@@ -682,105 +700,105 @@ void _rtcSetup()
 
 // Deactivates all SPI peripheral CS/CE lines
 //
-void _spiReleaseAllCs()
-{
-  if (_invertCsForTemperatureSensor == true)
-  {
-    gpio_set(cNssPort, cNssRtcPin);
-    gpio_clear(cNssPort, cNssTemperaturePin | cNssDisplayPin);
-  }
-  else
-  {
-    gpio_set(cNssPort, cNssRtcPin | cNssTemperaturePin);
-    gpio_clear(cNssPort, cNssDisplayPin);
-  }
-}
+// void _spiReleaseAllCs()
+// {
+//   if (_invertCsForTemperatureSensor == true)
+//   {
+//     gpio_set(cNssPort, cNssRtcPin);
+//     gpio_clear(cNssPort, cNssTemperaturePin | cNssDisplayPin);
+//   }
+//   else
+//   {
+//     gpio_set(cNssPort, cNssRtcPin | cNssTemperaturePin);
+//     gpio_clear(cNssPort, cNssDisplayPin);
+//   }
+// }
 
 
 // Toggle SPI MISO between display drivers and the other peripherals and
 //  activate the appropriate CS/CE line
 // ***** Make sure SPI is not busy/in use before switching things around! *****
-void _spiSelectPeripheral(const SpiPeripheral peripheral)
-{
-  // We won't waste time switching things around if we don't need to
-  if (_spiActivePeripheral != peripheral)
-  {
-    _spiActivePeripheral = peripheral;    // save for later!
-
-    if (peripheral != SpiPeripheral::None)
-    {
-      // Reset SPI, SPI_CR1 register cleared, SPI is disabled
-      spi_disable(SPI1);
-
-      _spiReleaseAllCs();
-
-      // Configure some SPI parameters common to all peripherals
-      spi_fifo_reception_threshold_8bit(SPI1);
-    	spi_set_data_size(SPI1, SPI_CR2_DS_8BIT);
-      /*
-       * Set NSS management to software.
-       *
-       * Note:
-       * Setting nss high is very important, even if we are controlling the GPIO
-       * ourselves this bit needs to be at least set to 1, otherwise the spi
-       * peripheral will not send any data out.
-       */
-    	spi_enable_software_slave_management(SPI1);
-    	spi_set_nss_high(SPI1);
-
-      // Configure more settings for not-special peripherals
-      if (peripheral != SpiPeripheral::HvDrivers)
-      {
-        // Everything else we use expects the MSb first
-        spi_send_msb_first(SPI1);
-        // ...and this phase
-        spi_set_clock_phase_1(SPI1);
-        // Configure display driver peripheral MISO pin as input
-        gpio_mode_setup(cSpi1AltPort, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
-        // Configure GPIOs: SCK=PA5, MISO=PA6 and MOSI=PA7
-        gpio_mode_setup(cSpi1Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoPin);
-      }
-    }
-
-    // Configure settings for special peripherals and activate CS/CE lines
-    switch (peripheral)
-    {
-      case SpiPeripheral::HvDrivers:
-        // Write the LSbs out first to the HV drivers
-        spi_send_lsb_first(SPI1);
-        // ...and the HV drivers prefer this
-        spi_set_clock_phase_0(SPI1);
-        // Configure other peripherals MISO pin as input
-        gpio_mode_setup(cSpi1Port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoPin);
-        // MISO=PB4 from HV drivers
-        gpio_mode_setup(cSpi1AltPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
-
-        // gpio_clear(cNssPort, cNssDisplayPin);   // this shouldn't be necessary here
-        break;
-
-      case SpiPeripheral::Rtc:
-        gpio_clear(cNssPort, cNssRtcPin);
-        break;
-
-      case SpiPeripheral::TempSensor:
-        if (_invertCsForTemperatureSensor == true)
-        {
-          gpio_set(cNssPort, cNssTemperaturePin);
-        }
-        else
-        {
-          gpio_clear(cNssPort, cNssTemperaturePin);
-        }
-        break;
-
-      default:
-        _spiReleaseAllCs();
-        break;
-    }
-     // Enable SPI1 peripheral
-    spi_enable(SPI1);
-  }
-}
+// void _spiSelectPeripheral(const Spi::SpiPeripheral peripheral)
+// {
+//   // We won't waste time switching things around if we don't need to
+//   if (_spiActivePeripheral != peripheral)
+//   {
+//     _spiActivePeripheral = peripheral;    // save for later!
+//
+//     if (peripheral != Spi::SpiPeripheral::None)
+//     {
+//       // Reset SPI, SPI_CR1 register cleared, SPI is disabled
+//       spi_disable(SPI1);
+//
+//       _spiReleaseAllCs();
+//
+//       // Configure some SPI parameters common to all peripherals
+//       spi_fifo_reception_threshold_8bit(SPI1);
+//     	spi_set_data_size(SPI1, SPI_CR2_DS_8BIT);
+//       /*
+//        * Set NSS management to software.
+//        *
+//        * Note:
+//        * Setting nss high is very important, even if we are controlling the GPIO
+//        * ourselves this bit needs to be at least set to 1, otherwise the spi
+//        * peripheral will not send any data out.
+//        */
+//     	spi_enable_software_slave_management(SPI1);
+//     	spi_set_nss_high(SPI1);
+//
+//       // Configure more settings for not-special peripherals
+//       if (peripheral != Spi::SpiPeripheral::HvDrivers)
+//       {
+//         // Everything else we use expects the MSb first
+//         spi_send_msb_first(SPI1);
+//         // ...and this phase
+//         spi_set_clock_phase_1(SPI1);
+//         // Configure display driver peripheral MISO pin as input
+//         gpio_mode_setup(cSpi1AltPort, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
+//         // Configure GPIOs: SCK=PA5, MISO=PA6 and MOSI=PA7
+//         gpio_mode_setup(cSpi1Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoPin);
+//       }
+//     }
+//
+//     // Configure settings for special peripherals and activate CS/CE lines
+//     switch (peripheral)
+//     {
+//       case Spi::SpiPeripheral::HvDrivers:
+//         // Write the LSbs out first to the HV drivers
+//         spi_send_lsb_first(SPI1);
+//         // ...and the HV drivers prefer this
+//         spi_set_clock_phase_0(SPI1);
+//         // Configure other peripherals MISO pin as input
+//         gpio_mode_setup(cSpi1Port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoPin);
+//         // MISO=PB4 from HV drivers
+//         gpio_mode_setup(cSpi1AltPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
+//
+//         // gpio_clear(cNssPort, cNssDisplayPin);   // this shouldn't be necessary here
+//         break;
+//
+//       case Spi::SpiPeripheral::Rtc:
+//         gpio_clear(cNssPort, cNssRtcPin);
+//         break;
+//
+//       case Spi::SpiPeripheral::TempSensor:
+//         if (_invertCsForTemperatureSensor == true)
+//         {
+//           gpio_set(cNssPort, cNssTemperaturePin);
+//         }
+//         else
+//         {
+//           gpio_clear(cNssPort, cNssTemperaturePin);
+//         }
+//         break;
+//
+//       default:
+//         _spiReleaseAllCs();
+//         break;
+//     }
+//      // Enable SPI1 peripheral
+//     spi_enable(SPI1);
+//   }
+// }
 
 
 // Configure SPI
@@ -796,8 +814,8 @@ void _spiSetup()
    * Clock phase: Data valid on 1st clock pulse
    * Frame format: MSB First
    */
-  spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_8, SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,
-                  SPI_CR1_CPHA_CLK_TRANSITION_2, SPI_CR1_MSBFIRST);
+  // spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_8, SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,
+  //                 SPI_CR1_CPHA_CLK_TRANSITION_2, SPI_CR1_MSBFIRST);
 
   // Setup SPI1 pins as alternate function zero
   gpio_set_af(cSpi1Port, GPIO_AF0, cSpi1SckPin | cSpi1MisoPin | cSpi1MosiPin);
@@ -930,18 +948,18 @@ void _timerSetupPWM()
   // - use no divider
   // - alignment edge
   // - count direction up
-  timer_set_mode(TIM2,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  timer_set_mode(cTubePwmTimer,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
-  timer_set_prescaler(TIM2, 0);
-  timer_set_repetition_counter(TIM2, 0);
-  timer_continuous_mode(TIM2);
-  timer_set_period(TIM2, 9600);
+  timer_set_prescaler(cTubePwmTimer, 0);
+  timer_set_repetition_counter(cTubePwmTimer, 0);
+  timer_continuous_mode(cTubePwmTimer);
+  timer_set_period(cTubePwmTimer, 9600);
 
-  timer_enable_preload(TIM2);
+  timer_enable_preload(cTubePwmTimer);
 
-  timer_enable_irq(TIM2, TIM_DIER_UIE);
+  timer_enable_irq(cTubePwmTimer, TIM_DIER_UIE);
 
-  timer_enable_counter(TIM2);
+  timer_enable_counter(cTubePwmTimer);
 }
 
 
@@ -969,17 +987,17 @@ void _tscSetup()
   gpio_set_output_options(cTscPortC, GPIO_OTYPE_PP, GPIO_OSPEED_MED, cTscTouchKeyPinsC);
   gpio_set_af(cTscPortC, GPIO_AF0, cTscTouchKeyPinsC);
 
-  /* To allow the control of the sampling capacitor I/O by the TSC peripheral,
-   the corresponding GPIO must be first set to alternate output open drain
-   mode and then the corresponding Gx_IOy bit in the TSC_IOSCR register must
-   be set. */
+  // To allow the control of the sampling capacitor I/O by the TSC peripheral,
+  //  the corresponding GPIO must be first set to alternate output open drain
+  //  mode and then the corresponding Gx_IOy bit in the TSC_IOSCR register must
+  //  be set.
 	TSC_IOSCR = cTscSamplingControlBits;
 
   _tscChannelCounter = 0;
 
-  /* To allow the control of the channel I/O by the TSC peripheral, the
-  corresponding GPIO must be first set to alternate output push-pull mode and
-  the corresponding Gx_IOy bit in the TSC_IOCCR register must be set. */
+  // To allow the control of the channel I/O by the TSC peripheral, the
+  //  corresponding GPIO must be first set to alternate output push-pull mode
+  //  and the corresponding Gx_IOy bit in the TSC_IOCCR register must be set.
   TSC_IOCCR = cTscChannelControlBits[_tscChannelCounter];
 
   // The GxE bits in the TSC_IOGCSR registers specify which analog I/O groups are enabled
@@ -1214,6 +1232,7 @@ void _syncRtcWithGps()
       && (gpsTime != _currentDateTime))
   {
     setDateTime(gpsTime);
+    _currentDateTime = gpsTime;
     _lastRtcGpsSyncHour = gpsTime.hour();
   }
 }
@@ -1234,14 +1253,14 @@ void initialize()
   _adcSetup();
   _tscSetup();
 
-  _systickSetup(1);   // tick every 1 mS
-  _nvicSetup();
-
   _spiSetup();
   _usartSetup();
   // _i2cSetup();
 
   Dmx512Rx::initialize();
+
+  _systickSetup(1);   // tick every 1 mS
+  _nvicSetup();
 
   // Let's initialize some memory/data structures
   for (_adcSampleCounter = 0; _adcSampleCounter < cAdcSamplesToAverage; _adcSampleCounter++)
@@ -1284,7 +1303,7 @@ void initialize()
   {
     uint8_t buffer[] = { 0, 0x08 };
 
-    while (_spiActivePeripheral != SpiPeripheral::None);
+    while (_spiActivePeripheral != Spi::SpiPeripheral::None);
     // isConnected() refreshes the status register so this will work without a refresh()
     _rtcIsSet = DS3234::isValid();
     // enable PPS and 32 kHz outputs
@@ -1315,9 +1334,6 @@ void initialize()
   startupDisplay.setTubesOff(0b111111);
   DisplayManager::writeDisplay(startupDisplay, RgbLed());
   delay(250);
-
-  _refreshRTC();
-  _refreshTemp();
 }
 
 
@@ -1488,7 +1504,7 @@ bool dstState()
 }
 
 
-DateTime getDateTime()
+DateTime dateTime()
 {
   // if ((GpsReceiver::isConnected() == true) && (GpsReceiver::isValid() == true))
   // {
@@ -2211,12 +2227,85 @@ void _spiDoNextQueued()
 }
 
 
-HwReqAck spiTransferRequest(SpiTransferReq* request)
+Spi::SpiPeripheral spiGetSelectedPeripheral()
+{
+  return _spiActivePeripheral;
+}
+
+
+HwReqAck spiSelectPeripheral(const Spi::SpiPeripheral peripheral)
+{
+  // We won't waste time switching things around if we don't need to
+  if (_spiActivePeripheral != peripheral)
+  {
+    _spiActivePeripheral = peripheral;    // save for later!
+
+    if (peripheral != Spi::SpiPeripheral::None)
+    {
+      // Reset SPI, SPI_CR1 register cleared, SPI is disabled
+      spi_disable(SPI1);
+
+      _spiReleaseAllCs();
+
+      // Configure more settings for not-special peripherals
+      if (peripheral != Spi::SpiPeripheral::HvDrivers)
+      {
+        // Configure display driver peripheral MISO pin as input
+        gpio_mode_setup(cSpi1AltPort, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
+        // Configure GPIOs: SCK=PA5, MISO=PA6 and MOSI=PA7
+        gpio_mode_setup(cSpi1Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoPin);
+        // Initialize SPI
+        _spi.initialize(&_spiDisplayInit);
+      }
+      else
+      {
+        // Configure other peripherals MISO pin as input
+        gpio_mode_setup(cSpi1Port, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cSpi1MisoPin);
+        // MISO=PB4 from HV drivers
+        gpio_mode_setup(cSpi1AltPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1MisoDisplayPin);
+        // Initialize SPI
+        _spi.initialize(&_spiPeripheralsInit);
+      }
+    }
+
+    // Configure settings for special peripherals and activate CS/CE lines
+    switch (peripheral)
+    {
+      case Spi::SpiPeripheral::HvDrivers:
+        // gpio_clear(cNssPort, cNssDisplayPin);  // this shouldn't be necessary here
+        break;
+
+      case Spi::SpiPeripheral::Rtc:
+        gpio_clear(cNssPort, cNssRtcPin);
+        break;
+
+      case Spi::SpiPeripheral::TempSensor:
+        if (_invertCsForTemperatureSensor == true)
+        {
+          gpio_set(cNssPort, cNssTemperaturePin);
+        }
+        else
+        {
+          gpio_clear(cNssPort, cNssTemperaturePin);
+        }
+        break;
+
+      default:
+        _spiReleaseAllCs();
+        break;
+    }
+    // Enable SPI1 peripheral
+    // spi_enable(SPI1);
+  }
+}
+
+
+HwReqAck spiTransferRequest(Spi::SpiTransferReq* request)
 {
   HwReqAck status = HwReqAck::HwReqAckBusy;
 
-  // nvic_disable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
-  // nvic_disable_irq(NVIC_TIM2_IRQ);
+  // nvic_disable_irq(cDmaIrqSpi1);
+  // nvic_disable_irq(cTubePwmTimerIrq);
 
   if (_spiXferQueue[1] == nullptr)
   {
@@ -2225,27 +2314,27 @@ HwReqAck spiTransferRequest(SpiTransferReq* request)
     status = HwReqAck::HwReqAckOk;
   }
 
-  // nvic_enable_irq(NVIC_TIM2_IRQ);
-  // nvic_enable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
+  // nvic_enable_irq(cTubePwmTimerIrq);
+  // nvic_enable_irq(cDmaIrqSpi1);
 
   return status;
 }
 
 
-HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length, const bool use16BitXfers)
+HwReqAck spiTransfer(const Spi::SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length, const bool use16BitXfers)
 {
   uint16_t mSize = DMA_CCR_MSIZE_8BIT, pSize = DMA_CCR_PSIZE_8BIT;
   volatile uint8_t temp_data __attribute__ ((unused));
 
   // ensure the timer interrupt doesn't squash another transfer
-  nvic_disable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
-  nvic_disable_irq(NVIC_TIM2_IRQ);
+  nvic_disable_irq(cDmaIrqSpi1);
+  nvic_disable_irq(cTubePwmTimerIrq);
 
-  if (_spiActivePeripheral != SpiPeripheral::None)
+  if (_spiActivePeripheral != Spi::SpiPeripheral::None)
   {
     // aaaannnnddd reenable it
-    nvic_enable_irq(NVIC_TIM2_IRQ);
-    nvic_enable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
+    nvic_enable_irq(cTubePwmTimerIrq);
+    nvic_enable_irq(cDmaIrqSpi1);
     // Let the caller know it was busy if so
     return HwReqAck::HwReqAckBusy;
   }
@@ -2308,8 +2397,8 @@ HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t 
 	spi_enable_tx_dma(SPI1);
 
   // aaaannnnddd reenable these
-  nvic_enable_irq(NVIC_TIM2_IRQ);
-  nvic_enable_irq(NVIC_DMA1_CHANNEL2_3_DMA2_CHANNEL1_2_IRQ);
+  nvic_enable_irq(cTubePwmTimerIrq);
+  nvic_enable_irq(cDmaIrqSpi1);
 
   return HwReqAck::HwReqAckOk;
 }
@@ -2317,7 +2406,7 @@ HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t 
 
 bool spiIsBusy()
 {
-  return _spiActivePeripheral != SpiPeripheral::None;
+  return _spiActivePeripheral != Spi::SpiPeripheral::None;
 }
 
 
@@ -2472,12 +2561,12 @@ void dmaIsr()
     // tx & rx should always finish at the same time; wait for the last bits to roll out
     while (SPI_SR(SPI1) & SPI_SR_BSY);
     // latch in the bits if we were sending to the display drivers
-    if (_spiActivePeripheral == SpiPeripheral::HvDrivers)
+    if (_spiActivePeripheral == Spi::SpiPeripheral::HvDrivers)
     {
       gpio_set(cNssPort, cNssDisplayPin);   // _spiSelectPeripheral() will clear this for us!
     }
     // release the appropriate CS line
-    _spiSelectPeripheral(SpiPeripheral::None);
+    _spiSelectPeripheral(Spi::SpiPeripheral::None);
 
     // fire off the next queued item to maintain more consistent timing for PWMing
     _spiDoNextQueued();
