@@ -50,7 +50,7 @@ void SetTimeDateView::enter()
   {
     case Application::OperatingMode::OperatingModeSetClock:
     case Application::OperatingMode::OperatingModeSetDate:
-    _workingDateTime = Hardware::getDateTime();
+    _workingDateTime = Application::dateTime();
     break;
 
     default:
@@ -74,7 +74,7 @@ bool SetTimeDateView::keyHandler(Keys::Key key)
           minute = _workingDateTime.minute(),
           second = _workingDateTime.second();
   bool    tick   = true;
-  DateTime setDateTime = Hardware::getDateTime(),
+  DateTime setDateTime = Application::dateTime(),
            workingDateTime = _workingDateTime;
 
   if (key == Keys::Key::A)
@@ -92,8 +92,7 @@ bool SetTimeDateView::keyHandler(Keys::Key key)
     {
       case Application::OperatingMode::OperatingModeSetClock:
       case Application::OperatingMode::OperatingModeSetDate:
-      Hardware::setDateTime(setDateTime);
-      Hardware::setDstState(Application::isDst(setDateTime), false);
+      Application::setDateTime(setDateTime);
       break;
 
       default:

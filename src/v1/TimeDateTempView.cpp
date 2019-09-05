@@ -35,7 +35,7 @@ const uint8_t TimeDateTempView::cIntensityAdjustmentIncrement = 100;
 
 TimeDateTempView::TimeDateTempView()
   : _currentTemperature(0),
-    _currentTime(Hardware::getDateTime()),
+    _currentTime(Application::dateTime()),
     _lastAnimationTime(DateTime()),
     _lastSwitchTime(DateTime()),
     _mode(Application::OperatingMode::OperatingModeFixedDisplay)
@@ -49,7 +49,7 @@ void TimeDateTempView::enter()
 
   _mode = Application::getOperatingMode();
 
-  _currentTime = Hardware::getDateTime();
+  _currentTime = Application::dateTime();
 
   _lastAnimationTime = _currentTime;
 
@@ -150,9 +150,9 @@ void TimeDateTempView::loop()
   bool displayFahrenheit = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DisplayFahrenheit);
 
   // update these only as needed -- keeps temperature from bouncing incessantly
-  if (_currentTime != Hardware::getDateTime())
+  if (_currentTime != Application::dateTime())
   {
-    _currentTime = Hardware::getDateTime();
+    _currentTime = Application::dateTime();
     _currentTemperature = Hardware::temperature(displayFahrenheit);
   }
   // set status LED to appropriate color if enabled as AM/PM indicator

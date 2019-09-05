@@ -21,6 +21,7 @@
 #include <cstdint>
 #include "DateTime.h"
 #include "Hardware.h"
+#include "SpiMaster.h"
 
 
 namespace kbxTubeClock {
@@ -28,6 +29,7 @@ namespace kbxTubeClock {
 namespace DS3234 {
 
 // Library usage:
+// 0. Call initialize() to trigger slave registration with SpiMaster.
 // 1. Set base year if required. Default is 2000.
 // 2. Call isConnected() to determine if IC is available for use.
 // 3. Call isValid() to determine validity of RTC data.
@@ -35,68 +37,84 @@ namespace DS3234 {
 // 5. Call refresh() to refresh register states from IC.
 // 6. Call getDateTime() as required, typically after calling refresh().
 
-// Configure the real time clock driver with a new base year
-//
-// @param yearBase The year base which is used for the RTC.
-//    The RTC stores the year only with two digits, plus one
-//    additional bit for the next century. If you set the
-//    year base to 2000, the RTC will hold the correct time
-//    for 200 years, starting from 2000-01-01 00:00:00.
-//
-void setBaseYear(uint16_t yearBase = 2000);
+/// @brief Initialize the DS3234 module
+///
+void initialize();
 
-// Get the current date/time
-//
-DateTime getDateTime();
-
-// Set the date/time
-//
-// @param dateTime The date and time to set in the RTC
-void setDateTime(const DateTime &dateTime);
-
-// Check if the RTC is connected; returns true if so
-//
+/// @brief Check if the RTC is connected; returns true if so
+/// @return true if DS3234 is connected
+///
 bool isConnected();
 
-// Check if the RTC is running; returns true if so
-//
+/// @brief Check if the RTC is running; returns true if so
+/// @return true if DS3234 is running
+///
 bool isRunning();
 
-// Check if the RTC is valid; returns true if so
-//
+/// @brief Check if the RTC is valid; returns true if so
+/// @return true if DS3234 is time is valid
+///
 bool isValid();
 
-// Get the raw temperature register value
-//
+/// @brief Get the current date/time
+///
+DateTime getDateTime();
+
+/// @brief Get the raw temperature register value
+/// @return temperature register's raw value as uint16_t
+///
 uint16_t getTemperatureRegister();
 
-// Get the whole-number part of the temperature register (in degrees celsius)
-//
+/// @brief Get the whole-number part of the temperature register (in degrees celsius)
+/// @return the temperature register's whole-number part as a int16_t
+///
 int16_t getTemperatureWholePart();
 
-// Get the fractional part of the temperature register (in degrees celsius)
-//
+/// @brief Get the fractional part of the temperature register (in degrees celsius)
+/// @return the temperature register's fractional part as a uint16_t
+///
 uint16_t getTemperatureFractionalPart();
 
-// Get a register's raw value
-//
-Hardware::HwReqAck getRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes);
+/// Configure the real time clock driver with a new base year
+///
+/// @param yearBase The year base which is used for the RTC.
+///    The RTC stores the year only with two digits, plus one
+///    additional bit for the next century. If you set the
+///    year base to 2000, the RTC will hold the correct time
+///    for 200 years, starting from 2000-01-01 00:00:00.
+///
+void setBaseYear(uint16_t yearBase = 2000);
 
-// Set a register's raw value
-//
-Hardware::HwReqAck setRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes, const bool block);
+/// @brief Set the date/time
+/// @param dateTime The date and time to set in the RTC
+///
+void setDateTime(const DateTime &dateTime);
 
-// Read one or more bytes from the DS3234's SRAM
-//
-Hardware::HwReqAck readSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes);
+/// @brief Get a register's raw value
+/// @return SpiMaster::SpiReqAck status indicating the state of the request
+///
+SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes);
 
-// Write one or more bytes to the DS3234's SRAM
-//
-Hardware::HwReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes, const bool block);
+/// @brief Set a register's raw value
+/// @return SpiMaster::SpiReqAck status indicating the state of the request
+///
+SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes, const bool block);
 
-// Read all registers from the DS3234
-//  Returns result of read from Hardware::spiTransfer
-Hardware::HwReqAck refresh();
+/// @brief Read one or more bytes from the DS3234's SRAM
+/// @return SpiMaster::SpiReqAck status indicating the state of the request
+///
+SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes);
+
+/// @brief Write one or more bytes to the DS3234's SRAM
+/// @return SpiMaster::SpiReqAck status indicating the state of the request
+///
+SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes, const bool block);
+
+/// @brief Read all registers from the DS3234
+/// @param block wait for SPI cycle to complete if true
+/// @return SpiMaster::SpiReqAck status indicating the state of the request
+///
+SpiMaster::SpiReqAck refresh(const bool block = false);
 
 }
 

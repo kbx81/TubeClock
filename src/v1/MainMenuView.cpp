@@ -46,7 +46,7 @@ void MainMenuView::enter()
     _selectedMode = Application::OperatingMode::OperatingModeSetClock;
   }
   // if the clock is set but not the date, select the SetDate mode automagically
-  else if (Hardware::getDateTime().yearShort(false) == 0)
+  else if (Application::dateTime().yearShort(false) == 0)
   {
     _selectedMode = Application::OperatingMode::OperatingModeSetDate;
   }

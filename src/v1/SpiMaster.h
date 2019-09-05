@@ -51,6 +51,7 @@ public:
   struct SpiSlave {
     uint32_t gpioPort;        // gpio port on which CS line lives
     uint16_t gpioPin;         // gpio pin on which CS line lives
+    bool     strobeCs;        // CS line is strobed upon xfer completion if true
     bool     polarity;        // CS/CE polarity (active high = true)
     uint32_t misoPort;        // port on which slave inputs data
     uint16_t misoPin;         // pin on which slave inputs data
@@ -83,7 +84,7 @@ public:
     uint8_t *bufferIn;
     uint8_t *bufferOut;
     uint16_t length;
-    volatile SpiReqAck state;
+    SpiReqAck state;
   };
 
 public:
@@ -92,9 +93,13 @@ public:
   ///
   static const uint8_t cMaxSlaves = 4;
 
+  /// @brief value indicating no slave registration occured
+  ///
+  static const uint8_t cNoSlave = 255;
+
   /// @brief maximum number of requests that may be queued
   ///
-  static const uint8_t cQueueSize = 4;
+  static const uint8_t cQueueSize = cMaxSlaves;
 
 
   /// @brief Default constructor
@@ -103,21 +108,33 @@ public:
 
 
   /// @brief Initialize SPI
-  /// @param SpiMasterParams structure containing desired configuration
-  /// @return HwReqAck result of initialization request
+  /// @param spiInit structure containing desired master configuration
   void initialize(const SpiMasterParams* spiInit);
 
   /// @brief Queues up a transfer via SPI via DMA
-  /// @return ID of slave as registered
+  /// @param slave structure containing desired slave configuration
+  /// @return ID of slave as registered or cNoSlave if failure
   uint8_t registerSlave(SpiSlave* slave);
 
+  /// @brief Gets a pointer to the slave's transfer request buffer
+  /// @param slave ID number to perform transfer for
+  /// @return SpiTransferReq pointer to the slave's transfer request buffer
+  SpiTransferReq* getTransferRequestBuffer(const uint8_t slave);
+
   /// @brief Queues up a transfer via SPI via DMA
+  /// @param slave ID number to perform transfer for
   /// @return HwReqAck state of transfer request
-  SpiReqAck queueTransfer(SpiTransferReq* request);
+  SpiReqAck queueTransfer(const uint8_t slave, SpiTransferReq* request);
 
   /// @brief Transfers data in/out through the SPI via DMA
+  /// @param slave ID number to perform transfer for
   /// @return HwReqAck state of transfer request
-  SpiReqAck transfer(SpiTransferReq* request);
+  SpiReqAck transfer(const uint8_t slave, SpiTransferReq* request);
+
+  /// @brief looks for the next transfer to initiate
+  /// @return true if another transfer was initiated
+  ///
+  bool processQueue();
 
   /// @brief Called from DMA complete interrupt
   ///
@@ -135,11 +152,12 @@ private:
   void _activateCsCe(const uint8_t slave);
   void _deactivateCsCe(const uint8_t slave);
 
+  void _deactivateAllCsCe();
+
   void _configureMiso(const uint8_t slave);
   void _deconfigureMiso(const uint8_t slave);
 
-  void _releaseAllCs();
-  void _selectPeripheral(const uint8_t slave);
+  SpiReqAck _selectPeripheral(const uint8_t slave);
 
   /// @brief value used to indicate no slave is active/selected
   ///
@@ -164,6 +182,10 @@ private:
   /// @brief the next transfer the SPI needs to do
   ///
   SpiTransferReq* _transferQueue[cQueueSize];
+
+  /// @brief transfer requests from slaves that the SPI needs to do
+  ///
+  SpiTransferReq _transferRequest[cMaxSlaves];
 
 };
 

@@ -111,7 +111,7 @@ DateTime _ackTime[cTimeSlotAlarmCount];
 // returns a bitmap indicating which alarms are active
 uint16_t _getActiveTimeSlotAlarms()
 {
-  DateTime slot, current = Hardware::dateTime();
+  DateTime slot, current = Application::dateTime();
   Settings *pSettings = Application::getSettingsPtr();
   uint16_t activeAlarms = 0;
   // first we'll look at the time slots
@@ -179,7 +179,7 @@ uint16_t _getActiveExternalAlarms()
 //
 void _executeAlarms()
 {
-  DateTime current = Hardware::dateTime();
+  DateTime current = Application::dateTime();
   Settings *pSettings = Application::getSettingsPtr();
   uint8_t tone = 0, hour = current.hour(false, pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
   bool weBeeping = false, weBlinking = false;
@@ -296,7 +296,7 @@ void initialize()
 {
   for (uint8_t i = 0; i < cTimeSlotAlarmCount; i++)
   {
-    _ackTime[i] = Hardware::dateTime();
+    _ackTime[i] = Application::dateTime();
   }
 }
 
@@ -312,7 +312,7 @@ void keyHandler(Keys::Key key)
 
 void loop()
 {
-  DateTime current = Hardware::dateTime();
+  DateTime current = Application::dateTime();
   Settings *pSettings = Application::getSettingsPtr();
 
   // first, check/get the external alarm inputs
@@ -345,7 +345,7 @@ void clearAlarm()
 {
   if (_activeAlarms != 0)
   {
-    DateTime current = Hardware::dateTime();
+    DateTime current = Application::dateTime();
 
     for (uint8_t i = 0; (i < cAlarmCount) && (_activeAlarms != 0); i++)
     {

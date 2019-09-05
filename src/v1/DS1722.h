@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include "Hardware.h"
+#include "SpiMaster.h"
 
 
 namespace kbxTubeClock {
@@ -27,25 +28,29 @@ namespace kbxTubeClock {
 namespace DS1722 {
 
 
-// Check if the chip is connected
-//
+/// @brief Initialize the DS1722 module
+///
+void initialize();
+
+/// @brief Check if the chip is connected
+///
 bool isConnected();
 
-// Get the raw temperature register value
-//
+/// @brief Get the raw temperature register value
+///
 uint16_t getTemperatureRegister();
 
-// Get the whole-number part of the temperature register (in degrees celsius)
-//
+/// @brief Get the whole-number part of the temperature register (in degrees celsius)
+///
 int16_t getTemperatureWholePart();
 
-// Get the fractional part of the temperature register (in degrees celsius)
-//
+/// @brief Get the fractional part of the temperature register (in degrees celsius)
+///
 uint16_t getTemperatureFractionalPart();
 
-// Read all registers from the DS1722
-//  Returns result of read from Hardware::spiTransfer()
-Hardware::HwReqAck refresh();
+/// @brief Read all registers from the DS1722
+///
+SpiMaster::SpiReqAck refresh(const bool block = false);
 
 }
 

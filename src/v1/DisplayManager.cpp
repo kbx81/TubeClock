@@ -32,6 +32,10 @@
 //         _displayBufferOut (TCL59xx PWM data buffer) ->
 //           DMA to SPI to TLC59xx shift registers & latches
 
+#include <libopencm3/stm32/dma.h>
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/spi.h>
+
 #include "Display.h"
 #include "DisplayManager.h"
 #include "Hardware.h"
@@ -39,7 +43,13 @@
 #include "NixieTube.h"
 #include "NixieGlyphCrossfader.h"
 #include "RgbLed.h"
+#include "SpiMaster.h"
 
+#if HARDWARE_VERSION == 1
+  #include "Hardware_v1.h"
+#else
+  #error HARDWARE_VERSION must be defined with a value of 1
+#endif
 
 namespace kbxTubeClock {
 
@@ -103,9 +113,17 @@ static uint16_t _intensityPercentage = 0;
 //
 volatile static bool _refreshIntensitiesNow = false;
 
-// TLC59xx refresh interval; slows down refreshing of the drivers to reduce
-//  flicker on boards with TLC5947 ICs. not useful for the TLC5951s.
+// Hardware refresh interval
+//
 static uint8_t _driverRefreshInterval = 0;
+
+// Pointer to SpiMaster, initialized by initialize()
+//
+SpiMaster *_spiMaster = nullptr;
+
+// Slave ID assigned by SpiMaster
+//
+static uint8_t _slaveId = SpiMaster::cNoSlave;
 
 
 // Modifies a triad of PWM channels in the buffer corresponding to a single RGB LED (pixel)
@@ -126,6 +144,23 @@ void _setDisplayPwmValue(const uint8_t glyphNumber, const uint16_t glyphValue)
 
 void initialize()
 {
+  SpiMaster::SpiTransferReq *request = nullptr;
+  SpiMaster::SpiSlave mySlave = {
+    .gpioPort       = Hardware::cNssPort,       // gpio port on which CS line lives
+    .gpioPin        = Hardware::cNssDisplayPin, // gpio pin on which CS line lives
+    .strobeCs       = true,                     // CS line is strobed upon xfer completion if true
+    .polarity       = true,                     // CS/CE polarity (true = active high)
+    .misoPort       = Hardware::cSpi1AltPort,           // port on which slave inputs data
+    .misoPin        = Hardware::cSpi1MisoDisplayPin,    // pin on which slave inputs data
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
+    .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
+    .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_1,    // Clock Phase
+    .lsbFirst       = SPI_CR1_LSBFIRST,     // Frame format -- lsb/msb first
+    .dataSize       = SPI_CR2_DS_8BIT,      // Data size (4 to 16 bits, see RM)
+    .memorySize     = DMA_CCR_MSIZE_8BIT,   // Memory word width (8, 16, 32 bit)
+    .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
+  };
+
   // Initialize the display drivers' global brightness and dot control levels
   setMasterIntensity(NixieGlyph::cGlyph100Percent);
 
@@ -138,8 +173,17 @@ void initialize()
     _pwmValues[i] = 0;
   }
 
-  // Write the first block of data to the drivers (to zero them out)
-  while (Hardware::spiTransfer(Hardware::SpiPeripheral::HvDrivers, (uint8_t*)_displayBufferIn, (uint8_t*)_displayBufferOut, cSpiBytesToSend, false) != Hardware::HwReqAck::HwReqAckOk);
+  _spiMaster = Hardware::getSpiMaster();
+
+  _slaveId = _spiMaster->registerSlave(&mySlave);
+
+  request = _spiMaster->getTransferRequestBuffer(_slaveId);
+
+  // Trigger a write of the first block of data to the drivers to zero them out
+  request->bufferIn = (uint8_t*)_displayBufferIn;
+  request->bufferOut = (uint8_t*)_displayBufferOut;
+  request->length = cSpiBytesToSend;
+  request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 }
 
 
@@ -190,28 +234,41 @@ void tick()
 
 void tickPWM()
 {
+  SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
   uint32_t pwmBits = 0;
 
-  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
+  if (request != nullptr)
   {
-    for (uint8_t i = 0; i < cPwmChannelsPerDevice; i++)
+    for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
     {
-      if (_pwmValues[i + (d * cPwmChannelsPerDevice)] > _pwmTickCounter)
+      for (uint8_t bit = 0; bit < cPwmChannelsPerDevice; bit++)
       {
-        pwmBits |= (1 << i);
+        if (_pwmValues[bit + (d * cPwmChannelsPerDevice)] > _pwmTickCounter)
+        {
+          pwmBits |= (1 << bit);
+        }
       }
+      _displayBufferOut[d] = pwmBits;
+      pwmBits = 0;
     }
-    _displayBufferOut[d] = pwmBits;
-    pwmBits = 0;
-  }
 
-  // Write the data to the drivers
-  Hardware::spiTransfer(Hardware::SpiPeripheral::HvDrivers, (uint8_t*)_displayBufferIn, (uint8_t*)_displayBufferOut, cSpiBytesToSend, false);
+    // Write the data to the drivers
+    // request->bufferIn = (uint8_t*)_displayBufferIn;
+    // request->bufferOut = (uint8_t*)_displayBufferOut;
+    // request->length = cSpiBytesToSend;
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-  // increment the tick counter and reset it if it's time
-  if (++_pwmTickCounter > NixieGlyph::cGlyphMaximumIntensity)
-  {
-    _pwmTickCounter = 0;
+    // trigger the transfer if nothing is in progress
+    if (_spiMaster->busy() == false)
+    {
+      _spiMaster->processQueue();
+    }
+
+    // increment the tick counter and reset it if it's time
+    if (++_pwmTickCounter > NixieGlyph::cGlyphMaximumIntensity)
+    {
+      _pwmTickCounter = 0;
+    }
   }
 }
 

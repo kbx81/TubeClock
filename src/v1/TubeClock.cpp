@@ -35,21 +35,21 @@ using namespace kbxTubeClock;
 /* ADC DMA */
 void dma1_channel1_isr(void)
 {
-	Hardware::dmaIsr();
+	Hardware::dmaCh1Isr();
 }
 
 
 /* SPI receive completed with DMA */
 void dma1_channel2_3_dma2_channel1_2_isr(void)
 {
-	Hardware::dmaIsr();
+	Hardware::dmaCh2to3Isr();
 }
 
 
 /* I2C and USART transmit/receive completed with DMA */
 void dma1_channel4_7_dma2_channel3_5_isr()
 {
-	Hardware::dmaIsr();
+	Hardware::dmaCh4to7Isr();
 }
 
 
@@ -72,7 +72,7 @@ void sys_tick_handler(void)
 }
 
 
-/* Timer 2 interrupt -- used for triggering LED driver latches */
+/* Timer 2 interrupt -- used for generating PWM for tubes */
 void tim2_isr()
 {
 	DisplayManager::tickPWM();

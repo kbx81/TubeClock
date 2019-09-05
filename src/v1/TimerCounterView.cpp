@@ -117,7 +117,7 @@ bool TimerCounterView::keyHandler(Keys::Key key)
 void TimerCounterView::loop()
 {
   Application::ExternalControl externalControlState = Application::getExternalControlState();
-  DateTime  currentTime = Hardware::getDateTime();
+  DateTime  currentTime = Application::dateTime();
   Display   tcDisp;
   Settings *pSettings = Application::getSettingsPtr();
   TimerMode currentTimerMode = static_cast<TimerMode>(Application::getViewMode());

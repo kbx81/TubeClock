@@ -205,7 +205,7 @@ namespace kbxTubeClock {
 
   bool Settings::hvState()
   {
-    DateTime currentTime = Hardware::getDateTime();
+    DateTime currentTime = Application::dateTime();
     int32_t i, delta,
             currentSecondsSinceMidnight = (int32_t)currentTime.secondsSinceMidnight(false),
             // minSecs = 0,  // first/earliest slot

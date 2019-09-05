@@ -16,9 +16,21 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
+#include <libopencm3/stm32/spi.h>
+
 #include <cstdint>
+
 #include "DS1722.h"
 #include "Hardware.h"
+#include "SpiMaster.h"
+
+#include "RgbLed.h"
+
+#if HARDWARE_VERSION == 1
+  #include "Hardware_v1.h"
+#else
+  #error HARDWARE_VERSION must be defined with a value of 1
+#endif
 
 
 namespace kbxTubeClock {
@@ -56,46 +68,99 @@ static uint8_t _spiWorkingBufferOut[cNumberOfRegisters];
 static uint8_t* _ds1722RegisterIn = _spiWorkingBufferIn + 1;
 // static uint8_t* _ds1722RegisterOut = _spiWorkingBufferOut + 1;
 
-// SPI transfer requests
+// Pointer to SpiMaster, initialized by initialize()
 //
-static Hardware::SpiTransferReq _request = {
-    peripheral : Hardware::SpiPeripheral::TempSensor,
-    bufferIn : _spiWorkingBufferIn,
-    bufferOut : _spiWorkingBufferOut,
-    length : cNumberOfRegisters,
-    use16BitXfers : false,
-    state : Hardware::HwReqAck::HwReqAckError
-};
+static SpiMaster *_spiMaster = nullptr;
+
+// Slave ID assigned by SpiMaster
+//
+static uint8_t _slaveId = SpiMaster::cNoSlave;
+
+
+void initialize()
+{
+  SpiMaster::SpiSlave mySlave = {
+    .gpioPort       = Hardware::cNssPort,           // gpio port on which CS line lives
+    .gpioPin        = Hardware::cNssTemperaturePin, // gpio pin on which CS line lives
+    .strobeCs       = false,                // CS line is strobed upon xfer completion if true
+    .polarity       = true,                 // CS/CE polarity (true = active high)
+    .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
+    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
+    .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
+    .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
+    .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
+    .dataSize       = SPI_CR2_DS_8BIT,      // Data size (4 to 16 bits, see RM)
+    .memorySize     = DMA_CCR_MSIZE_8BIT,   // Memory word width (8, 16, 32 bit)
+    .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
+  };
+
+  _spiMaster = Hardware::getSpiMaster();
+
+  _slaveId = _spiMaster->registerSlave(&mySlave);
+}
+
+
+void flash(const SpiMaster::SpiReqAck state)
+{
+  switch (state)
+  {
+    case SpiMaster::SpiReqAck::SpiReqAckQueued:
+    Hardware::setStatusLed(RgbLed(0, 0, 1024));
+    break;
+
+    case SpiMaster::SpiReqAck::SpiReqAckError:
+    Hardware::setStatusLed(RgbLed(1024, 0, 0));
+    break;
+
+    case SpiMaster::SpiReqAck::SpiReqAckBusy:
+    Hardware::setStatusLed(RgbLed(0, 1024, 0));
+    break;
+
+    default:
+    Hardware::setStatusLed(RgbLed(1024, 250, 250));
+  }
+  Hardware::delay(250);
+  // while (1);
+}
 
 
 bool isConnected()
 {
-  // Start writing at the Configuration register
-  _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister | cWriteBit;
-  // Set the config register to the value we want to use
-  _spiWorkingBufferOut[cAddressByte + 1] = cConfigByte;
+  SpiMaster::SpiTransferReq* volatile request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-  _request.length = 2;
-  // Write to the regsiter
-  while (Hardware::spiTransferRequest(&_request) != Hardware::HwReqAck::HwReqAckOk);
-  while (_request.state != Hardware::HwReqAck::HwReqAckOk);
-
-  _request.length = cNumberOfRegisters;
-  // This is the address we want to start reading from
-  _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
-  // Try to read the byte (and other registers) back
-  while (Hardware::spiTransferRequest(&_request) != Hardware::HwReqAck::HwReqAckOk);
-  while (_request.state != Hardware::HwReqAck::HwReqAckOk);
-
-  // If we read back the byte we wrote, the IC is very likely connected
-  if (_ds1722RegisterIn[cConfigurationRegister] == cConfigByte)
+  if (request != nullptr)
   {
-    // Kick off a full register refresh
-    while (refresh() != Hardware::HwReqAck::HwReqAckOk);
+    // Start writing at the Configuration register
+    _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister | cWriteBit;
+    // Set the config register to the value we want to use
+    _spiWorkingBufferOut[cAddressByte + 1] = cConfigByte;
 
-    return true;
+    request->bufferIn = _spiWorkingBufferIn;
+    request->bufferOut = _spiWorkingBufferOut;
+    request->length = 2;
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+    // We must wait for the transfer to complete before we touch any buffers again
+    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    // flash(request->state);
+
+    // This is the address we want to start reading from
+    _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
+    // Try to read the byte (and other registers) back
+    request->length = cNumberOfRegisters;
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+    // We must wait for the transfer to complete before we touch any buffers again
+    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+
+    // If we read back the byte we wrote, the IC is very likely connected
+    if (_ds1722RegisterIn[cConfigurationRegister] == cConfigByte)
+    {
+      // Kick off a full register refresh
+      while (refresh() != SpiMaster::SpiReqAck::SpiReqAckOk);
+
+      return true;
+    }
   }
-
   return false;
 }
 
@@ -118,12 +183,23 @@ uint16_t getTemperatureFractionalPart()
 }
 
 
-Hardware::HwReqAck refresh()
+SpiMaster::SpiReqAck refresh(const bool block)
 {
-  // This is the address we want to start reading from
-  _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
-  // Try to read the byte (and other registers) back
-  return Hardware::spiTransferRequest(&_request);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+
+  if (request != nullptr)
+  {
+    // This is the address we want to start reading from
+    _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
+    // Try to read the byte (and other registers) back
+    // return Hardware::spiTransferRequest(&_request);
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+
+    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
+
+    return SpiMaster::SpiReqAck::SpiReqAckOk;
+  }
+  return SpiMaster::SpiReqAck::SpiReqAckError;
 }
 
 

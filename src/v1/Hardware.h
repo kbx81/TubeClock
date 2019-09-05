@@ -23,6 +23,7 @@
 #include "DateTime.h"
 #include "Display.h"
 #include "RgbLed.h"
+#include "SpiMaster.h"
 
 #ifndef HARDWARE_VERSION
   #error HARDWARE_VERSION must be defined with a value of 1
@@ -38,7 +39,8 @@ namespace Hardware {
   enum HwReqAck : uint8_t {
     HwReqAckOk,
     HwReqAckBusy,
-    HwReqAckError
+    HwReqAckError,
+    HwReqAckQueued
   };
 
   /// @brief What triggers peripheral refreshes
@@ -259,17 +261,9 @@ namespace Hardware {
   /// @return false if failure (the USART was busy)
   HwReqAck writeSerial(const uint32_t usart, const uint32_t length, const char* data);
 
-  /// @brief Queues up a transfer via SPI via DMA
-  /// @return HwReqAck state of transfer request
-  HwReqAck spiTransferRequest(SpiTransferReq* request);
-
-  /// @brief Transfers data in/out through the SPI via DMA
-  /// @return HwReqAck state of transfer request
-  HwReqAck spiTransfer(const SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length, const bool use16BitXfers);
-
-  /// @brief Permits checking the status of the SPI; returns true if busy
-  ///
-  bool     spiIsBusy();
+  /// @brief Gets the pointer to the current SpiMaster
+  /// @return pointer to current SpiMaster
+  SpiMaster* getSpiMaster();
 
   /// @brief Sets the given status LED to the given intensity/RgbLed
   ///
@@ -300,7 +294,9 @@ namespace Hardware {
 
   /// @brief Interrupt Service Routines
   ///
-  void     dmaIsr();
+  void     dmaCh1Isr();
+  void     dmaCh2to3Isr();
+  void     dmaCh4to7Isr();
   void     exti415Isr();
   void     systickIsr();
   void     tim2Isr();
