@@ -18,9 +18,6 @@
 //
 #include <libopencm3/stm32/spi.h>
 
-#include <libopencm3/stm32/usart.h>
-#include <stdio.h>
-
 #include <cstdint>
 
 #include "DateTime.h"
@@ -125,18 +122,6 @@ static SpiMaster *_spiMaster = nullptr;
 //
 static uint8_t _slaveId = SpiMaster::cNoSlave;
 
-// a string used for USART tx
-//
-char _buffer[20];
-
-
-// Function to print a DateTime object
-//
-void printDateTime(const DateTime dateTime)
-{
-  Hardware::writeSerial(USART1, sprintf(_buffer, "%d-%d-%d %d:%d:%d\r\n", dateTime.yearShort(), dateTime.month(), dateTime.day(), dateTime.hour(), dateTime.minute(), dateTime.second()), _buffer);
-}
-
 
 // Function to convert BCD format into binary format
 //
@@ -163,7 +148,7 @@ void initialize()
     .polarity       = false,                // CS/CE polarity (true = active high)
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
     .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,     // Baudrate
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
     .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
     .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
     .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
@@ -180,7 +165,7 @@ void initialize()
 
 bool isConnected()
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)
   {
@@ -195,14 +180,14 @@ bool isConnected()
     request->length = 2;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cSramAddressRegister;
     // Try to read the byte back and check if it matches what we expect
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // If we read back the byte we wrote, the RTC is very likely connected
     if (_ds3234RegisterIn[0] == cTestByte)
@@ -270,42 +255,47 @@ void setBaseYear(uint16_t yearBase)
 
 void setDateTime(const DateTime &dateTime)
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-  // first, we must send the address of the register at which the write is to begin
-  _spiWorkingBufferOut[cAddressByte] = cStatusRegister | cWriteBit;
-  // clear the OSF bit 7, keep EN32kHz at its default
-  _spiWorkingBufferOut[cAddressByte + 1] = 0x48;
-  // Set the buffer up with our data stuff and trigger the transfer to write to
-  //  the status register to clear the OSF
-  request->bufferIn = _spiWorkingBufferIn;
-  request->bufferOut = _spiWorkingBufferOut;
-  request->length = 2;
-  request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
-  // We must wait for the transfer to complete before we touch any buffers again
-  while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+  if (request != nullptr)
+  {
+    // Wait...just in case a transfer is already in progress
+    while (_spiMaster->transferComplete(_slaveId) == false);
+    // first, we must send the address of the register at which the write is to begin
+    _spiWorkingBufferOut[cAddressByte] = cStatusRegister | cWriteBit;
+    // clear the OSF bit 7, keep EN32kHz at its default
+    _spiWorkingBufferOut[cAddressByte + 1] = 0x48;
+    // Set the buffer up with our data stuff and trigger the transfer to write to
+    //  the status register to clear the OSF
+    request->bufferIn = _spiWorkingBufferIn;
+    request->bufferOut = _spiWorkingBufferOut;
+    request->length = 2;
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+    // We must wait for the transfer to complete before we touch any buffers again
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
-  // Again, we need to write the starting register address first...
-  _spiWorkingBufferOut[cAddressByte] = cSecondsRegister | cWriteBit;
+    // Again, we need to write the starting register address first...
+    _spiWorkingBufferOut[cAddressByte] = cSecondsRegister | cWriteBit;
 
-  _ds3234RegisterOut[cSecondsRegister] = dateTime.second(true);
-  _ds3234RegisterOut[cMinutesRegister] = dateTime.minute(true);
-  _ds3234RegisterOut[cHoursRegister] = dateTime.hour(true, false);
-  _ds3234RegisterOut[cDoWRegister] = dateTime.dayOfWeek();
-  _ds3234RegisterOut[cDateRegister] = dateTime.day(true);
-  _ds3234RegisterOut[cMonthRegister] = dateTime.month(true);
-  _ds3234RegisterOut[cYearRegister] = dateTime.yearShort(true);
-  // Based on the buffer we set up above, we'll start at the seconds register
-  //  and write up from there
-  request->length = 8;
-  request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
-  while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    _ds3234RegisterOut[cSecondsRegister] = dateTime.second(true);
+    _ds3234RegisterOut[cMinutesRegister] = dateTime.minute(true);
+    _ds3234RegisterOut[cHoursRegister] = dateTime.hour(true, false);
+    _ds3234RegisterOut[cDoWRegister] = dateTime.dayOfWeek();
+    _ds3234RegisterOut[cDateRegister] = dateTime.day(true);
+    _ds3234RegisterOut[cMonthRegister] = dateTime.month(true);
+    _ds3234RegisterOut[cYearRegister] = dateTime.yearShort(true);
+    // Based on the buffer we set up above, we'll start at the seconds register
+    //  and write up from there
+    request->length = 8;
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+    while (_spiMaster->transferComplete(_slaveId) == false);
+  }
 }
 
 
 SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes)
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)
   {
@@ -317,7 +307,7 @@ SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t* const r
     request->length = numberOfBytes;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     return request->state;
   }
@@ -327,7 +317,7 @@ SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t* const r
 
 SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes, const bool block)
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)
   {
@@ -344,7 +334,7 @@ SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t* const r
     request->length = numberOfBytes + 1;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
 
     return request->state;
   }
@@ -354,7 +344,7 @@ SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t* const r
 
 SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes)
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if ((request != nullptr) && (numberOfBytes < cSramMaxRWSize))
   {
@@ -368,7 +358,7 @@ SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const dat
     request->length = 2;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cSramDataRegister;
@@ -376,7 +366,7 @@ SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const dat
     request->length = numberOfBytes + 1;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
     // finally, copy the data read into the given buffer
     for (uint8_t i = 0; (i < numberOfBytes) && (i < cSramMaxRWSize); i++)
     {
@@ -391,7 +381,7 @@ SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const dat
 
 SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes, const bool block)
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if ((request != nullptr) && (numberOfBytes < cSramMaxRWSize))
   {
@@ -411,7 +401,7 @@ SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const da
     request->length = numberOfBytes + 2;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
 
     return request->state;
   }
@@ -425,6 +415,8 @@ SpiMaster::SpiReqAck refresh(const bool block)
 
   if (request != nullptr)
   {
+    // Wait...just in case a transfer is already in progress
+    while (_spiMaster->transferComplete(_slaveId) == false);
     // Address the seconds register, then (try to) read all the registers
     _spiWorkingBufferOut[cAddressByte] = cSecondsRegister;
 
@@ -433,9 +425,8 @@ SpiMaster::SpiReqAck refresh(const bool block)
     request->length = cNumberOfRegisters;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
-    printDateTime(getDateTime());
-    // return Hardware::spiTransferRequest(&_request);
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
+
     return SpiMaster::SpiReqAck::SpiReqAckOk;
   }
   return SpiMaster::SpiReqAck::SpiReqAckError;

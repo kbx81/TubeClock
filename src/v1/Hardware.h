@@ -58,15 +58,6 @@ namespace Hardware {
     DS323x
   };
 
-  /// @brief SPI1 peripherals
-  ///
-  enum SpiPeripheral : uint8_t {
-    None,
-    HvDrivers,
-    Rtc,
-    TempSensor
-  };
-
   /// @brief Type of temperature sensor connected, if any
   ///
   enum TempSensorType : uint8_t {
@@ -77,18 +68,6 @@ namespace Hardware {
     LM74,
     LM75,
     MCP9808
-  };
-
-
-  /// @brief Structure defining SPI transfer requests
-  ///
-  struct SpiTransferReq {
-    SpiPeripheral peripheral;
-    uint8_t *bufferIn;
-    uint8_t *bufferOut;
-    uint16_t length;
-    bool use16BitXfers;
-    volatile HwReqAck state;
   };
 
 

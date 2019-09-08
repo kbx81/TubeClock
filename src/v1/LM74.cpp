@@ -73,7 +73,7 @@ void initialize()
     .polarity       = false,                // CS/CE polarity (true = active high)
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
     .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
     .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
     .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
     .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
@@ -90,7 +90,7 @@ void initialize()
 
 bool isConnected()
 {
-  volatile SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)
   {
@@ -100,14 +100,14 @@ bool isConnected()
     // Try to read the temperature registers
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // If we read back some possible expected values, we'll go with it
     if (((_lm74Register[0] == 0xff) && ((_lm74Register[1] & 0xfc) == 0))
         || ((_lm74Register[1] & 0x04) == 0x04))
     {
       // Kick off a full register refresh
-      while (refresh() != SpiMaster::SpiReqAck::SpiReqAckOk);
+      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
 
       return true;
     }
@@ -148,12 +148,11 @@ SpiMaster::SpiReqAck refresh(const bool block)
     // Trigger a read of the temperature registers
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
 
     return SpiMaster::SpiReqAck::SpiReqAckOk;
   }
   // Try to read the temperature registers
-  // return Hardware::spiTransferRequest(&_request);
   return SpiMaster::SpiReqAck::SpiReqAckError;
 }
 

@@ -171,35 +171,30 @@ SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave)
   // We won't waste time switching things around if we don't need to
   if (_selectedSlave != slave)
   {
+    _deconfigureMiso(_selectedSlave);
     // if we are selecting a slave...and not just deactivating CS/CE lines...
     if (slave != cNoSlave)
     {
+      _configureMiso(slave);
+
       _deactivateCsCe(_selectedSlave);
       // Reset SPI, SPI_CR1 register cleared, SPI is disabled
       spi_disable(_params.spi);
-
-      _deconfigureMiso(_selectedSlave);
-
-      _selectedSlave = slave;    // save for later!
-
-      _configureMiso(_selectedSlave);
-
-      result = _configureMaster(_selectedSlave);
-
-      if (_slave[_selectedSlave].strobeCs == false)
-      {
-        _activateCsCe(_selectedSlave);
-      }
-
-      // Enable SPI1 peripheral
+      // Configure the SPI as master for the slave being selected
+      result = _configureMaster(slave);
+      // (Re)Enable SPI1 peripheral
       spi_enable(_params.spi);
+
+      if (_slave[slave].strobeCs == false)
+      {
+        _activateCsCe(slave);
+      }
     }
     else
     {
       _deactivateCsCe(_selectedSlave);
-
-      _selectedSlave = slave;    // save for later!
     }
+    _selectedSlave = slave;    // save for later!
   }
 
   return result;
@@ -266,6 +261,8 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
   {
     return SpiReqAck::SpiReqAckError;
   }
+  // indicate busy
+  request->state = SpiReqAck::SpiReqAckBusy;
 
   if (_params.dmaController != 0)
   {
@@ -322,17 +319,23 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
 }
 
 
+bool SpiMaster::transferComplete(const uint8_t slave)
+{
+  if (slave < _nextSlave)
+  {
+    return (_transferRequest[slave].state == SpiReqAck::SpiReqAckOk);
+  }
+  return false;
+}
+
+
 bool SpiMaster::processQueue()
 {
   for (uint8_t slave = 0; slave < _nextSlave; slave++)
   {
     if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued)
     {
-      if (transfer(slave, &_transferRequest[slave]) == SpiReqAck::SpiReqAckOk)
-      {
-        // indicate busy
-        _transferRequest[slave].state = SpiReqAck::SpiReqAckBusy;
-      }
+      transfer(slave, &_transferRequest[slave]);
       // return indicating a transfer was initiated
       return true;
     }
@@ -342,12 +345,12 @@ bool SpiMaster::processQueue()
 }
 
 
-void SpiMaster::transferComplete()
+void SpiMaster::dmaComplete()
 {
   if (_selectedSlave < _nextSlave)
   {
     // tx & rx should always finish at the same time; wait for any remaining bits to roll out
-    while (SPI_SR(SPI1) & SPI_SR_BSY);
+    while ((SPI_SR(SPI1) & SPI_SR_BSY) != 0);
     // strobe the CS/CE pin if slave is configured for it
     if (_slave[_selectedSlave].strobeCs == true)
     {
@@ -367,6 +370,19 @@ void SpiMaster::transferComplete()
 bool SpiMaster::busy()
 {
   return (_selectedSlave != cNoSlave);
+}
+
+
+bool SpiMaster::queuesEmpty()
+{
+  for (uint8_t slave = 0; slave < _nextSlave; slave++)
+  {
+    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued)
+    {
+      return false;
+    }
+  }
+  return true;
 }
 
 

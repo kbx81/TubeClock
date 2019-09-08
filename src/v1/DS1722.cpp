@@ -24,8 +24,6 @@
 #include "Hardware.h"
 #include "SpiMaster.h"
 
-#include "RgbLed.h"
-
 #if HARDWARE_VERSION == 1
   #include "Hardware_v1.h"
 #else
@@ -86,7 +84,7 @@ void initialize()
     .polarity       = true,                 // CS/CE polarity (true = active high)
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
     .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
     .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
     .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
     .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
@@ -101,33 +99,9 @@ void initialize()
 }
 
 
-void flash(const SpiMaster::SpiReqAck state)
-{
-  switch (state)
-  {
-    case SpiMaster::SpiReqAck::SpiReqAckQueued:
-    Hardware::setStatusLed(RgbLed(0, 0, 1024));
-    break;
-
-    case SpiMaster::SpiReqAck::SpiReqAckError:
-    Hardware::setStatusLed(RgbLed(1024, 0, 0));
-    break;
-
-    case SpiMaster::SpiReqAck::SpiReqAckBusy:
-    Hardware::setStatusLed(RgbLed(0, 1024, 0));
-    break;
-
-    default:
-    Hardware::setStatusLed(RgbLed(1024, 250, 250));
-  }
-  Hardware::delay(250);
-  // while (1);
-}
-
-
 bool isConnected()
 {
-  SpiMaster::SpiTransferReq* volatile request = _spiMaster->getTransferRequestBuffer(_slaveId);
+  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)
   {
@@ -141,8 +115,7 @@ bool isConnected()
     request->length = 2;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
-    // flash(request->state);
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
@@ -150,13 +123,13 @@ bool isConnected()
     request->length = cNumberOfRegisters;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while ((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true));
+    while (_spiMaster->transferComplete(_slaveId) == false);
 
     // If we read back the byte we wrote, the IC is very likely connected
     if (_ds1722RegisterIn[cConfigurationRegister] == cConfigByte)
     {
       // Kick off a full register refresh
-      while (refresh() != SpiMaster::SpiReqAck::SpiReqAckOk);
+      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
 
       return true;
     }
@@ -192,10 +165,9 @@ SpiMaster::SpiReqAck refresh(const bool block)
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
     // Try to read the byte (and other registers) back
-    // return Hardware::spiTransferRequest(&_request);
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    while (((request->state != SpiMaster::SpiReqAck::SpiReqAckOk) || (_spiMaster->busy() == true)) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
 
     return SpiMaster::SpiReqAck::SpiReqAckOk;
   }

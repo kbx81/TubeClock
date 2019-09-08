@@ -127,10 +127,6 @@ static const uint32_t cMaximumIdleCount = 120000;
 //
 static const uint8_t cMinimumIntensityMultiplier = 10;
 
-// DST offset in seconds
-//
-static const int16_t cDstOffsetSeconds = 60 * 60;
-
 // Idle cycle counter
 //
 volatile static auto _idleCounter = cMaximumIdleCount;
@@ -241,7 +237,7 @@ void setDateTime(const DateTime &now)
   if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
       && (isDst(now) == true))
   {
-    Hardware::setDateTime(_currentTime.addSeconds(cDstOffsetSeconds));
+    Hardware::setDateTime(_currentTime.addSeconds(-cDstOffsetSeconds));
   }
   else
   {

@@ -118,6 +118,10 @@ namespace Application {
   const uint16_t cSecondsInAnHour = 60 * 60;
   const uint32_t cSecondsInADay = cSecondsInAnHour * 24;
 
+  // DST offset in seconds
+  //
+  static const int16_t cDstOffsetSeconds = 60 * 60;
+
   /// @brief Common colors used throughout
   ///
   static const RgbLed

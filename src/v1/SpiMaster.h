@@ -62,29 +62,16 @@ public:
     uint32_t dataSize;        // Data size (4 to 16 bits, see RM)
     uint32_t memorySize;      // Memory word width (8, 16, 32 bit)
     uint32_t peripheralSize;  // Peripheral word width (8, 16, 32 bit)
-    // uint32_t Mode;
-    // uint32_t Direction;
-    // uint32_t DataSize;
-    // uint32_t CLKPolarity;
-    // uint32_t CLKPhase;
-    // uint32_t NSS;
-    // uint32_t BaudRatePrescaler;
-    // uint32_t FirstBit;
-    // uint32_t TIMode;
-    // uint32_t CRCCalculation;
-    // uint32_t CRCPolynomial;
-    // uint32_t CRCLength;
-    // uint32_t NSSPMode;
   };
 
   /// @brief Structure defining SPI transfer requests
   ///
   struct SpiTransferReq {
+    SpiReqAck state;
     uint8_t slave;
     uint8_t *bufferIn;
     uint8_t *bufferOut;
     uint16_t length;
-    SpiReqAck state;
   };
 
 public:
@@ -131,6 +118,11 @@ public:
   /// @return HwReqAck state of transfer request
   SpiReqAck transfer(const uint8_t slave, SpiTransferReq* request);
 
+  /// @brief Indicates if a given slave's transfer has completed
+  /// @return true if transfer is complete
+  ///
+  bool transferComplete(const uint8_t slave);
+
   /// @brief looks for the next transfer to initiate
   /// @return true if another transfer was initiated
   ///
@@ -138,12 +130,15 @@ public:
 
   /// @brief Called from DMA complete interrupt
   ///
-  void transferComplete();
+  void dmaComplete();
 
   /// @brief Permits checking the status of the SPI; returns true if busy
   ///
   bool busy();
 
+  /// @brief Permits checking the status of the queues; returns true if no transfers are queued
+  ///
+  bool queuesEmpty();
 
 private:
 
@@ -178,10 +173,6 @@ private:
   /// @brief slave configurations
   ///
   SpiSlave _slave[cMaxSlaves];
-
-  /// @brief the next transfer the SPI needs to do
-  ///
-  SpiTransferReq* _transferQueue[cQueueSize];
 
   /// @brief transfer requests from slaves that the SPI needs to do
   ///

@@ -1145,12 +1145,12 @@ void initialize()
   _usartSetup();
   // _i2cSetup();
 
-  Dmx512Rx::initialize();
-
   DisplayManager::initialize();
   DS3234::initialize();
   LM74::initialize();
   DS1722::initialize();
+
+  Dmx512Rx::initialize();
 
   _systickSetup(1);   // tick every 1 mS
   _nvicSetup();
@@ -1232,7 +1232,7 @@ void refresh()
 {
   iwdg_reset();
 
-  _refreshPeripherals();
+  // _refreshPeripherals();
   _syncRtcWithGps();
 
   DisplayManager::refresh();
@@ -2237,7 +2237,7 @@ void dmaCh2to3Isr()
   		dma_disable_channel(DMA1, DMA_CHANNEL3);
   	}
 
-    _spi1Master.transferComplete();
+    _spi1Master.dmaComplete();
   }
 }
 
@@ -2378,6 +2378,7 @@ void systickIsr()
 
     _incrementOnTimeSecondsCounter();
   }
+  _refreshPeripherals();
   // update ADC samples
   if (_adcSampleTimer++ >= cAdcSampleInterval)
   {
