@@ -148,7 +148,7 @@ void initialize()
     .polarity       = false,                // CS/CE polarity (true = active high)
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
     .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
+    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
     .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
     .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
     .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
