@@ -55,6 +55,7 @@
 #include "LM74.h"
 #include "RgbLed.h"
 #include "SpiMaster.h"
+#include "Usart.h"
 
 #if HARDWARE_VERSION == 1
   #include "Hardware_v1.h"
@@ -68,18 +69,60 @@ namespace kbxTubeClock {
 namespace Hardware {
 
 
-  // I2C1 state
-  //
-  enum I2cState : uint8_t {
-    I2cIdle,
-    I2cBusy
-  };
-
-
-// USART baud rates
+// I2C1 state
 //
-static const uint32_t cUsart1BaudRate = 115200;
-static const uint32_t cUsart2BaudRate = 250000;
+enum I2cState : uint8_t {
+  I2cIdle,
+  I2cBusy
+};
+
+
+// SPI interface initialization objects
+//
+static const SpiMaster::SpiMasterParams _spi1MasterParams = {
+  SPI1,                     // spi
+  DMA1,                     // dmaController
+  cSpi1RxDmaChannel,        // channelRx
+  cSpi1TxDmaChannel         // channelTx
+};
+
+// USART interface initialization objects
+//
+static const Usart::UsartParams _usartParams[cNumberOfUsarts] = {
+  {   cGpsUsart,            // USART
+      DMA1,                 // dmaController
+      cUsart1RxDmaChannel,  // channelRx
+      cUsart1TxDmaChannel   // channelTx
+  },
+  {   cDmxUsart,            // USART
+      DMA1,                 // dmaController
+      cUsart2RxDmaChannel,  // channelRx
+      cUsart2TxDmaChannel   // channelTx
+  }
+};
+
+// USART interface initialization objects
+//
+static const Usart::UsartTransferParams _usartTransferParams[cNumberOfUsarts] = {
+  {   cUsart1BaudRate,      // Baud rate
+      cUsart1DataBits,      // Number of data bits
+      cUsart1StopBits,      // Number of stop bits
+      cUsart1Parity,        // Parity
+      cUsart1Mode,          // Mode (Tx, Rx, Tx+Rx)
+      cUsart1FlowControl,   // Flow control
+      cUsart1AutoBaud,      // Enable auto-baud rate detection
+      cUsart1DriverEnable   // Enable hardware DE output (for RS-485)
+  },
+  {   cUsart2BaudRate,      // Baud rate
+      cUsart2DataBits,      // Number of data bits
+      cUsart2StopBits,      // Number of stop bits
+      cUsart2Parity,        // Parity
+      cUsart2Mode,          // Mode (Tx, Rx, Tx+Rx)
+      cUsart2FlowControl,   // Flow control
+      cUsart2AutoBaud,      // Enable auto-baud rate detection
+      cUsart2DriverEnable   // Enable hardware DE output (for RS-485)
+  }
+};
 
 // number of ADC channels we're using
 //
@@ -152,14 +195,14 @@ static const uint8_t cTscSamplesToAverage = 32;
 //
 static const int32_t cVddCalibrationVoltage = 3300;
 
-// SPI interface initialization objects
+
+// SpiMaster object for SPI
 //
-static const SpiMaster::SpiMasterParams _spi1MasterParams = {
-  SPI1,                             // spi
-  DMA1,                             // dmaController
-  cSpi1RxDmaChannel,                // channelRx
-  cSpi1TxDmaChannel                 // channelTx
-};
+static SpiMaster _spi1Master;
+
+// Usart objects for USARTs
+//
+static Usart _usart[cNumberOfUsarts];
 
 // tracks which array element the next sample is to be written to
 //
@@ -245,10 +288,6 @@ static uint8_t _onTimeLastSecond = 0;
 // seconds of HV on time
 //
 static uint32_t _onTimeSecondsCounter = 0;
-
-// SpiMaster object for SPI
-//
-static SpiMaster _spi1Master;
 
 // provides a way to calibrate the temperature indication
 //
@@ -338,7 +377,7 @@ static TempSensorType _externalTemperatureSensor = TempSensorType::NoTempSensor;
 // a string used for USART tx
 //
 // char _buffer[80];
-// writeSerial(USART1, sprintf(_buffer, "thing = %d\r\n", thing), _buffer);
+// writeSerial(cGpsUsart, sprintf(_buffer, "thing = %d\r\n", thing), _buffer);
 
 
 // set up the ADC
@@ -902,79 +941,41 @@ void _tscSetup()
 }
 
 
-void _usart1Setup()
-{
-  // Setup USART1 TX & RX pins as alternate function
-  if (cUsart1TxPin == GPIO9)
-  {
-    gpio_set_af(cUsart1TxPort, GPIO_AF1, cUsart1TxPin);
-  }
-  else if (cUsart1TxPin == GPIO6)
-  {
-    gpio_set_af(cUsart1TxPort, GPIO_AF0, cUsart1TxPin);
-  }
-
-  if (cUsart1RxPin == GPIO10)
-  {
-    gpio_set_af(cUsart1RxPort, GPIO_AF1, cUsart1RxPin);
-  }
-  else if (cUsart1RxPin == GPIO7)
-  {
-    gpio_set_af(cUsart1RxPort, GPIO_AF0, cUsart1RxPin);
-  }
-  // Set up USART1 parameters
-  usart_set_databits(USART1, 8);
-	usart_set_baudrate(USART1, cUsart1BaudRate);
-  usart_set_stopbits(USART1, USART_STOPBITS_1);
-	usart_set_parity(USART1, USART_PARITY_NONE);
-	usart_set_mode(USART1, USART_MODE_TX_RX);
-	usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
-
-  USART1_CR2 |= (USART_CR2_ABRMOD_FALL_EDGE | USART_CR2_ABREN);    // enable auto-baud rate detection
-
-  usart_enable_rx_interrupt(USART1);
-  // usart_enable_tx_interrupt(USART1);
-  usart_enable_error_interrupt(USART1);
-  // Enable the USART
-  usart_enable(USART1);
-
-  // Setup GPIO pins for USART1 transmit and recieve
-  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
-  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
-}
-
-
-void _usart2Setup()
-{
-  // Setup USART2 TX & RX pins as alternate function
-  gpio_set_af(cUsart2Port, GPIO_AF1, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
-  // Set up USART2 parameters
-  usart_set_databits(USART2, 8);
-	usart_set_baudrate(USART2, cUsart2BaudRate);
-  usart_set_stopbits(USART2, USART_STOPBITS_2);
-	usart_set_parity(USART2, USART_PARITY_NONE);
-	usart_set_mode(USART2, USART_MODE_RX);
-	usart_set_flow_control(USART2, USART_FLOWCONTROL_NONE);
-  // Enable the USART's RS-485 driver mode output
-  USART2_CR3 |= USART_CR3_DEM;
-
-  // usart_enable_rx_interrupt(USART2);
-  // usart_enable_tx_interrupt(USART2);
-  usart_enable_error_interrupt(USART2);
-  // Enable the USART
-  usart_enable(USART2);
-
-  // Setup GPIO pins for USART2 transmit, recieve, and direction
-  gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
-}
-
-
 // Set up USARTs
 //
 void _usartSetup()
 {
-  _usart1Setup();
-  _usart2Setup();
+  // Setup USART1 TX & RX pins as alternate function
+  gpio_set_af(cUsart1TxPort, cUsart1TxAF, cUsart1TxPin);
+  gpio_set_af(cUsart1RxPort, cUsart1RxAF, cUsart1RxPin);
+  // Setup USART2 TX & RX pins as alternate function
+  gpio_set_af(cUsart2Port, cUsart2AF, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
+
+  // Configure Usart instances with USART hardware and DMA channels
+  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
+  {
+    _usart[usart].initialize(&_usartParams[usart]);
+    _usart[usart].configure(&_usartTransferParams[usart]);
+  }
+
+  // Enable relevant interrupts
+  usart_enable_rx_interrupt(cGpsUsart);
+  // usart_enable_tx_interrupt(cGpsUsart);
+  usart_enable_error_interrupt(cGpsUsart);
+
+  // usart_enable_rx_interrupt(cDmxUsart);
+  // usart_enable_tx_interrupt(cDmxUsart);
+  usart_enable_error_interrupt(cDmxUsart);
+
+  // Enable the USARTs
+  usart_enable(cGpsUsart);
+  usart_enable(cDmxUsart);
+
+  // Setup GPIO pins for USART1 transmit and recieve
+  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
+  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
+  // Setup GPIO pins for USART2 transmit, recieve, and direction
+  gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
 }
 
 
@@ -1948,137 +1949,19 @@ bool i2cIsBusy()
 }
 
 
-HwReqAck readSerial(const uint32_t usart, const uint32_t length, char* data)
-{
-  switch (usart)
-  {
-    case USART2:
-    if ((DMA1_ISR & DMA_ISR_TCIF6) || !(USART2_CR3 & USART_CR3_DMAR))
-    {
-      dma_channel_reset(DMA1, cUsart2RxDmaChannel);
-      // Set up rx dma, note it has higher priority to avoid overrun
-      dma_set_peripheral_address(DMA1, cUsart2RxDmaChannel, (uint32_t)&USART2_RDR);
-      dma_set_memory_address(DMA1, cUsart2RxDmaChannel, (uint32_t)data);
-      dma_set_number_of_data(DMA1, cUsart2RxDmaChannel, length);
-      dma_set_read_from_peripheral(DMA1, cUsart2RxDmaChannel);
-      dma_enable_memory_increment_mode(DMA1, cUsart2RxDmaChannel);
-      dma_set_peripheral_size(DMA1, cUsart2RxDmaChannel, DMA_CCR_PSIZE_8BIT);
-      dma_set_memory_size(DMA1, cUsart2RxDmaChannel, DMA_CCR_MSIZE_8BIT);
-      dma_set_priority(DMA1, cUsart2RxDmaChannel, DMA_CCR_PL_VERY_HIGH);
-
-      // Enable dma transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(DMA1, cUsart2RxDmaChannel);
-
-    	// Activate dma channel
-    	dma_enable_channel(DMA1, cUsart2RxDmaChannel);
-
-      usart_enable_rx_dma(USART2);
-    }
-    else
-    {
-      return HwReqAck::HwReqAckBusy;
-    }
-    break;
-
-    default:
-    if ((DMA1_ISR & DMA_ISR_TCIF5) || !(USART1_CR3 & USART_CR3_DMAR))
-    {
-      dma_channel_reset(DMA1, cUsart1RxDmaChannel);
-      // Set up rx dma, note it has higher priority to avoid overrun
-      dma_set_peripheral_address(DMA1, cUsart1RxDmaChannel, (uint32_t)&USART1_RDR);
-      dma_set_memory_address(DMA1, cUsart1RxDmaChannel, (uint32_t)data);
-      dma_set_number_of_data(DMA1, cUsart1RxDmaChannel, length);
-      dma_set_read_from_peripheral(DMA1, cUsart1RxDmaChannel);
-      dma_enable_memory_increment_mode(DMA1, cUsart1RxDmaChannel);
-      dma_set_peripheral_size(DMA1, cUsart1RxDmaChannel, DMA_CCR_PSIZE_8BIT);
-      dma_set_memory_size(DMA1, cUsart1RxDmaChannel, DMA_CCR_MSIZE_8BIT);
-      dma_set_priority(DMA1, cUsart1RxDmaChannel, DMA_CCR_PL_VERY_HIGH);
-
-      // Enable dma transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(DMA1, cUsart1RxDmaChannel);
-
-    	// Activate dma channel
-    	dma_enable_channel(DMA1, cUsart1RxDmaChannel);
-
-      usart_enable_rx_dma(USART1);
-    }
-    else
-    {
-      return HwReqAck::HwReqAckBusy;
-    }
-  }
-  return HwReqAck::HwReqAckOk;
-}
-
-
-HwReqAck writeSerial(const uint32_t usart, const uint32_t length, const char* data)
-{
-  switch (usart)
-  {
-    case USART2:
-    if (USART2_ISR & USART_ISR_TC)
-    {
-      dma_channel_reset(DMA1, cUsart2TxDmaChannel);
-      // Set up tx dma
-      dma_set_peripheral_address(DMA1, cUsart2TxDmaChannel, (uint32_t)&USART1_TDR);
-      dma_set_memory_address(DMA1, cUsart2TxDmaChannel, (uint32_t)data);
-      dma_set_number_of_data(DMA1, cUsart2TxDmaChannel, length);
-      dma_set_read_from_memory(DMA1, cUsart2TxDmaChannel);
-      dma_enable_memory_increment_mode(DMA1, cUsart2TxDmaChannel);
-      dma_set_peripheral_size(DMA1, cUsart2TxDmaChannel, DMA_CCR_PSIZE_8BIT);
-      dma_set_memory_size(DMA1, cUsart2TxDmaChannel, DMA_CCR_MSIZE_8BIT);
-      dma_set_priority(DMA1, cUsart2TxDmaChannel, DMA_CCR_PL_HIGH);
-
-      // Enable dma transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(DMA1, cUsart2TxDmaChannel);
-
-    	// Activate dma channel
-    	dma_enable_channel(DMA1, cUsart2TxDmaChannel);
-
-      usart_enable_tx_dma(USART2);
-    }
-    else
-    {
-      return HwReqAck::HwReqAckBusy;
-    }
-    break;
-
-    default:
-    if (USART1_ISR & USART_ISR_TC)
-    {
-      dma_channel_reset(DMA1, cUsart1TxDmaChannel);
-      // Set up tx dma
-      dma_set_peripheral_address(DMA1, cUsart1TxDmaChannel, (uint32_t)&USART1_TDR);
-      dma_set_memory_address(DMA1, cUsart1TxDmaChannel, (uint32_t)data);
-      dma_set_number_of_data(DMA1, cUsart1TxDmaChannel, length);
-      dma_set_read_from_memory(DMA1, cUsart1TxDmaChannel);
-      dma_enable_memory_increment_mode(DMA1, cUsart1TxDmaChannel);
-      dma_set_peripheral_size(DMA1, cUsart1TxDmaChannel, DMA_CCR_PSIZE_8BIT);
-      dma_set_memory_size(DMA1, cUsart1TxDmaChannel, DMA_CCR_MSIZE_8BIT);
-      dma_set_priority(DMA1, cUsart1TxDmaChannel, DMA_CCR_PL_HIGH);
-
-      // Enable dma transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(DMA1, cUsart1TxDmaChannel);
-
-      USART1_ICR |= USART_ICR_TCCF;
-
-    	// Activate dma channel
-    	dma_enable_channel(DMA1, cUsart1TxDmaChannel);
-
-      usart_enable_tx_dma(USART1);
-    }
-    else
-    {
-      return HwReqAck::HwReqAckBusy;
-    }
-  }
-  return HwReqAck::HwReqAckOk;
-}
-
-
 SpiMaster* getSpiMaster()
 {
   return &_spi1Master;
+}
+
+
+Usart* getUsart(const uint8_t usart)
+{
+  if (usart < cNumberOfUsarts)
+  {
+    return &_usart[usart];
+  }
+  return nullptr;
 }
 
 

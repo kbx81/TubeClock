@@ -20,10 +20,14 @@
 
 #include <cstddef>
 #include <cstdint>
+
+#include <libopencm3/stm32/usart.h>
+
 #include "DateTime.h"
 #include "Display.h"
 #include "RgbLed.h"
 #include "SpiMaster.h"
+#include "Usart.h"
 
 #ifndef HARDWARE_VERSION
   #error HARDWARE_VERSION must be defined with a value of 1
@@ -70,6 +74,35 @@ namespace Hardware {
     MCP9808
   };
 
+
+  // Number of USARTs to configure
+  //
+  static const uint8_t cNumberOfUsarts = 2;
+
+  // USART default/initial baud rates
+  //
+  static const uint32_t cUsart1BaudRate = 115200;
+  static const uint32_t cUsart2BaudRate = 250000;
+
+  // USART1 data transnfer parameters
+  //
+  static const uint8_t cUsart1DataBits  = 8;                      // Number of data bits
+  static const auto cUsart1StopBits     = USART_STOPBITS_1;       // Number of stop bits
+  static const auto cUsart1Parity       = USART_PARITY_NONE;      // Parity
+  static const auto cUsart1Mode         = USART_MODE_TX_RX;       // Mode (Tx, Rx, Tx+Rx)
+  static const auto cUsart1FlowControl  = USART_FLOWCONTROL_NONE; // Flow control
+  static const auto cUsart1AutoBaud     = USART_CR2_ABRMOD_FALL_EDGE | USART_CR2_ABREN; // Enable auto-baud rate detection
+  static const auto cUsart1DriverEnable = false;                  // Enable hardware DE output (for RS-485)
+
+  // USART1 data transnfer parameters
+  //
+  static const uint8_t cUsart2DataBits  = 8;                      // Number of data bits
+  static const auto cUsart2StopBits     = USART_STOPBITS_2;       // Number of stop bits
+  static const auto cUsart2Parity       = USART_PARITY_NONE;      // Parity
+  static const auto cUsart2Mode         = USART_MODE_RX;          // Mode (Tx, Rx, Tx+Rx)
+  static const auto cUsart2FlowControl  = USART_FLOWCONTROL_NONE; // Flow control
+  static const auto cUsart2AutoBaud     = 0;                      // Enable auto-baud rate detection
+  static const auto cUsart2DriverEnable = true;                   // Enable hardware DE output (for RS-485)
 
   /// @brief Hardware version to build for
   ///
@@ -232,17 +265,13 @@ namespace Hardware {
   ///
   bool     i2cIsBusy();
 
-  /// @brief Reads data from the serial port with DMA
-  /// @return false if failure (the USART was busy)
-  HwReqAck readSerial(const uint32_t usart, const uint32_t length, char* data);
-
-  /// @brief Writes data to the serial port with DMA
-  /// @return false if failure (the USART was busy)
-  HwReqAck writeSerial(const uint32_t usart, const uint32_t length, const char* data);
-
   /// @brief Gets the pointer to the current SpiMaster
   /// @return pointer to current SpiMaster
   SpiMaster* getSpiMaster();
+
+  /// @brief Gets a pointer to the specified USART interface
+  /// @return pointer to requested USART interface
+  Usart*   getUsart(const uint8_t usart);
 
   /// @brief Sets the given status LED to the given intensity/RgbLed
   ///

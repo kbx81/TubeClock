@@ -25,28 +25,40 @@
 #include <libopencm3/stm32/syscfg.h>
 #include <libopencm3/stm32/timer.h>
 #include <libopencm3/stm32/tsc.h>
+#include <libopencm3/stm32/usart.h>
 
 
 namespace kbxTubeClock {
 
 namespace Hardware {
 
+  // USART assignments
+  //
+  static const auto cGpsUsart = USART1;
+  static const auto cDmxUsart = USART2;
+
   // USART Tx and Rx ports, pins, & IRQs
   //
   // static const auto cUsart1Port = GPIOA;
   static const auto cUsart1RxPort = GPIOA;
   static const auto cUsart1RxPin  = GPIO10;
+  static const auto cUsart1RxAF   = GPIO_AF1;
   static const auto cUsart1TxPort = GPIOB;
   static const auto cUsart1TxPin  = GPIO6;
+  static const auto cUsart1TxAF   = GPIO_AF0;
   static const auto cUsart1Irq    = NVIC_USART1_IRQ;
 
   static const auto cUsart2Port   = GPIOA;
   // static const auto cUsart2RxPort = GPIOA;
   static const auto cUsart2RxPin  = GPIO3;
+  // static const auto cUsart2RxAF   = GPIO_AF1;
   // static const auto cUsart2TxPort = GPIOA;
   static const auto cUsart2TxPin  = GPIO2;
+  // static const auto cUsart2TxAF   = GPIO_AF1;
   // static const auto cUsart2DePort = GPIOA;
   static const auto cUsart2DePin  = GPIO1;
+  // static const auto cUsart2DeAF   = GPIO_AF1;
+  static const auto cUsart2AF     = GPIO_AF1;
   static const auto cUsart2Irq    = NVIC_USART2_IRQ;
 
   // external alarm input port(s) & pins

@@ -66,6 +66,10 @@ static const uint8_t cMaximumTimeBetweenPackets = 250;
 //
 static const uint8_t cMinimumNumberOfPacketsToActive = 5;
 
+// Number of bytes we receive in the DMX-512 packet (512 + start bit)
+//
+static const uint16_t cNumberOfRxBytes = 512 + 1;
+
 // USARTs I/O port
 //
 static const uint32_t cUsartPort = GPIOA;
@@ -100,13 +104,13 @@ volatile static uint8_t _dmxPassedChecks = 0;
 void _readSerialSetup()
 {
   // we would do this but we have to wait for the break detection to enable DMA
-  // Hardware::readSerial(USART2, 513, _pDmxPacketActive);
+  // Hardware::readSerial(Hardware::cDmxUsart, cNumberOfRxBytes, _pDmxPacketActive);
 
   dma_channel_reset(DMA1, Hardware::cUsart2RxDmaChannel);
   // Set up Rx DMA, note it has higher priority to avoid overrun
-  dma_set_peripheral_address(DMA1, Hardware::cUsart2RxDmaChannel, (uint32_t)&USART2_RDR);
+  dma_set_peripheral_address(DMA1, Hardware::cUsart2RxDmaChannel, (uint32_t)&USART_RDR(Hardware::cDmxUsart));
   dma_set_memory_address(DMA1, Hardware::cUsart2RxDmaChannel, (uint32_t)_pDmxPacketActive);
-  dma_set_number_of_data(DMA1, Hardware::cUsart2RxDmaChannel, 513);
+  dma_set_number_of_data(DMA1, Hardware::cUsart2RxDmaChannel, cNumberOfRxBytes);
   dma_set_read_from_peripheral(DMA1, Hardware::cUsart2RxDmaChannel);
   dma_enable_memory_increment_mode(DMA1, Hardware::cUsart2RxDmaChannel);
   dma_set_peripheral_size(DMA1, Hardware::cUsart2RxDmaChannel, DMA_CCR_PSIZE_8BIT);
@@ -160,9 +164,9 @@ void initialize()
   nvic_set_priority(NVIC_TIM16_IRQ, 128);
 	nvic_enable_irq(NVIC_TIM16_IRQ);
 
-  USART2_CR1 &= ~USART_CR1_RE;
+  USART_CR1(Hardware::cDmxUsart) &= ~USART_CR1_RE;
 
-  // Swap USART2 Rx pin to timer to measure the break and mark after break
+  // Swap cDmxUsart Rx pin to timer to measure the break and mark after break
   gpio_set_af(cUsartPort, GPIO_AF0, GPIO3);
 }
 
@@ -199,16 +203,16 @@ void rxIsr()
   //  flag (FE) at the start of each DMX-512 packet. Regardless, any errors just
   //  result in the DmxRxError state being set, which ultimately results in the
   //  packet being discarded after its reception has been completed.
-  if (USART2_ISR & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE | USART_ISR_RXNE))
+  if (USART_ISR(Hardware::cDmxUsart) & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE | USART_ISR_RXNE))
   {
     // Clear the RXNE flag -- it may be set with the flags above
-    USART2_RQR = USART_RQR_RXFRQ;
+    USART_RQR(Hardware::cDmxUsart) = USART_RQR_RXFRQ;
     // Disable the receiver
-    USART2_CR1 &= ~USART_CR1_RE;
+    USART_CR1(Hardware::cDmxUsart) &= ~USART_CR1_RE;
 
     // Reset timer counter to start break time detection
     timer_generate_event(TIM15, TIM_EGR_UG);
-    // Swap USART2 Rx pin to the timer to measure the break and mark after break
+    // Swap cDmxUsart Rx pin to the timer to measure the break and mark after break
   	gpio_set_af(cUsartPort, GPIO_AF0, GPIO3);
 
     _dmxState = DmxRxState::DmxRxError;
@@ -289,8 +293,8 @@ void timerUartIsr()
     gpio_set_af(cUsartPort, GPIO_AF1, GPIO3);
 
     dma_enable_channel(DMA1, Hardware::cUsart2RxDmaChannel);
-    usart_enable_rx_dma(USART2);
-    USART2_CR1 |= USART_CR1_RE;
+    usart_enable_rx_dma(Hardware::cDmxUsart);
+    USART_CR1(Hardware::cDmxUsart) |= USART_CR1_RE;
 
     _dmxState = DmxRxState::DmxRxReceiving;
 
