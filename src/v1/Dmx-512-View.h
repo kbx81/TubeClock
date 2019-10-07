@@ -47,6 +47,10 @@ private:
   //
   Application::OperatingMode _mode;
 
+  // views for each DMX-512 mode
+  //
+  void _dmxExtendedModeView(Dmx512Packet* packet, uint16_t address);
+  void _dmxStandardModeView(Dmx512Packet* packet, uint16_t address);
 };
 
 }

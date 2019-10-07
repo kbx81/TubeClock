@@ -23,6 +23,8 @@
 #include "Dmx-512-Packet.h"
 #include "Dmx-512-Rx.h"
 #include "Dmx-512-View.h"
+#include "NixieGlyph.h"
+#include "NixieTube.h"
 #include "Settings.h"
 #include "View.h"
 
@@ -63,37 +65,24 @@ bool Dmx512View::keyHandler(Keys::Key key)
 
 void Dmx512View::loop()
 {
-  Dmx512Packet* currentPacket = Dmx512Rx::getLastPacket();
-  Display dmxDisplay;
-  RgbLed currentLed;
+  Dmx512Packet* packet = Dmx512Rx::getLastPacket();
   Settings *pSettings = Application::getSettingsPtr();
-  uint16_t rate, address = pSettings->getRawSetting(Settings::Setting::DmxAddress);
+  uint16_t address = pSettings->getRawSetting(Settings::Setting::DmxAddress);
 
   if (Dmx512Rx::signalIsActive() == true)
   {
-    if (currentPacket->startCode() == 0)
+    if (packet->startCode() == 0)
     {
       if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DmxExtended) == true)
       {
-        address += 4;
-
-        rate = (currentPacket->channel(address++) * cChannelMultiplier) + cChannelMultiplier;
-        currentLed.setDuration(rate);
+        // in this mode, fade duration (followed by tube values and intensities) starts at offset 4
+        _dmxExtendedModeView(packet, address + 4);
       }
-      // Skip over the display blanking/driver current level parameter
-      address++;
-
-      // for (uint8_t i = 0; i <= Display::cPixelCount; i++)
-      // {
-      //   currentLed.setRed(currentPacket->channel((i * 3) + address) << cChannelMultiplier);
-      //   currentLed.setGreen(currentPacket->channel((i * 3) + address + 1) << cChannelMultiplier);
-      //   currentLed.setBlue(currentPacket->channel((i * 3) + address + 2) << cChannelMultiplier);
-      //   if (i < Display::cPixelCount)
-      //   {
-      //     dmxDisplay.setPixelFromRaw(i, currentLed);
-      //   }
-      // }
-      // DisplayManager::writeDisplay(dmxDisplay, currentLed);
+      else
+      {
+        // in this mode, tube values starts at offset 1
+        _dmxStandardModeView(packet, address + 1);
+      }
     }
   }
   else
@@ -102,6 +91,64 @@ void Dmx512View::loop()
     // Kick us back to the main menu if the signal was lost
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
+}
+
+
+void Dmx512View::_dmxExtendedModeView(Dmx512Packet* packet, uint16_t address)
+{
+  uint16_t duration = (packet->channel(address++) * cChannelMultiplier) + cChannelMultiplier;
+  Display dmxDisplay;
+  NixieTube currentTube(0, 0, duration);
+  NixieGlyph currentGlyph(0, duration);
+
+  // jump over the master intensity channel
+  address++;
+
+  // set tube values and intensities based on DMX-512 channel values in packet
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    // we add cTubeCount + 1 to get the tube intensity channels
+    uint32_t top = (packet->channel(address + t + Display::cTubeCount) * NixieGlyph::cGlyphMaximumIntensity);
+    uint16_t level = static_cast<uint16_t>(top / 255);
+
+    currentTube.setGlyph(packet->channel(address + t) / 25.6);
+    currentTube.setIntensity(level);
+
+    dmxDisplay.setTubeFromRaw(t, currentTube);
+  }
+
+  address += (Display::cTubeCount * 2); // jump over tube values and tube intensities
+
+  // set dot/point intensities based on DMX-512 channel values in packet
+  for (uint8_t d = 0; d < Display::cDotCount; d++)
+  {
+    // we add cTubeCount to get the tube intensity channels
+    uint32_t top = (packet->channel(address++) * NixieGlyph::cGlyphMaximumIntensity);
+    uint16_t level = static_cast<uint16_t>(top / 255);
+
+    currentGlyph.setIntensity(level);
+
+    dmxDisplay.setDot(d, currentGlyph);
+  }
+
+  DisplayManager::writeDisplay(dmxDisplay);
+}
+
+
+void Dmx512View::_dmxStandardModeView(Dmx512Packet* packet, uint16_t address)
+{
+  Display dmxDisplay;
+  NixieTube currentTube;
+
+  // set tube values and intensities based on DMX-512 channel values in packet
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    currentTube.setGlyph(packet->channel(address + t) / 10);
+
+    dmxDisplay.setTubeFromRaw(t, currentTube);
+  }
+
+  DisplayManager::writeDisplay(dmxDisplay);
 }
 
 

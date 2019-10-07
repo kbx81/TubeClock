@@ -10,8 +10,8 @@
 ## General TODO
 
 1. More effects/animations
-1. Fix intermittent weirdness on startup...some SPI buffer issue??
-1. DMX-512 control
+1. Fix intermittent weirdness on startup...some SPI issue??
+1. DMX-512 Standard mode testing (...and fixes?)
 1. Documentation!
 
 ## Notes

@@ -110,7 +110,7 @@ static uint8_t _spiWorkingBufferOut[cNumberOfRegisters];
 
 // A full copy of DS3234 registers, refreshed by calling the refresh() function
 // ...dirty black magic, but it works...
-static uint8_t* _ds3234Registers  = _spiRefreshBufferIn + 1;
+static uint8_t* _ds3234Registers   = _spiRefreshBufferIn + 1;
 static uint8_t* _ds3234RegisterIn  = _spiWorkingBufferIn + 1;
 static uint8_t* _ds3234RegisterOut = _spiWorkingBufferOut + 1;
 

@@ -384,7 +384,8 @@ Mode 25 allows setting the day of week ordinal (first, second, third, fourth) in
 Mode 26 allows setting the month in which DST ends.\
 Mode 27 allows setting the day of week ordinal (first, second, third, fourth) in
  which DST ends.\
-Mode 28 allows setting the day of the week on which the DST time change occurs.\
+Mode 28 allows setting the day of the week on which the DST time change occurs.
+ Value from 0=Sunday, 1=Monday...6=Saturday.\
 Mode 29 allows setting the hour at which the DST time change occurs.
 
 #### Mode 30: Effect duration

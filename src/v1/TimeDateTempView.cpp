@@ -22,6 +22,7 @@
 #include "DateTime.h"
 #include "Display.h"
 #include "DisplayManager.h"
+#include "Dmx-512-Controller.h"
 #include "NixieGlyph.h"
 #include "Settings.h"
 #include "TimeDateTempView.h"
@@ -126,8 +127,6 @@ bool TimeDateTempView::keyHandler(Keys::Key key)
 
   if (tick == true)
   {
-    // _lastAnimationTime = _currentTime.secondsSinceMidnight();
-    // _lastSwitchTime = _currentTime.secondsSinceMidnight();
     _lastAnimationTime = _currentTime;
     _lastSwitchTime = _currentTime;
   }
@@ -211,7 +210,7 @@ void TimeDateTempView::loop()
     }
   }
   // run an animation if it's time to do so
-  if (_currentTime >= animationDisplayTime)
+  if ((_currentTime >= animationDisplayTime) && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
   {
     Animator::run();
 
@@ -253,11 +252,18 @@ Display::dateTimeDisplaySelection TimeDateTempView::_getDisplaySelection(const F
 
 void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item)
 {
+  Application::ExternalControl externalControlState = Application::getExternalControlState();
   Settings *pSettings = Application::getSettingsPtr();
   uint32_t dotsBitmap = _getDotsBitmap(),
            secondsSinceMidnight = _currentTime.secondsSinceMidnight(false);
   uint16_t duration = pSettings->getRawSetting(Settings::Setting::FadeDuration);
   uint8_t tubeIntensityBitmap = 0b111111;
+
+  if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum)
+  {
+    duration = Dmx512Controller::fadeDuration();
+  }
+  
   NixieGlyph dotOn(NixieGlyph::cGlyphMaximumIntensity, duration),
              dotOff(0, duration);
 

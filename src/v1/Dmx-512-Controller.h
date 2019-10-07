@@ -26,16 +26,21 @@ namespace kbxTubeClock {
 namespace Dmx512Controller {
 
 
-// Initialize it all
-//
+/// @brief Initialize it all
+///
 void initialize();
 
-// Controls main application and views based on DMX-512 input; sets strobe delay
-//
+/// @brief Controls main application and views based on DMX-512 input; sets strobe delay
+///
 void controller();
 
-// Should be called by a timer (systick) once every millisecond (ideally)
-//
+/// @brief Gets the current fade duration
+/// @return Current requested fade duration
+///
+uint16_t fadeDuration();
+
+/// @brief Should be called by a timer (systick) once every millisecond (ideally)
+///
 void strobeTimer();
 
 

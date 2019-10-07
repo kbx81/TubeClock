@@ -119,7 +119,7 @@ void usart1_isr(void)
 }
 
 
-/* USART1 */
+/* USART2 */
 void usart2_isr(void)
 {
 	Dmx512Rx::rxIsr();

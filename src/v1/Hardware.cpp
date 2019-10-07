@@ -374,10 +374,14 @@ static bool _rtcIsSet = false;
 //
 static TempSensorType _externalTemperatureSensor = TempSensorType::NoTempSensor;
 
-// a string used for USART tx
+// a string and some bits used for printf debugging :)
 //
 // char _buffer[80];
-// writeSerial(cGpsUsart, sprintf(_buffer, "thing = %d\r\n", thing), _buffer);
+// Usart::UsartTransferReq request;
+// request.state = Usart::UsartReqAck::UsartReqAckQueued;
+// request.length = sprintf(_buffer, "date: %lx\r\n", dr);
+// request.buffer = (uint8_t*)_buffer;
+// _usart[0].transmit(&request);
 
 
 // set up the ADC
@@ -1068,7 +1072,7 @@ SpiMaster::SpiReqAck _refreshRTC()
 
     year += (10 * ((dr >> RTC_DR_YT_SHIFT) & RTC_DR_YT_MASK));
     year += ((dr >> RTC_DR_YU_SHIFT) & RTC_DR_YU_MASK);
-
+    // 2019-10-05 - RTC_DR_MT_MASK is incorrect in rtc_common_l1f024.h
     month = 10 * ((dr >> RTC_DR_MT_SHIFT) & RTC_DR_MT_MASK);
     month += ((dr >> RTC_DR_MU_SHIFT) & RTC_DR_MU_MASK);
 
@@ -1123,7 +1127,6 @@ void _syncRtcWithGps()
       && (gpsTime != _currentDateTime))
   {
     setDateTime(gpsTime);
-    _currentDateTime = gpsTime;
     _lastRtcGpsSyncHour = gpsTime.hour();
   }
 }
@@ -1151,10 +1154,10 @@ void initialize()
   LM74::initialize();
   DS1722::initialize();
 
-  Dmx512Rx::initialize();
-
   _systickSetup(1);   // tick every 1 mS
   _nvicSetup();
+
+  Dmx512Rx::initialize();
 
   // Let's initialize some memory/data structures
   for (_adcSampleCounter = 0; _adcSampleCounter < cAdcSamplesToAverage; _adcSampleCounter++)

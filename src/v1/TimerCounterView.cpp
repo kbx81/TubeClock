@@ -20,6 +20,7 @@
 #include "AlarmHandler.h"
 #include "Application.h"
 #include "DisplayManager.h"
+#include "Dmx-512-Controller.h"
 #include "Hardware.h"
 #include "Settings.h"
 #include "TimerCounterView.h"
@@ -128,6 +129,12 @@ void TimerCounterView::loop()
   if (((currentTimerMode == TimerMode::TimerRunUp) || (currentTimerMode == TimerMode::TimerRunDown))
    && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
   {
+    tcDisp.setTubeDurations(duration);
+  }
+
+  if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum)
+  {
+    duration = Dmx512Controller::fadeDuration();
     tcDisp.setTubeDurations(duration);
   }
 

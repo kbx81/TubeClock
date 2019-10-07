@@ -52,31 +52,28 @@ static const uint8_t cChannelMultiplier = 4;
 //  Tones are queued by Hardware::tone() so they'll sound constant if needed
 static const uint8_t cToneDuration = 60;
 
-// Master intensity level
+// Duration for crossfades as received in DMX-512 packet
 //
-volatile static uint16_t _masterIntensityLevel;
+static uint16_t _fadeDuration = 0;
+
+// Master intensity level
+//  10000 = 100%
+volatile static uint16_t _masterIntensityLevel = 0;
 
 // Counter for strobe delays
 //
-volatile static uint16_t _strobeCounter;
+volatile static uint16_t _strobeCounter = 0;
 
 // Delay between strobe pulses (here, in milliseconds)
 //  Time unit depends on frequency of calls to strobeTimer()
-volatile static uint16_t _strobeDelay;
+volatile static uint16_t _strobeDelay = cStrobeMinimumRate;
 
 
-void initialize()
+void _dmxExtendedModeController(Dmx512Packet* packet, uint16_t address)
 {
-}
-
-
-void controller()
-{
-  Dmx512Packet* currentPacket = Dmx512Rx::getLastPacket();
   // RgbLed dmxLed[2];
-  Settings *pSettings = Application::getSettingsPtr();
-  uint32_t _top = 0;
-  uint16_t pitch, duration, address = pSettings->getRawSetting(Settings::Setting::DmxAddress);
+  uint32_t top = 0;
+  uint16_t pitch = 0;
   uint8_t level = 0;
   const Application::OperatingMode opMode[] = { Application::OperatingMode::OperatingModeDmx512Display,
                                                 Application::OperatingMode::OperatingModeFixedDisplay,
@@ -95,54 +92,75 @@ void controller()
                                 ViewMode::ViewMode2,
                                 ViewMode::ViewMode3 };
 
-  if (currentPacket->startCode() == 0)
+  // first, set the display mode based on channel offset 0
+  level = packet->channel(address++) / 32;
+  Application::setOperatingMode(opMode[level]);
+  Application::setViewMode(viewMode[level]);
+ 
+  // next, set the beeper volume. volume only uses upper three bits
+  level = packet->channel(address++) >> 5;
+  Hardware::setVolume(level);
+
+  // next, set the beeper pitch/frequency
+  pitch = packet->channel(address++);
+  Hardware::tone(pitch * cPitchMultiplier, cToneDuration);
+
+  // next, set up strobing if it is enabled (greater than zero)
+  _strobeDelay = packet->channel(address++) * cChannelMultiplier;
+  if (_strobeDelay > 0)
+  {
+    _strobeDelay += cStrobeMinimumRate;
+  }
+  else
+  {
+    _strobeCounter = 0;
+  }
+ 
+  // determine and store the fade duration
+  _fadeDuration = (packet->channel(address++) * cChannelMultiplier) + cChannelMultiplier;
+ 
+  // next, determine the master intensity level
+  top = (packet->channel(address) * NixieGlyph::cGlyph100Percent);
+  _masterIntensityLevel = static_cast<uint16_t>(top / 255);
+}
+
+
+void _dmxStandardModeController(Dmx512Packet* packet, uint16_t address)
+{
+  uint32_t top = (packet->channel(address) * NixieGlyph::cGlyph100Percent);
+  _masterIntensityLevel = static_cast<uint16_t>(top / 255);
+}
+
+
+void initialize()
+{
+}
+
+
+void controller()
+{
+  Dmx512Packet* packet = Dmx512Rx::getLastPacket();
+  Settings *pSettings = Application::getSettingsPtr();
+  uint16_t address = pSettings->getRawSetting(Settings::Setting::DmxAddress);
+
+  if (packet->startCode() == 0)
   {
     if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DmxExtended) == true)
     {
-      level = currentPacket->channel(address++) / 32;
-      Application::setOperatingMode(opMode[level]);
-      Application::setViewMode(viewMode[level]);
-      // volume only uses upper three bits
-      level = currentPacket->channel(address++) >> 5;
-      Hardware::setVolume(level);
-
-      pitch = currentPacket->channel(address++);
-      Hardware::tone(pitch * cPitchMultiplier, cToneDuration);
-
-      _strobeDelay = currentPacket->channel(address++) * cChannelMultiplier;
-      if (_strobeDelay > 0)
-      {
-        _strobeDelay += cStrobeMinimumRate;
-      }
-      else
-      {
-        _strobeCounter = 0;
-      }
-
-      duration = currentPacket->channel(address++) * cChannelMultiplier;
-
-      // Set display blanking/driver current level
-      _top = (currentPacket->channel(address++) * NixieGlyph::cGlyph100Percent);
-
-      // dmxLed[0].setDuration(duration);
-      // dmxLed[0].setRed(currentPacket->channel(address++) << cChannelMultiplier);
-      // dmxLed[0].setGreen(currentPacket->channel(address++) << cChannelMultiplier);
-      // dmxLed[0].setBlue(currentPacket->channel(address++) << cChannelMultiplier);
-      //
-      // dmxLed[1].setDuration(duration);
-      // dmxLed[1].setRed(currentPacket->channel(address++) << cChannelMultiplier);
-      // dmxLed[1].setGreen(currentPacket->channel(address++) << cChannelMultiplier);
-      // dmxLed[1].setBlue(currentPacket->channel(address++) << cChannelMultiplier);
-
-      // pSettings->setColors(Settings::Slot::SlotDmx, dmxLed[0], dmxLed[1]);
+      _dmxExtendedModeController(packet, address);
     }
     else
     {
-      _top = (currentPacket->channel(address) * NixieGlyph::cGlyph100Percent);
+      _dmxStandardModeController(packet, address);
     }
-    _masterIntensityLevel = static_cast<uint16_t>(_top / 255);
-    DisplayManager::setMasterIntensity(_masterIntensityLevel);
+  DisplayManager::setMasterIntensity(_masterIntensityLevel);
   }
+}
+
+
+uint16_t fadeDuration()
+{
+  return _fadeDuration;
 }
 
 

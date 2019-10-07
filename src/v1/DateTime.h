@@ -133,12 +133,12 @@ public:
   uint8_t day(const bool bcd = false) const;
 
   /// Get the day of the week.
-  /// Value from 0=Sunday, 1=Monday to 6=Saturday.
+  /// Value from 0=Sunday, 1=Monday...6=Saturday
   ///
   uint8_t dayOfWeek() const;
 
   /// Set the day of the week.
-  /// Value from 0=Monday to 6=Sunday.
+  /// Value from 0=Sunday, 1=Monday...6=Saturday
   ///
   void setDayOfWeek(uint8_t dayOfWeek);
 

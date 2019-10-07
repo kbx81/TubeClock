@@ -16,6 +16,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
+// To use:
+// 1. Hardware starts -- SpiMaster object gets initialized via initialize()
+// 2. Slaves register:
+//     a. Slave must get pointer to SpiMaster object (via Hardware::getSpiMaster())
+//     b. Slave calls SpiMaster::registerSlave() with its slave structure
+//     c. Slave stores returned slave ID
+// 3. Slave(s) initiate(s) transfers by calling SpiMaster::transfer() with slave ID
 #pragma once
 
 
