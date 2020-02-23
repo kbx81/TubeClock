@@ -65,8 +65,8 @@ void sys_tick_handler(void)
 {
 	Hardware::systickIsr();
 	Keys::repeatHandler();
-  Dmx512Controller::strobeTimer();
-  DisplayManager::tick();
+	Dmx512Controller::strobeTimer();
+	DisplayManager::tick();
 	Animator::tick();
 	Application::tick();
 }
@@ -84,7 +84,7 @@ void tim2_isr()
 void tim7_isr()
 {
 	InfraredRemote::overflow();
-  Hardware::tim7Isr();
+  	Hardware::tim7Isr();
 }
 
 
@@ -132,7 +132,7 @@ int main()
 {
 	Hardware::initialize();
 
-  Application::initialize();
+  	Application::initialize();
 
-  Application::loop();
+  	Application::loop();
 }

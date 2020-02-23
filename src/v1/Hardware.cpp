@@ -987,14 +987,19 @@ void _incrementOnTimeSecondsCounter()
 {
   if ((_onTimeLastSecond != _currentDateTime.second()) && (_hvState == true))
   {
+    bool dbpState = (PWR_CR & PWR_CR_DBP);
+
     _onTimeLastSecond = _currentDateTime.second();
 
     pwr_disable_backup_domain_write_protect();
 
     RTC_BKPXR(0) = ++_onTimeSecondsCounter;
 
-    pwr_enable_backup_domain_write_protect();
-
+    if (dbpState == false)
+    {
+      pwr_enable_backup_domain_write_protect();
+    }
+    
     // if connected, save to DS3234 RAM, also
     // if (_externalRtcConnected == true)
     // {
