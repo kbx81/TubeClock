@@ -82,6 +82,7 @@
 ## Notes
 
 *Parts flagged with a `*` are optional based on desired GPS configuration
+
 **Carefully check polarity when installing -- the silkscreen on the board may be reversed!
 
 Capacitors `C1`, `C5`, `C6` and `C8` must be rated for 16 to 25 volts! Other capacitors may be rated for 6.3 to 10 volts unless otherwise noted.
