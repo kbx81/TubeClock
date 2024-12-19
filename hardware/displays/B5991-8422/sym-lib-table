@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "TubeClock")(type "KiCad")(uri "${KIPRJMOD}/../../kicad_libs/TubeClock/TubeClock-v8.kicad_sym")(options "")(descr ""))
+)
