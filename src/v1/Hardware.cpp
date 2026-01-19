@@ -866,7 +866,9 @@ void _timerSetupPWM()
   timer_set_prescaler(cTubePwmTimer, 0);
   timer_set_repetition_counter(cTubePwmTimer, 0);
   timer_continuous_mode(cTubePwmTimer);
-  timer_set_period(cTubePwmTimer, 9600);
+  // Timer frequency: 48MHz / 3750 = 12800 Hz
+  // With 256 PWM steps (0-255), complete cycle = 256/12800 = 20ms (50Hz refresh to minimize flicker)
+  timer_set_period(cTubePwmTimer, 3750);
 
   timer_enable_preload(cTubePwmTimer);
 

@@ -38,7 +38,7 @@ public:
   /// Important constants
   ///
   static const uint16_t cGlyph100Percent = 10000;
-  static const uint16_t cGlyphMaximumIntensity = 100;
+  static const uint16_t cGlyphMaximumIntensity = 255;  // 2^8 - 1 for optimal PWM with uint8_t natural rollover
 
 
   /// @brief Compare this NixieGlyph to another

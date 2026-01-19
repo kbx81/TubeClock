@@ -25,12 +25,25 @@
 // That said, the display workflow might be the most confusing aspect of this
 // codebase. The following flow diagram should help clarify how it works:
 //
-// writeDisplay()/writeStatusLed() ->
-//   _loadCrossfaders() ->
-//     refresh() updates crossfades when _refreshIntensitiesNow is set via tick() ->
-//       _setDisplayPwmTriad() ->
-//         _displayBufferOut (TCL59xx PWM data buffer) ->
-//           DMA to SPI to TLC59xx shift registers & latches
+// writeDisplay()/writeStatusLed() (main loop) ->
+//   _loadCrossfaders() (loads new target values into crossfaders)
+//
+// tick() (called from sys_tick_handler at 1000 Hz) ->
+//   crossfader tick() updates fade state ->
+//   atomic buffer swap (_activeBuffer flip) ->
+//   sets flag for refresh()
+//
+// refresh() (main loop) ->
+//   reads crossfader states, adjusts intensity ->
+//   _setDisplayPwmValue() writes to INACTIVE _pwmValues buffer
+//
+// tickPWM() (called from tim2_isr at 12,800 Hz) ->
+//   reads from ACTIVE _pwmValues buffer and generates software PWM ->
+//     _displayBufferOut (HV562x shift register data) ->
+//       SPI DMA to HV562x shift registers & latches
+//
+// Double buffering eliminates data races: ISR reads from one buffer while
+// main loop writes to the other, then tick() atomically swaps them.
 
 #include <libopencm3/stm32/dma.h>
 #include <libopencm3/stm32/gpio.h>
@@ -76,18 +89,26 @@ static const uint8_t cPwmChannelsPerDevice = 32;
 //
 static const uint8_t cSpiBytesToSend = (cPwmChannelsPerDevice * cPwmNumberOfDevices) / 8;
 
-// SoftPWM tick counter
+// SoftPWM tick counter - uint8_t allows natural rollover at 256
 //
-static uint16_t _pwmTickCounter = 0;
+static uint8_t _pwmTickCounter = 0;
 
-// SoftPWM values
+// Double-buffered SoftPWM values for race-free updates
+// Buffer 0 and 1 swap roles: one is actively read by ISR, other is written by main loop
+// Organized as [buffer][device][channel] for better cache locality
+// Aligned to 4-byte boundary for optimal ARM memory access
 //
-static uint16_t _pwmValues[cPwmNumberOfDevices * cPwmChannelsPerDevice];
+static uint16_t _pwmValues[2][cPwmNumberOfDevices][cPwmChannelsPerDevice] __attribute__((aligned(4)));
 
-// HV562x buffers
+// Active buffer index - read by tickPWM() ISR, swapped atomically by tick() ISR
+// 0 or 1 indicating which buffer tickPWM() should read from
 //
-static uint32_t _displayBufferIn[cPwmNumberOfDevices];
-static uint32_t _displayBufferOut[cPwmNumberOfDevices];
+volatile static uint8_t _activeBuffer = 0;
+
+// HV562x buffers - aligned for DMA transfers
+//
+static uint32_t _displayBufferIn[cPwmNumberOfDevices] __attribute__((aligned(4)));
+static uint32_t _displayBufferOut[cPwmNumberOfDevices] __attribute__((aligned(4)));
 
 // display buffers for processing crossfades
 //
@@ -126,13 +147,22 @@ SpiMaster *_spiMaster = nullptr;
 static uint8_t _slaveId = SpiMaster::cNoSlave;
 
 
-// Modifies a triad of PWM channels in the buffer corresponding to a single RGB LED (pixel)
+// Writes to PWM buffer corresponding to a glyph
+// Writes to the INACTIVE buffer (the one not being read by tickPWM ISR)
 //
 void _setDisplayPwmValue(const uint8_t glyphNumber, const uint16_t glyphValue)
 {
   if (glyphNumber < cGlyphCount)
   {
-    _pwmValues[(cPwmNumberOfDevices * cPwmChannelsPerDevice) - 1 - glyphNumber] = glyphValue;
+    uint8_t linearIndex = (cPwmNumberOfDevices * cPwmChannelsPerDevice) - 1 - glyphNumber;
+    // Optimized division and modulo for power-of-2 (32 = 2^5)
+    // Division by 32 = right shift by 5, modulo 32 = mask with 0x1F
+    uint8_t device = linearIndex >> 5;   // Fast divide by 32 (cPwmChannelsPerDevice)
+    uint8_t channel = linearIndex & 0x1F; // Fast modulo 32
+
+    // Write to inactive buffer (opposite of what tickPWM is reading)
+    uint8_t inactiveBuffer = 1 - _activeBuffer;
+    _pwmValues[inactiveBuffer][device][channel] = glyphValue;
   }
   // status LED
   // else if (ledNumber == Display::cPixelCount)
@@ -164,13 +194,22 @@ void initialize()
   // Initialize the display drivers' global brightness and dot control levels
   setMasterIntensity(NixieGlyph::cGlyph100Percent);
 
-  _displayBufferOut[0] = 0;
-  _displayBufferOut[1] = 0;
-  _displayBufferOut[2] = 0;
-
-  for (uint8_t i = 0; i < cPwmNumberOfDevices * cPwmChannelsPerDevice; i++)
+  // Initialize both PWM buffers to zero
+  for (uint8_t b = 0; b < 2; b++)
   {
-    _pwmValues[i] = 0;
+    for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
+    {
+      for (uint8_t c = 0; c < cPwmChannelsPerDevice; c++)
+      {
+        _pwmValues[b][d][c] = 0;
+      }
+    }
+  }
+
+  // Initialize display output buffers
+  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
+  {
+    _displayBufferOut[d] = 0;
   }
 
   _spiMaster = Hardware::getSpiMaster();
@@ -193,11 +232,9 @@ void refresh()
   {
     NixieGlyph activeGlyph;
 
-    // refresh all crossfaders, adjust intensities, write to the PWM buffer
+    // Read crossfader states (already ticked in ISR), adjust intensities, write to PWM buffer
     for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
     {
-      _crossfader[glyphCrossfader].tick();
-
       activeGlyph = _crossfader[glyphCrossfader].getActive();
       // adjust the brightness based on _intensityPercentage
       activeGlyph.adjustIntensity(_intensityPercentage);
@@ -214,6 +251,17 @@ void refresh()
 
 void tick()
 {
+  // Tick all crossfaders here in the ISR for precise 1000 Hz timing
+  // This ensures fade duration values accurately represent milliseconds
+  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
+  {
+    _crossfader[glyphCrossfader].tick();
+  }
+
+  // Atomically swap buffers - main loop's writes are now visible to tickPWM() ISR
+  // This single-byte write is atomic on ARM Cortex-M, ensuring race-free buffer swap
+  _activeBuffer = 1 - _activeBuffer;
+
   _refreshIntensitiesNow = true;
   // refresh the status LED here to play nicely with strobing via DMX-512
   if (_autoRefreshStatusLed == true)
@@ -235,21 +283,35 @@ void tick()
 void tickPWM()
 {
   SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
-  uint32_t pwmBits = 0;
 
   if (request != nullptr)
   {
-    for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
+    // Read from active buffer (set by tick() ISR via atomic buffer swap)
+    uint8_t activeBuffer = _activeBuffer;
+
+    // Process all 3 devices with 8-bit unrolling to improve performance
+    // Total of 12 iterations (3 devices × 4 bytes) instead of 96
+    for (uint8_t device = 0; device < cPwmNumberOfDevices; device++)
     {
-      for (uint8_t bit = 0; bit < cPwmChannelsPerDevice; bit++)
+      uint32_t pwmBits = 0;
+
+      // Process 8 bits at a time (4 iterations per device: 32 bits / 8 = 4)
+      for (uint8_t byteIdx = 0; byteIdx < 4; byteIdx++)
       {
-        if (_pwmValues[bit + (d * cPwmChannelsPerDevice)] > _pwmTickCounter)
-        {
-          pwmBits |= (1 << bit);
-        }
+        uint8_t offset = byteIdx << 3;  // byteIdx * 8
+
+        // Unroll 8 bits manually for branchless performance
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 0] > _pwmTickCounter)) << (offset + 0);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 1] > _pwmTickCounter)) << (offset + 1);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 2] > _pwmTickCounter)) << (offset + 2);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 3] > _pwmTickCounter)) << (offset + 3);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 4] > _pwmTickCounter)) << (offset + 4);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 5] > _pwmTickCounter)) << (offset + 5);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 6] > _pwmTickCounter)) << (offset + 6);
+        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 7] > _pwmTickCounter)) << (offset + 7);
       }
-      _displayBufferOut[d] = pwmBits;
-      pwmBits = 0;
+
+      _displayBufferOut[device] = pwmBits;
     }
 
     // Write the data to the drivers
@@ -264,11 +326,8 @@ void tickPWM()
       _spiMaster->processQueue();
     }
 
-    // increment the tick counter and reset it if it's time
-    if (++_pwmTickCounter > NixieGlyph::cGlyphMaximumIntensity)
-    {
-      _pwmTickCounter = 0;
-    }
+    // increment the tick counter - uint8_t naturally wraps at 256 (no masking needed!)
+    _pwmTickCounter++;
   }
 }
 
