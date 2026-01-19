@@ -1,2 +1,4 @@
 .DS_Store
+.hypothesis
 .vscode
+build/

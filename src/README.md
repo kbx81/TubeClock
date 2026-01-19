@@ -74,5 +74,17 @@ When compiling (with gcc), you'll need to add `-DHARDWARE_VERSION=X` to the
  application loop. See `Application.cpp` and `Hardware.cpp` and work your way
  through the rest from there.
 
+To build the code, there is a basic Makefile in the `src/v1` directory; simply
+run `make` and it'll build what you need. Then, you can write the resulting
+binary to the STM32 via an ST-Link with:
+
+```shell
+st-flash write TubeClock.bin 0x08000000
+```
+
+For more advanced debugging, you can use GDB. Run `st-util --n` followed by
+`arm-none-eabi-gdb TubeClock.elf --init-eval-command="target remote 127.0.0.1:4242"`
+to connect.
+
 Please don't hesitate to reach out with any questions or comments -- it is nice
  to hear feedback. Happy hacking!
