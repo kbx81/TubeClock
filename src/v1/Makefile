@@ -20,7 +20,20 @@
 # Build directory - relative to project root
 BUILD_DIR = ../../build/v1
 
+# Settings profile selection - determines default settings compiled into the binary
+#   0 = Standard  : US/North America (DST enabled, 12-hour, Fahrenheit)
+#   1 = European  : Europe (24-hour, Celsius, no DST handling)
+#   2 = Minimal   : Silent mode (no beeps/effects, basic display)
+#   3 = Kbx       : kbx's preferred (slower fades, quieter beeps)
+# Override at build time with: make PROFILE=1
+# The compiler will validate the PROFILE value and error if out of range.
+# Default profile if not specified:
+PROFILE ?= 0
+
 DEFS	+= -DHARDWARE_VERSION=1
+DEFS	+= -DSETTINGS_PROFILE=$(PROFILE)
+# Uncomment to enable GPIO profiling pins (e.g. for logic analyzer measurement of ISR timing)
+# DEFS	+= -DENABLE_PROFILING
 BINARY = $(BUILD_DIR)/TubeClock
 SRCS   = $(filter-out TubeClock.cpp, $(wildcard *.cpp))
 # CFLAGS += -I./
@@ -30,10 +43,12 @@ OBJS  += $(addprefix $(BUILD_DIR)/,$(SRCS:.cpp=.o))
 
 OPENCM3_DIR=../../../../libopencm3
 # LDSCRIPT = $(OPENCM3_DIR)/lib/stm32/f0/stm32f04xz6.ld
-LDSCRIPT = $(OPENCM3_DIR)/lib/stm32/f0/stm32f07xzb.ld
+# LDSCRIPT = $(OPENCM3_DIR)/lib/stm32/f0/stm32f07xzb.ld
+# Custom linker script with reserved settings flash area
+LDSCRIPT = stm32f07xzb-tubeclock.ld
 # LDFLAGS += -Wl,--Map=$(BINARY).map
 
-CXXSTD	 = -std=c++11
+CXXSTD	 = -std=c++17
 
 include ../../../../libopencm3.target.mk
 

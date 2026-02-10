@@ -116,6 +116,11 @@ SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const da
 ///
 SpiMaster::SpiReqAck refresh(const bool block = false);
 
+/// @brief Returns true if the last refresh() SPI transfer has completed
+/// @return true if transfer is complete and getDateTime() will return fresh data
+///
+bool transferComplete();
+
 }
 
 }

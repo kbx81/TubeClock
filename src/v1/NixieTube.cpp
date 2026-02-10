@@ -42,18 +42,11 @@
 namespace kbxTubeClock {
 
 
-  NixieTube::NixieTube(const uint8_t glyph, const uint16_t intensity, const uint32_t duration)
+  NixieTube::NixieTube(const uint8_t glyph, const uint8_t intensity, const uint32_t duration)
     : _activeGlyph(glyph),
       _duration(duration),
       _intensity()
   {
-    uint16_t safeIntensity = NixieGlyph::cGlyphMaximumIntensity;
-
-    if (intensity < NixieGlyph::cGlyphMaximumIntensity)
-    {
-      safeIntensity = intensity;
-    }
-
     for (uint8_t i = 0; i < cGlyphsPerTube; i++)
     {
       _intensity[i] = 0;
@@ -61,12 +54,12 @@ namespace kbxTubeClock {
 
     if (glyph < cGlyphsPerTube)
     {
-      _intensity[glyph] = safeIntensity;
+      _intensity[glyph] = intensity;
     }
     else
     {
       _activeGlyph = 0;
-      _intensity[_activeGlyph] = safeIntensity;
+      _intensity[_activeGlyph] = intensity;
     }
   }
 
@@ -112,24 +105,17 @@ namespace kbxTubeClock {
   }
 
 
-  void NixieTube::setIntensity(const uint16_t intensity)
+  void NixieTube::setIntensity(const uint8_t intensity)
   {
     setIntensity(_activeGlyph, intensity);
   }
 
 
-  void NixieTube::setIntensity(const uint8_t glyph, const uint16_t intensity)
+  void NixieTube::setIntensity(const uint8_t glyph, const uint8_t intensity)
   {
     if (glyph < cGlyphsPerTube)
     {
-      if (intensity < NixieGlyph::cGlyphMaximumIntensity)
-      {
-        _intensity[glyph] = intensity;
-      }
-      else
-      {
-        _intensity[glyph] = NixieGlyph::cGlyphMaximumIntensity;
-      }
+      _intensity[glyph] = intensity;
     }
   }
 
@@ -202,17 +188,19 @@ namespace kbxTubeClock {
 
   void NixieTube::adjustIntensity(const uint8_t glyph, uint16_t percentageOfCurrentx100)
   {
-    uint32_t top;
+    const uint32_t cGlyph100Percent = 65536;  // 100% as 16-bit fixed-point
 
     if (glyph < cGlyphsPerTube)
     {
-      if (percentageOfCurrentx100 > NixieGlyph::cGlyph100Percent)
+      // Fast path: full intensity, no calculation needed
+      if (percentageOfCurrentx100 >= cGlyph100Percent)
       {
-        percentageOfCurrentx100 = NixieGlyph::cGlyph100Percent;
+        return;  // intensity unchanged
       }
 
-      top = _intensity[glyph] * percentageOfCurrentx100;
-      _intensity[glyph] = top / NixieGlyph::cGlyph100Percent;
+      // Optimized: use shift instead of division for 65536
+      uint32_t top = _intensity[glyph] * percentageOfCurrentx100;
+      _intensity[glyph] = top >> 16;  // Fast divide by 65536
     }
   }
 
@@ -231,18 +219,19 @@ namespace kbxTubeClock {
 
   void NixieTube::mergeWithNixieTube(uint16_t percentageOfOriginalTubex100, const NixieTube &tube)
   {
-    int32_t intensity;
+    const uint32_t cGlyph100Percent = 65536;  // 100% as 16-bit fixed-point
 
-    if (percentageOfOriginalTubex100 > NixieGlyph::cGlyph100Percent)
+    // Fast path: 100% of original tube
+    if (percentageOfOriginalTubex100 >= cGlyph100Percent)
     {
-      percentageOfOriginalTubex100 = NixieGlyph::cGlyph100Percent;
+      return;  // keep current intensities unchanged
     }
 
     for (uint8_t i = 0; i < NixieTube::cGlyphsPerTube; i++)
     {
       // new intensity = led0 - ((led0 - led1) * percentage)
-      intensity = _intensity[i] - tube.getIntensity(i);
-      intensity = _intensity[i] - ((intensity * percentageOfOriginalTubex100) / NixieGlyph::cGlyph100Percent);
+      int32_t intensity = _intensity[i] - tube.getIntensity(i);
+      intensity = _intensity[i] - ((intensity * percentageOfOriginalTubex100) >> 16);  // Fast divide by 65536
       _intensity[i] = intensity;
     }
   }
@@ -250,18 +239,23 @@ namespace kbxTubeClock {
 
   void NixieTube::setFromMergedNixieTubes(uint16_t percentageOfTube0x100, const NixieTube &tube0, const NixieTube &tube1)
   {
-    int32_t intensity;
+    const uint32_t cGlyph100Percent = 65536;  // 100% as 16-bit fixed-point
 
-    if (percentageOfTube0x100 > NixieGlyph::cGlyph100Percent)
+    // Fast path: 100% of tube0
+    if (percentageOfTube0x100 >= cGlyph100Percent)
     {
-      percentageOfTube0x100 = NixieGlyph::cGlyph100Percent;
+      for (uint8_t i = 0; i < NixieTube::cGlyphsPerTube; i++)
+      {
+        _intensity[i] = tube0.getIntensity(i);
+      }
+      return;
     }
 
     for (uint8_t i = 0; i < NixieTube::cGlyphsPerTube; i++)
     {
       // new intensity = led0 - ((led0 - led1) * percentage)
-      intensity = tube0.getIntensity(i) - tube1.getIntensity(i);
-      intensity = tube0.getIntensity(i) - ((intensity * percentageOfTube0x100) / NixieGlyph::cGlyph100Percent);
+      int32_t intensity = tube0.getIntensity(i) - tube1.getIntensity(i);
+      intensity = tube0.getIntensity(i) - ((intensity * percentageOfTube0x100) >> 16);  // Fast divide by 65536
       _intensity[i] = intensity;
     }
   }

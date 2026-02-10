@@ -219,13 +219,13 @@ namespace Application {
   void setIntensityAutoAdjust(const bool enable, const bool quickAdjust = false);
 
   /// @brief Returns the application's current display intensity
-  /// @return current display intensity percentage application is using (see RgbLed)
-  uint16_t getIntensity();
+  /// @return current display intensity (0-255)
+  uint8_t getIntensity();
 
   /// @brief Set the application's display intensity and disables automagic adjusting of the display intensity
-  /// @param intensity New display intensity percentage application should use (see RgbLed)
+  /// @param intensity New display intensity (0-255)
   ///
-  void setIntensity(const uint16_t intensity);
+  void setIntensity(const uint8_t intensity);
 
   /// @brief Refreshs master display intensity. Call at fixed intervals.
   ///

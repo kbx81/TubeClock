@@ -31,7 +31,7 @@
 namespace kbxTubeClock {
 
 
-const uint8_t TimeDateTempView::cIntensityAdjustmentIncrement = 100;
+const uint8_t TimeDateTempView::cIntensityAdjustmentIncrement = 5;  // Increment by 5 on 0-255 scale (~2% steps)
 
 
 TimeDateTempView::TimeDateTempView()
@@ -108,14 +108,14 @@ bool TimeDateTempView::keyHandler(Keys::Key key)
   if ((key == Keys::Key::U) && (Application::getIntensityAutoAdjust() == false))
   {
     const int16_t intensity = Application::getIntensity() + cIntensityAdjustmentIncrement;
-    if (intensity <= RgbLed::cLed100Percent)
+    if (intensity <= 255)
     {
       Application::setIntensity(intensity);
       tick = true;
     }
     else
     {
-      Application::setIntensity(RgbLed::cLed100Percent);
+      Application::setIntensity(255);  // Maximum brightness
     }
   }
 
@@ -285,6 +285,7 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
 
       case FixedDisplayItem::Date:
         dotsBitmap = 0b1010;  // lower dots only for date display
+        [[fallthrough]];
 
       default:
         display->setDisplayFromDateTime(_currentTime, _getDisplaySelection(item));

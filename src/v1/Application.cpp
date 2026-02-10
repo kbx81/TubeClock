@@ -123,21 +123,17 @@ static viewDescriptor const cViewDescriptor[] = {
 //   Counter is incremented by tick()
 static const uint32_t cMaximumIdleCount = 120000;
 
-// A value by which we multiply the preference stored in the Settings
-//
-static const uint8_t cMinimumIntensityMultiplier = 10;
-
 // Idle cycle counter
 //
 volatile static auto _idleCounter = cMaximumIdleCount;
 
-// minimum intensity
-//   100 = 1%
-static uint16_t _minimumIntensity = cMinimumIntensityMultiplier;
-
-// master display intensity
+// minimum intensity (0-255 scale)
 //
-static uint16_t _intensityPercentage = _minimumIntensity;
+static uint8_t _minimumIntensity = 1;
+
+// master display intensity (0-255 scale)
+//
+static uint8_t _masterIntensity = _minimumIntensity;
 
 // important daylight savings dates & times
 //
@@ -200,7 +196,7 @@ void initialize()
   // make sure the display lights up at start-up time if auto-adjust is disabled
   if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity) == false)
   {
-    setIntensity(RgbLed::cLed100Percent);
+    setIntensity(255);  // Full brightness
   }
   // setOperatingMode() will refreshSettings()
   if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle) == true)
@@ -216,9 +212,15 @@ void initialize()
 
 DateTime dateTime()
 {
-  if (_currentTime.second() != Hardware::dateTime().second())
+  // Read hardware time once to avoid race condition where _currentDateTime
+  // could be updated by ISR between reading _currentTime.second() and Hardware::dateTime().second()
+  DateTime hardwareTime = Hardware::dateTime();
+
+  // Check if the second has changed in the hardware RTC
+  // With PPS configured for EXTI_TRIGGER_RISING, this will update exactly once per second
+  if (_currentTime.second() != hardwareTime.second())
   {
-    _currentTime = Hardware::dateTime();
+    _currentTime = hardwareTime;
 
     if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
         && (isDst(_currentTime) == true))
@@ -377,7 +379,8 @@ void refreshSettings()
 
   GpsReceiver::setTimeZone(timeZoneOffsetInMinutes);
 
-  _minimumIntensity = _settings.getRawSetting(Settings::Setting::MinimumIntensity) * cMinimumIntensityMultiplier;
+  // Convert stored setting (0-255) to master intensity scale (0-255)
+  _minimumIntensity = _settings.getRawSetting(Settings::Setting::MinimumIntensity);
   setIntensityAutoAdjust(_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity), true);
 }
 
@@ -464,29 +467,40 @@ void _refreshDst()
 //
 void _updateIntensityPercentage(const bool quick = false)
 {
-  // determine the new value for _intensityPercentage
-  uint16_t currentPercentage = (Hardware::lightLevel() * RgbLed::cLed100Percent) / RgbLed::cLedMaxIntensity;
+  // Convert light level (0-4095) to intensity (0-255)
+  // Need accurate conversion here - the bit shift approximation was too inaccurate
+  uint16_t currentIntensity = (Hardware::lightLevel() * 255) / 4095;
 
-  // make sure the intensity does not go below the minimum level
-  if (currentPercentage < _minimumIntensity)
+  // Enforce minimum intensity
+  if (currentIntensity < _minimumIntensity)
   {
-    currentPercentage = _minimumIntensity;
+    currentIntensity = _minimumIntensity;
   }
 
   if (quick == true)
   {
-    _intensityPercentage = currentPercentage;
+    // Quick mode: snap immediately to target
+    _masterIntensity = currentIntensity;
   }
   else
   {
-    if (currentPercentage > _intensityPercentage)
+    // Smooth mode with deadband and adaptive step size
+    int16_t error = currentIntensity - _masterIntensity;
+
+    // Deadband of ±2 counts prevents hunting/flickering from noise
+    if (error > 2)
     {
-     _intensityPercentage++;
+      // Adaptive step: larger steps when far from target, smaller when close
+      // This gives fast initial response with smooth final approach
+      uint8_t step = (error > 20) ? 2 : 1;
+      _masterIntensity += step;
     }
-    else if (currentPercentage < _intensityPercentage)
+    else if (error < -2)
     {
-     _intensityPercentage--;
+      uint8_t step = (error < -20) ? 2 : 1;
+      _masterIntensity -= step;
     }
+    // Within deadband: do nothing (prevents flickering)
   }
 }
 
@@ -511,24 +525,16 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust)
 }
 
 
-uint16_t getIntensity()
+uint8_t getIntensity()
 {
-  return _intensityPercentage;
+  return _masterIntensity;
 }
 
 
-void setIntensity(const uint16_t intensity)
+void setIntensity(const uint8_t intensity)
 {
   _autoAdjustIntensities = false;
-
-  if (intensity < RgbLed::cLed100Percent)
-  {
-    _intensityPercentage = intensity;
-  }
-  else
-  {
-    _intensityPercentage = RgbLed::cLed100Percent;
-  }
+  _masterIntensity = intensity;  // 0-255 scale, no clamping needed for uint8_t
 }
 
 
@@ -563,7 +569,7 @@ void loop()
     // We control the master display intensity only if DMX-512 is NOT active
     if (_externalControlMode != ExternalControl::Dmx512ExtControlEnum)
     {
-      DisplayManager::setMasterIntensity(_intensityPercentage);
+      DisplayManager::setMasterIntensity(_masterIntensity);
     }
 
     // Check the buttons
@@ -592,6 +598,7 @@ void loop()
           Hardware::tick();
           // Take control back
           _externalControlMode = ExternalControl::NoActiveExtControlEnum;
+          Dmx512Controller::setDmx512Active(false);
           // Make sure the display is visible
           DisplayManager::setDisplayBlanking(false);
         }
@@ -620,6 +627,7 @@ void loop()
       if (Dmx512Rx::signalIsActive() == true)
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
+        Dmx512Controller::setDmx512Active(true);
         Hardware::setHvState(true);
       }
       // Kick back to the default display mode
@@ -662,10 +670,12 @@ void loop()
       if (_previousDmxState == true)
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
+        Dmx512Controller::setDmx512Active(true);
       }
       else
       {
         _externalControlMode = ExternalControl::NoActiveExtControlEnum;
+        Dmx512Controller::setDmx512Active(false);
         AlarmHandler::clearAlarm();   // just in case...
       }
       // Setting this mode activates the view but also kicks us back to the menu if there is no signal

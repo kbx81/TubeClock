@@ -18,6 +18,9 @@
 //
 
 #include <libopencm3/cm3/nvic.h>
+#ifdef ENABLE_PROFILING
+#include <libopencm3/stm32/gpio.h>
+#endif
 #include "Hardware.h"
 #include "Animator.h"
 #include "Application.h"
@@ -75,8 +78,14 @@ void sys_tick_handler(void)
 /* Timer 2 interrupt -- used for generating PWM for tubes */
 void tim2_isr()
 {
+#ifdef ENABLE_PROFILING
+	gpio_set(GPIOA, GPIO0);
+#endif
 	DisplayManager::tickPWM();
 	Hardware::tim2Isr();
+#ifdef ENABLE_PROFILING
+	gpio_clear(GPIOA, GPIO0);
+#endif
 }
 
 

@@ -96,18 +96,13 @@ void NixieGlyphCrossfader::startNewFadeIfDifferent(const NixieGlyph &newTarget)
 void NixieGlyphCrossfader::tick()
 {
   // the _active NixieGlyph object's duration value is the current number of ticks into the fade
-  uint32_t currentTick  = _active.getDuration(),
-           totalTicks   = _target.getDuration(),
-           percentTicks = NixieGlyph::cGlyph100Percent;
+  uint32_t currentTick = _active.getDuration();
+  uint32_t totalTicks  = _target.getDuration();
 
   if (currentTick < totalTicks)
   {
-    if (totalTicks != 0)  // do not divide by zero omg
-    {
-      percentTicks = (NixieGlyph::cGlyph100Percent * currentTick) / totalTicks;
-    }
-    // set _active to the merged values of _start and _target
-    _active.setFromMergedNixieGlyphs(percentTicks, _start, _target);
+    // set _active to the interpolated value between _start and _target
+    _active.setFromLinearInterpolation(currentTick, totalTicks, _start, _target);
     _active.setDuration(currentTick + 1);
   }
   else if (currentTick >= totalTicks)

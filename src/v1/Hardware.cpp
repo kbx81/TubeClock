@@ -24,6 +24,7 @@
 // #include <stdlib.h>
 // #include <string.h>
 #include <libopencm3/cm3/nvic.h>
+#include <libopencm3/cm3/scb.h>
 #include <libopencm3/cm3/systick.h>
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/stm32/crc.h>
@@ -135,13 +136,18 @@ static const uint8_t cAdcTemperature = 1;
 static const uint8_t cAdcVref = 2;
 static const uint8_t cAdcVbat = 3;
 
-// how frequently we will sample things
+// how frequently we will sample things (in milliseconds)
 //
-static const uint16_t cAdcSampleInterval = 500;
+static const uint16_t cAdcSampleIntervalLight = 500;   // Light sensor sampling (500ms = 2 Hz)
+static const uint16_t cAdcSampleIntervalSlow = 2000;   // Temp/voltage sampling (2000ms = 0.5 Hz)
 
-// number of samples averaged for light level and temp
+// IIR filter coefficients (shift amounts for division by power of 2)
+// Lower shift = faster response but more noise; Higher shift = slower but smoother
+// We use upscaling to maintain precision in integer math
 //
-static const uint8_t cAdcSamplesToAverage = 16;
+static const uint8_t cAdcLightFilterShift = 4;       // 1/16 weight (~8s time constant @ 500ms sample rate)
+static const uint8_t cAdcTempVoltageFilterShift = 3;  // 1/8 weight (~16s time constant @ 2000ms sample rate)
+static const uint8_t cAdcFilterUpscale = 4;          // Scale factor for precision (multiply by 16)
 
 // value used to increase precision in our maths
 //
@@ -150,6 +156,10 @@ static const int16_t cBaseMultiplier = 1000;
 // maximum time to wait before disconnecting Vbat from the ADC's bridge divider
 //
 static const uint16_t cBatteryMeasuringTimeout = 5000;
+
+// delay (in milliseconds) after PPS edge before reading RTC
+// gives external RTC time to update its registers after PPS trigger
+static const uint8_t cPpsRtcReadDelay = 10;
 
 // the last page number in the flash memory
 //
@@ -179,17 +189,20 @@ static const uint8_t cToneFrequencyMinimum = 92;
 //
 static const uint8_t cToneVolumeMaximum = 7;
 
-// maximum minimum allowed to consider a key pressed/touched
+// Touch detection thresholds
 //
-static const uint16_t cTscMaximumMinimum = 1536;
+static const int16_t cTscTouchThreshold = 150;     // Delta value to trigger touch detection
+static const int16_t cTscReleaseThreshold = 100;   // Delta value to release touch (hysteresis)
 
-// minimum required difference between min and max readings
-//
-static const uint16_t cTscMinimumDelta = 400;
+// Adaptive baseline tracking speed (shift amount for division)
+//  Higher value = slower tracking (more stable but slower to adapt)
+//  6 = 1/64 per sample, 7 = 1/128 per sample
+static const uint8_t cTscBaselineShift = 6;
 
-// number of samples averaged for sensors
-//
-static const uint8_t cTscSamplesToAverage = 32;
+// IIR filter speed (shift amount for division)
+//  Lower value = faster response but more noise
+//  3 = ~8 sample equivalent, 4 = ~16 sample equivalent
+static const uint8_t cTscFilterShift = 3;
 
 // calibration voltage used (3.3 volts)
 //
@@ -204,29 +217,23 @@ static SpiMaster _spi1Master;
 //
 static Usart _usart[cNumberOfUsarts];
 
-// tracks which array element the next sample is to be written to
+// tracks when to take ADC samples
 //
-static uint8_t _adcSampleCounter = 0;
+static uint16_t _adcSampleTimerLight = 0;
+static uint16_t _adcSampleTimerSlow = 0;
 
-// tracks when to take a sample
+// IIR filtered ADC values (replaces averaging arrays - saves 96 bytes!)
+// These use exponential moving average for better noise rejection
+// Values are upscaled by cAdcFilterUpscale to maintain precision in integer math
 //
-static uint16_t _adcSampleTimer = 0;
+static uint32_t _adcFilteredLight = 0;
+static uint32_t _adcFilteredTemp = 0;
+static uint32_t _adcFilteredVoltageVddA = 0;
+static uint32_t _adcFilteredVoltageBatt = 0;
 
-// samples averaged for light
+// Cached light level result (0-4095) to avoid redundant calculation
 //
-static uint16_t _adcSampleSetLight[cAdcSamplesToAverage];
-
-// samples averaged for temperature
-//
-static uint16_t _adcSampleSetTemp[cAdcSamplesToAverage];
-
-// samples averaged for VddA voltage
-//
-static uint16_t _adcSampleSetVoltageVddA[cAdcSamplesToAverage];
-
-// samples averaged for battery voltage
-//
-static uint16_t _adcSampleSetVoltageBatt[cAdcSamplesToAverage];
+static uint16_t _cachedLightLevel = 0;
 
 // threshold above which we do not BLANK during display refreshes
 //  used when autoAdjustIntensities is true
@@ -306,29 +313,21 @@ static uint16_t _toneFrequencyNext = 0;
 //
 static uint8_t _toneVolume = 0;
 
-// tracks which array element the next sample is to be written to
-//
-static uint8_t _tscSampleCounter = 0;
-
-// samples averaged for buttons
-//
-static uint16_t _tscSampleSets[cTscChannelCount][cTscSamplesToAverage];
-
-// minimum read values for buttons
-//
-static uint16_t _tscMinimums[cTscChannelCount];
-
-// maximum read values for buttons
-//
-static uint16_t _tscMaximums[cTscChannelCount];
-
 // tracks which TSC channel(s) we'll sample next
 //
 static uint8_t _tscChannelCounter = 0;
 
-// a place for data from the TSC to live
+// adaptive baseline for each channel (tracks untouched capacitance)
 //
-static uint16_t _tscAcquisitionValues[cTscChannelCount];
+static uint16_t _tscBaseline[cTscChannelCount];
+
+// filtered sensor readings for each channel
+//
+static uint16_t _tscFiltered[cTscChannelCount];
+
+// touch state for each channel (bit 0-5 correspond to channels 0-5)
+//
+static uint8_t _tscTouchState = 0;
 
 // date & time stored by Refresh()
 //
@@ -361,6 +360,18 @@ volatile static bool _refreshRTCNow = false;
 // true if the external temperature sensor needs to be refreshed
 //
 volatile static bool _refreshTempNow = false;
+
+// countdown timer for delaying RTC read after PPS (in milliseconds)
+//  gives external RTC time to update its registers after PPS edge
+volatile static uint8_t _ppsDelayCounter = 0;
+
+// true if a non-blocking DS3234 SPI refresh has been queued and we are
+//  waiting for the DMA transfer to complete before reading the result
+volatile static bool _rtcReadPending = false;
+
+// true if a non-blocking temperature sensor SPI refresh has been queued and
+//  we are waiting for the DMA transfer to complete before reading the result
+volatile static bool _tempReadPending = false;
 
 // indicates if the app can rely on a periodic interrupt (PPS) to trigger
 //  external RTC and temperature sensor refreshes
@@ -499,6 +510,12 @@ void _dmaSetup()
 //
 void _gpioSetup()
 {
+#ifdef ENABLE_PROFILING
+  // Configure PA0 as output for ISR profiling (scope probe)
+  gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);
+  gpio_clear(GPIOA, GPIO0);
+#endif
+
   // Configure the SPI NSS pins for the HV drivers, RTC, and temp sensor
   gpio_mode_setup(cNssPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, cNssDisplayPin | cNssRtcPin | cNssTemperaturePin);
   // Configure the BLANK pin for the LED drivers
@@ -520,9 +537,10 @@ void _gpioSetup()
   }
 
   // Next, configure the external PPS/SQW_In pulse-per-second input pin and interrupt
+  // Trigger only on rising edge to avoid double-triggering on square wave PPS signal
   gpio_mode_setup(cPpsPort, GPIO_MODE_INPUT, GPIO_PUPD_NONE, cPpsPin);
   exti_select_source(EXTI13, cPpsPort);
-  exti_set_trigger(EXTI13, EXTI_TRIGGER_BOTH);
+  exti_set_trigger(EXTI13, EXTI_TRIGGER_RISING);
   exti_enable_request(EXTI13);
 
   // Finally, configure the external IR remote sensor input pin and interrupt
@@ -630,14 +648,15 @@ void _nvicSetup()
 	// nvic_enable_irq(NVIC_ADC_COMP_IRQ);
   // nvic_set_priority(NVIC_DMA1_CHANNEL1_IRQ, 0);
 	// nvic_enable_irq(NVIC_DMA1_CHANNEL1_IRQ);
-  nvic_set_priority(cDmaIrqSpi1, 0);
+  // DMA interrupts set to priority 64 to ensure they don't preempt the critical PWM timer
+  nvic_set_priority(cDmaIrqSpi1, 64);
 	nvic_enable_irq(cDmaIrqSpi1);
-  nvic_set_priority(cDmaIrqUsarts, 0);
+  nvic_set_priority(cDmaIrqUsarts, 64);
 	nvic_enable_irq(cDmaIrqUsarts);
   // EXTI interrupts -- PPS and IR sensor inputs
   nvic_set_priority(cPpsIrq, 64);
 	nvic_enable_irq(cPpsIrq);
-  // PWM timer interrupt (triggers refresh of tubes)
+  // PWM timer interrupt (triggers refresh of tubes) - HIGHEST priority (0) for deterministic timing
   nvic_set_priority(cTubePwmTimerIrq, 0);
 	nvic_enable_irq(cTubePwmTimerIrq);
   // IR interrupt (overflow = timeout)
@@ -749,6 +768,12 @@ void _systickSetup(const uint16_t xms)
 {
 	// div8 per ST, stays compatible with M3/M4 parts, well done ST
 	systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
+  // Lower SysTick priority to 64 to allow TIM2 PWM ISR (priority 0) to preempt it
+  // On Cortex-M0, SHPR3[31:30] controls SysTick priority (2 bits = 4 priority levels: 0, 64, 128, 192)
+  // This allows TIM2 to interrupt SysTick, minimizing PWM jitter
+  // At 60Hz refresh (period 3125), scope shows stable 65-80-50µs pattern averaging 65.09µs
+  // Occasional SysTick preemption causes 80µs periods, but timing auto-compensates with 50µs periods
+  SCB_SHPR3 |= (64 << 24);
 	// clear counter so it starts right away
 	STK_CVR = 0;
 
@@ -866,9 +891,12 @@ void _timerSetupPWM()
   timer_set_prescaler(cTubePwmTimer, 0);
   timer_set_repetition_counter(cTubePwmTimer, 0);
   timer_continuous_mode(cTubePwmTimer);
-  // Timer frequency: 48MHz / 3750 = 12800 Hz
-  // With 256 PWM steps (0-255), complete cycle = 256/12800 = 20ms (50Hz refresh to minimize flicker)
-  timer_set_period(cTubePwmTimer, 3750);
+  // Timer frequency: 48MHz / 3125 = 15360 Hz
+  // With 256 PWM steps (0-255), complete cycle = 256/15360 = 16.67ms (60Hz refresh)
+  // Timer period = 65.10µs provides excellent timing margin (25.3%) for ISR execution (~49µs max)
+  // Scope testing shows stable operation with 65-80-50µs period pattern (avg 65.09µs)
+  // Pattern caused by occasional SysTick preemption, but timing compensates perfectly
+  timer_set_period(cTubePwmTimer, 3125);
 
   timer_enable_preload(cTubePwmTimer);
 
@@ -1011,67 +1039,104 @@ void _incrementOnTimeSecondsCounter()
 }
 
 
-SpiMaster::SpiReqAck _refreshTemp()
+void _refreshTemp()
 {
-  SpiMaster::SpiReqAck status = SpiMaster::SpiReqAck::SpiReqAckOk;
-
   // Determine where to get the temperature from and get it
   switch (_externalTemperatureSensor)
   {
     case TempSensorType::DS3234:
-      // Registers will have been refreshed above
-      _temperatureXcBaseMultiplier =  DS3234::getTemperatureWholePart() * cBaseMultiplier;
-      _temperatureXcBaseMultiplier += ((DS3234::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      // Temperature comes from the DS3234 registers, which are refreshed by
+      //  _refreshRTC(). Only read once the RTC DMA transfer has completed.
+      if ((_refreshTempNow == true) && (_rtcReadPending == false))
+      {
+        _temperatureXcBaseMultiplier =  DS3234::getTemperatureWholePart() * cBaseMultiplier;
+        _temperatureXcBaseMultiplier += ((DS3234::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+        _refreshTempNow = false;
+      }
       break;
 
     case TempSensorType::LM74:
-      status = LM74::refresh();
-      _temperatureXcBaseMultiplier =  LM74::getTemperatureWholePart() * cBaseMultiplier;
-      _temperatureXcBaseMultiplier += ((LM74::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      // Phase 1: queue the SPI refresh (non-blocking)
+      if (_refreshTempNow == true)
+      {
+        SpiMaster::SpiReqAck status = LM74::refresh();
+        if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
+            || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
+        {
+          _tempReadPending = true;
+          _refreshTempNow = false;
+        }
+      }
+      // Phase 2: harvest the result once DMA completes
+      if ((_tempReadPending == true) && (LM74::transferComplete() == true))
+      {
+        _temperatureXcBaseMultiplier =  LM74::getTemperatureWholePart() * cBaseMultiplier;
+        _temperatureXcBaseMultiplier += ((LM74::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+        _tempReadPending = false;
+      }
       break;
 
     case TempSensorType::DS1722:
-      status = DS1722::refresh();
-      _temperatureXcBaseMultiplier =  DS1722::getTemperatureWholePart() * cBaseMultiplier;
-      _temperatureXcBaseMultiplier += ((DS1722::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      // Phase 1: queue the SPI refresh (non-blocking)
+      if (_refreshTempNow == true)
+      {
+        SpiMaster::SpiReqAck status = DS1722::refresh();
+        if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
+            || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
+        {
+          _tempReadPending = true;
+          _refreshTempNow = false;
+        }
+      }
+      // Phase 2: harvest the result once DMA completes
+      if ((_tempReadPending == true) && (DS1722::transferComplete() == true))
+      {
+        _temperatureXcBaseMultiplier =  DS1722::getTemperatureWholePart() * cBaseMultiplier;
+        _temperatureXcBaseMultiplier += ((DS1722::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+        _tempReadPending = false;
+      }
       break;
 
     default:
-      uint32_t totalTemp = 0;
-
-      // Add up some values so we can compute some averages...
-      for (uint8_t i = 0; i < cAdcSamplesToAverage; i++)
+      // Internal ADC temperature -- no SPI involved, can read immediately
+      if (_refreshTempNow == true)
       {
-        totalTemp += _adcSampleSetTemp[i];
+        int32_t averageTemp = _adcFilteredTemp >> cAdcFilterUpscale;
+        // Now we can compute the temperature based on RM's formula, * cBaseMultiplier
+        _temperatureXcBaseMultiplier = (averageTemp * voltageVddA() / cVddCalibrationVoltage) - ST_TSENSE_CAL1_30C;
+        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier * (110 - 30) * cBaseMultiplier;
+        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier / (ST_TSENSE_CAL2_110C - ST_TSENSE_CAL1_30C);
+        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier + 30000 + (_temperatureAdjustment * cBaseMultiplier);
+        _refreshTempNow = false;
       }
-      // Get the averages of the last several readings
-      int32_t averageTemp = totalTemp / cAdcSamplesToAverage;
-      // Now we can compute the temperature based on RM's formula, * cBaseMultiplier
-      _temperatureXcBaseMultiplier = (averageTemp * voltageVddA() / cVddCalibrationVoltage) - ST_TSENSE_CAL1_30C;
-      _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier * (110 - 30) * cBaseMultiplier;
-      _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier / (ST_TSENSE_CAL2_110C - ST_TSENSE_CAL1_30C);
-      _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier + 30000 + (_temperatureAdjustment * cBaseMultiplier);
   }
-
-  return status;
 }
 
 
-SpiMaster::SpiReqAck _refreshRTC()
+void _refreshRTC()
 {
-  SpiMaster::SpiReqAck status = SpiMaster::SpiReqAck::SpiReqAckOk;
-  // Update time/date if it's the DS323x's turn
   if (_externalRtcConnected == true)
   {
-    status = DS3234::refresh();
+    // Phase 1: queue the SPI refresh (non-blocking)
+    if (_refreshRTCNow == true)
+    {
+      SpiMaster::SpiReqAck status = DS3234::refresh();  // non-blocking
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
+          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
+      {
+        _rtcReadPending = true;
+        _refreshRTCNow = false;
+      }
+    }
 
-    if (status == SpiMaster::SpiReqAck::SpiReqAckOk)
+    // Phase 2: harvest the result once DMA completes
+    if ((_rtcReadPending == true) && (DS3234::transferComplete() == true))
     {
       _currentDateTime = DS3234::getDateTime();
-      // _rtcIsSet = DS3234::isValid();
+      _rtcReadPending = false;
     }
   }
-  else
+  else if (_refreshRTCNow == true)
   {
     uint32_t dr = RTC_DR, tr = RTC_TR;
     uint16_t year = 2000;
@@ -1098,43 +1163,35 @@ SpiMaster::SpiReqAck _refreshRTC()
     _currentDateTime.setDate(year, month, day);
     _currentDateTime.setTime(hour, minute, second);
     // _rtcIsSet = RTC_ISR & RTC_ISR_INITS;
-  }
 
-  return status;
+    _refreshRTCNow = false;
+  }
 }
 
 
 void _refreshPeripherals()
 {
-  if (_refreshRTCNow == true)
-  {
-    if (_refreshRTC() == SpiMaster::SpiReqAck::SpiReqAckOk)
-    {
-      _refreshRTCNow = false;
-    }
-  }
-
-  if (_refreshTempNow == true)
-  {
-    if (_refreshTemp() == SpiMaster::SpiReqAck::SpiReqAckOk)
-    {
-      _refreshTempNow = false;
-    }
-  }
+  _refreshRTC();
+  _refreshTemp();
 }
 
 
 void _syncRtcWithGps()
 {
-  DateTime gpsTime = GpsReceiver::getLocalDateTime();
-
+  // Only read GPS time when we might actually sync (avoids reading GPS data every loop)
+  // Only sync when not waiting for PPS refresh to avoid race with _currentDateTime update
   if ((GpsReceiver::isConnected() == true)
       && (GpsReceiver::isValid() == true)
-      && (gpsTime.hour() != _lastRtcGpsSyncHour)
-      && (gpsTime != _currentDateTime))
+      && (_ppsDelayCounter == 0))
   {
-    setDateTime(gpsTime);
-    _lastRtcGpsSyncHour = gpsTime.hour();
+    DateTime gpsTime = GpsReceiver::getLocalDateTime();
+
+    // Only sync RTCs once per hour when hour changes
+    if (gpsTime.hour() != _lastRtcGpsSyncHour)
+    {
+      setDateTime(gpsTime);
+      _lastRtcGpsSyncHour = gpsTime.hour();
+    }
   }
 }
 
@@ -1166,21 +1223,21 @@ void initialize()
 
   Dmx512Rx::initialize();
 
-  // Let's initialize some memory/data structures
-  for (_adcSampleCounter = 0; _adcSampleCounter < cAdcSamplesToAverage; _adcSampleCounter++)
-  {
-    _adcSampleSetLight[_adcSampleCounter] = _bufferADC[cAdcPhototransistor];
-    _adcSampleSetTemp[_adcSampleCounter] = _bufferADC[cAdcTemperature];
-    _adcSampleSetVoltageVddA[_adcSampleCounter] = _bufferADC[cAdcVref];
-    _adcSampleSetVoltageBatt[_adcSampleCounter] = _bufferADC[cAdcVbat];
-  }
+  // Initialize IIR filters with current ADC readings (upscaled for precision)
+  _adcFilteredLight = (uint32_t)_bufferADC[cAdcPhototransistor] << cAdcFilterUpscale;
+  _adcFilteredTemp = (uint32_t)_bufferADC[cAdcTemperature] << cAdcFilterUpscale;
+  _adcFilteredVoltageVddA = (uint32_t)_bufferADC[cAdcVref] << cAdcFilterUpscale;
+  _adcFilteredVoltageBatt = (uint32_t)_bufferADC[cAdcVbat] << cAdcFilterUpscale;
+  _cachedLightLevel = _bufferADC[cAdcPhototransistor];
 
+  // Initialize TSC baseline and filter values
+  // Start with mid-range baseline; will adapt quickly during first acquisitions
   for (_tscChannelCounter = 0; _tscChannelCounter < cTscChannelCount; _tscChannelCounter++)
   {
-    _tscAcquisitionValues[_tscChannelCounter] = 0;
-    _tscMinimums[_tscChannelCounter] = 0xffff;
-    _tscMaximums[_tscChannelCounter] = 0;
+    _tscBaseline[_tscChannelCounter] = 2048;  // Mid-range initial baseline
+    _tscFiltered[_tscChannelCounter] = 2048;  // Mid-range initial filter
   }
+  _tscTouchState = 0;  // All buttons released initially
 
   // Here we check for other temperature sensors
   if (LM74::isConnected() == true)
@@ -1337,31 +1394,8 @@ uint8_t buttonsReleased()
 
 void buttonsRefresh()
 {
-  uint32_t avg = 0;
-  uint16_t mid = 0;
-  uint8_t  button = 0, sample = 0;
-
-  for (button = 0; button < cTscChannelCount; button++)
-  {
-    avg = 0;
-    mid = (_tscMaximums[button] - _tscMinimums[button]) / 3;
-
-    for (sample = 0; sample < cTscSamplesToAverage; sample++)
-    {
-      avg += _tscSampleSets[button][sample];
-    }
-    avg = avg / cTscSamplesToAverage;
-
-    if ((avg < _tscMinimums[button] + mid) && (_tscMaximums[button] - _tscMinimums[button] > cTscMinimumDelta) && _tscMinimums[button] < cTscMaximumMinimum)
-    {
-      _buttonStates |= (1 << button);
-    }
-    else
-    {
-      _buttonStates &= ~(1 << button);
-    }
-  }
-
+  // Touch detection is performed entirely in the ISR (tscIsr)
+  // Here we simply copy the ISR-computed state and track changes
   _buttonsChanged = _buttonStates ^ _buttonStatesPrevious;
   _buttonStatesPrevious = _buttonStates;
 }
@@ -1491,15 +1525,9 @@ int32_t temperature(const bool fahrenheit, const bool bcd)
 
 uint16_t lightLevel()
 {
-  uint32_t totalLight = 0;
-
-  // Add up some values so we can compute some averages...
-  for (uint8_t i = 0; i < cAdcSamplesToAverage; i++)
-  {
-    totalLight += _adcSampleSetLight[i];
-  }
-  // Compute average light level and save it for access later
-  return totalLight / cAdcSamplesToAverage;
+  // Return cached IIR-filtered light level (updated in systickIsr)
+  // No computation needed - saves ~200 cycles per call!
+  return _cachedLightLevel;
 }
 
 
@@ -1517,34 +1545,20 @@ void onTimeSecondsReset()
 
 uint16_t voltageBatt()
 {
-  uint32_t adcSampleSum = 0;
-
   _batteryMeasuringCounter = 0;
   adc_enable_vbat_sensor();
 
-  // Add up some values so we can compute some averages...
-  for (uint8_t i = 0; i < cAdcSamplesToAverage; i++)
-  {
-    adcSampleSum += _adcSampleSetVoltageBatt[i];
-  }
-  // Get the averages of the last several readings
-  int32_t adcSampleAverage = adcSampleSum / cAdcSamplesToAverage;
-  // Determine the voltage as it affects the temperature calculation
+  // Use IIR filtered battery voltage (downscale to actual ADC range)
+  int32_t adcSampleAverage = _adcFilteredVoltageBatt >> cAdcFilterUpscale;
+  // Determine the voltage
   return cVddCalibrationVoltage * (int32_t)ST_VREFINT_CAL / adcSampleAverage;
 }
 
 
 uint16_t voltageVddA()
 {
-  uint32_t adcSampleSum = 0;
-
-  // Add up some values so we can compute some averages...
-  for (uint8_t i = 0; i < cAdcSamplesToAverage; i++)
-  {
-    adcSampleSum += _adcSampleSetVoltageVddA[i];
-  }
-  // Get the averages of the last several readings
-  int32_t adcSampleAverage = adcSampleSum / cAdcSamplesToAverage;
+  // Use IIR filtered VddA voltage (downscale to actual ADC range)
+  int32_t adcSampleAverage = _adcFilteredVoltageVddA >> cAdcFilterUpscale;
   // Determine the voltage as it affects the temperature calculation
   return cVddCalibrationVoltage * (int32_t)ST_VREFINT_CAL / adcSampleAverage;
 }
@@ -2143,16 +2157,11 @@ void dmaCh4to7Isr()
 
     dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL4);
 
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart1TxDmaChannel == DMA_CHANNEL4)
-    {
+    // Use compile-time dispatch based on DMA channel assignment
+    if constexpr (cUsart1TxDmaChannel == DMA_CHANNEL4)
       usart_disable_tx_dma(USART1);
-    }
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart2TxDmaChannel == DMA_CHANNEL4)
-    {
+    else if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL4)
       usart_disable_tx_dma(USART2);
-    }
 
 		dma_disable_channel(DMA1, DMA_CHANNEL4);
 	}
@@ -2163,16 +2172,12 @@ void dmaCh4to7Isr()
 
 		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL5);
 
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart1RxDmaChannel == DMA_CHANNEL5)
-    {
+    // Use compile-time dispatch based on DMA channel assignment
+    if constexpr (cUsart1RxDmaChannel == DMA_CHANNEL5)
       usart_disable_rx_dma(USART1);
-    }
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart2RxDmaChannel == DMA_CHANNEL5)
+    else if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL5)
     {
       usart_disable_rx_dma(USART2);
-
       Dmx512Rx::rxCompleteIsr();
     }
 
@@ -2184,20 +2189,17 @@ void dmaCh4to7Isr()
 		DMA1_IFCR |= DMA_IFCR_CTCIF6;
 
 		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL6);
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart2RxDmaChannel == DMA_CHANNEL6)
+
+    // Use compile-time dispatch based on DMA channel assignment
+    if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL6)
     {
       usart_disable_rx_dma(USART2);
-
       Dmx512Rx::rxCompleteIsr();
     }
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cI2c1TxDmaChannel == DMA_CHANNEL6)
+    else if constexpr (cI2c1TxDmaChannel == DMA_CHANNEL6)
     {
       i2c_disable_txdma(I2C1);
-
       _i2cState = I2cState::I2cIdle;
-
       if (_i2cNumberRx > 0)
       {
         i2cReceive(_i2cAddr, _i2cBufferRx, _i2cNumberRx, true);
@@ -2212,18 +2214,14 @@ void dmaCh4to7Isr()
 		DMA1_IFCR |= DMA_IFCR_CTCIF7;
 
 		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL7);
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cUsart2TxDmaChannel == DMA_CHANNEL7)
-    {
+
+    // Use compile-time dispatch based on DMA channel assignment
+    if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL7)
       usart_disable_tx_dma(USART2);
-    }
-    // this is terrible. we should track which peripheral was active and disable it accordingly...
-    if (cI2c1RxDmaChannel == DMA_CHANNEL7)
+    else if constexpr (cI2c1RxDmaChannel == DMA_CHANNEL7)
     {
       i2c_disable_rxdma(I2C1);
-
       _i2cState = I2cState::I2cIdle;
-
       _i2cBufferRx = nullptr;
       _i2cNumberRx = 0;
     }
@@ -2237,8 +2235,9 @@ void exti415Isr()
 {
   if (exti_get_flag_status(EXTI13) != false)
   {
-    _refreshRTCNow = true;
-    _refreshTempNow = true;
+    // Delay RTC read to allow external RTC to update its registers after PPS edge
+    // This prevents reading stale values when PPS fires
+    _ppsDelayCounter = cPpsRtcReadDelay;
 
     _incrementOnTimeSecondsCounter();
 
@@ -2263,8 +2262,18 @@ void systickIsr()
   _delayCounter++;
   _delayCounterNB++;
 
+  // Handle PPS delay countdown - when it reaches 1, trigger the RTC refresh
+  if (_ppsDelayCounter > 0)
+  {
+    _ppsDelayCounter--;
+    if (_ppsDelayCounter == 0)
+    {
+      _refreshRTCNow = true;
+      _refreshTempNow = true;
+    }
+  }
   // we'll do this if PPS isn't working
-  if (_peripheralRefreshTrigger == PeripheralRefreshTrigger::SysTick)
+  else if (_peripheralRefreshTrigger == PeripheralRefreshTrigger::SysTick)
   {
     _refreshRTCNow = true;
     _refreshTempNow = true;
@@ -2272,20 +2281,41 @@ void systickIsr()
     _incrementOnTimeSecondsCounter();
   }
   _refreshPeripherals();
-  // update ADC samples
-  if (_adcSampleTimer++ >= cAdcSampleInterval)
+
+  // Light sensor sampling (500ms interval = 2 Hz)
+  if (_adcSampleTimerLight++ >= cAdcSampleIntervalLight)
   {
-    _adcSampleTimer = 0;
+    _adcSampleTimerLight = 0;
 
-    if (++_adcSampleCounter >= cAdcSamplesToAverage)
-    {
-      _adcSampleCounter = 0;
-    }
+    // IIR filter with upscaling for precision: filtered = filtered - (filtered >> shift) + (sample << (upscale - shift))
+    // The upscaling maintains precision in integer math (avoids losing LSBs)
+    _adcFilteredLight = _adcFilteredLight
+                        - (_adcFilteredLight >> cAdcLightFilterShift)
+                        + (((uint32_t)_bufferADC[cAdcPhototransistor] << cAdcFilterUpscale) >> cAdcLightFilterShift);
 
-    _adcSampleSetLight[_adcSampleCounter] = _bufferADC[cAdcPhototransistor];
-    _adcSampleSetTemp[_adcSampleCounter] = _bufferADC[cAdcTemperature];
-    _adcSampleSetVoltageVddA[_adcSampleCounter] = _bufferADC[cAdcVref];
-    _adcSampleSetVoltageBatt[_adcSampleCounter] = _bufferADC[cAdcVbat];
+    // Update cached light level (downscale back to actual ADC range)
+    _cachedLightLevel = _adcFilteredLight >> cAdcFilterUpscale;
+  }
+
+  // Temperature and voltage sampling (2000ms interval = 0.5 Hz - they change very slowly)
+  if (_adcSampleTimerSlow++ >= cAdcSampleIntervalSlow)
+  {
+    _adcSampleTimerSlow = 0;
+
+    // IIR filter for temperature (with upscaling)
+    _adcFilteredTemp = _adcFilteredTemp
+                       - (_adcFilteredTemp >> cAdcTempVoltageFilterShift)
+                       + (((uint32_t)_bufferADC[cAdcTemperature] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+
+    // IIR filter for VddA voltage (with upscaling)
+    _adcFilteredVoltageVddA = _adcFilteredVoltageVddA
+                              - (_adcFilteredVoltageVddA >> cAdcTempVoltageFilterShift)
+                              + (((uint32_t)_bufferADC[cAdcVref] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+
+    // IIR filter for battery voltage (with upscaling)
+    _adcFilteredVoltageBatt = _adcFilteredVoltageBatt
+                              - (_adcFilteredVoltageBatt >> cAdcTempVoltageFilterShift)
+                              + (((uint32_t)_bufferADC[cAdcVbat] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
   }
 
   // update the tone timer and turn off the tone if the timer has expired
@@ -2315,21 +2345,13 @@ void systickIsr()
 
 void tim2Isr()
 {
-	if (TIM2_SR & TIM_SR_UIF)
-	{
-    // clear the event flag
-		TIM2_SR &= ~TIM_SR_UIF;
-	}
+	TIM2_SR &= ~TIM_SR_UIF;   // Always clear flag; we shouldn't be here if the flag isn't set
 }
 
 
 void tim7Isr()
 {
-	if (TIM7_SR & TIM_SR_UIF)
-	{
-    // clear the event flag
-		TIM7_SR &= ~TIM_SR_UIF;
-	}
+	TIM7_SR &= ~TIM_SR_UIF;   // Always clear flag; we shouldn't be here if the flag isn't set
 }
 
 
@@ -2350,55 +2372,87 @@ void tscIsr()
   // process acquisition, advance to next channels, and trigger another acquisition
   if (TSC_ISR & TSC_ISR_EOAF)
   {
-    // ensure the counter is in bounds -- should already be as initialized above
-    // if (_tscChannelCounter >= cTscChannelsPerGroup)
-    // {
-    //   _tscChannelCounter = 0;
-    // }
+    // Read hardware counter values from both groups
+    uint16_t rawValue[2];
+    rawValue[1] = TSC_IOGxCR(6);  // Group 6
+    rawValue[0] = TSC_IOGxCR(3);  // Group 3
 
-    _tscAcquisitionValues[_tscChannelCounter + cTscChannelsPerGroup] = TSC_IOGxCR(6);
-    _tscAcquisitionValues[_tscChannelCounter] = TSC_IOGxCR(3);
-
-    for (uint8_t i = _tscChannelCounter; i < cTscChannelCount; i += cTscChannelsPerGroup)
+    // Process both channels acquired in this cycle (one from each group)
+    for (uint8_t groupIdx = 0; groupIdx < 2; groupIdx++)
     {
-      // if the value we just got is less than the known minimum...
-      if (_tscAcquisitionValues[i] < _tscMinimums[i])
+      uint8_t channelIdx = _tscChannelCounter + (groupIdx * cTscChannelsPerGroup);
+
+      if (channelIdx >= cTscChannelCount)
+        continue;
+
+      uint16_t raw = rawValue[groupIdx];
+
+      // Step 1: IIR Low-Pass Filter (exponentially weighted moving average)
+      // filtered = filtered - (filtered >> shift) + (raw >> shift)
+      // This implements: filtered = (filtered * (N-1) + raw) / N where N = 2^shift
+      _tscFiltered[channelIdx] = _tscFiltered[channelIdx]
+                                  - (_tscFiltered[channelIdx] >> cTscFilterShift)
+                                  + (raw >> cTscFilterShift);
+
+      // Step 2: Calculate delta from baseline
+      // Touch causes capacitance increase which decreases the counter value
+      // So: delta = baseline - filtered (positive delta = touch detected)
+      int16_t delta = (int16_t)_tscBaseline[channelIdx] - (int16_t)_tscFiltered[channelIdx];
+
+      // Step 3: Touch detection with hysteresis
+      bool isTouched = (_tscTouchState & (1 << channelIdx)) != 0;
+
+      if (!isTouched && delta > cTscTouchThreshold)
       {
-        // ...update the minimum with the new minimum
-        _tscMinimums[i] = _tscAcquisitionValues[i];
+        // Touch detected - set the touch state bit
+        _tscTouchState |= (1 << channelIdx);
+        _buttonStates |= (1 << channelIdx);
+      }
+      else if (isTouched && delta < cTscReleaseThreshold)
+      {
+        // Touch released - clear the touch state bit
+        _tscTouchState &= ~(1 << channelIdx);
+        _buttonStates &= ~(1 << channelIdx);
       }
 
-      // if the value we just got is greater than the known maximum...
-      if (_tscAcquisitionValues[i] > _tscMaximums[i])
+      // Step 4: Adaptive baseline tracking (only update when not touched)
+      // This allows the baseline to track environmental changes (temperature, humidity)
+      // but prevents it from tracking sustained touches
+      if (!isTouched)
       {
-        // ...update the maximum with the new value
-        _tscMaximums[i] = _tscAcquisitionValues[i];
+        // Asymmetric tracking: slow rise, faster fall
+        if (_tscFiltered[channelIdx] > _tscBaseline[channelIdx])
+        {
+          // Baseline rises slowly (tracks long-term drift upward)
+          uint16_t rise = (_tscFiltered[channelIdx] - _tscBaseline[channelIdx]) >> cTscBaselineShift;
+          _tscBaseline[channelIdx] += rise;
+        }
+        else
+        {
+          // Baseline falls faster (quick recovery after finger lift)
+          uint16_t fall = (_tscBaseline[channelIdx] - _tscFiltered[channelIdx]) >> (cTscBaselineShift - 2);
+          _tscBaseline[channelIdx] -= fall;
+        }
       }
-
-      // update the sample set with the value we just got
-      _tscSampleSets[i][_tscSampleCounter] = _tscAcquisitionValues[i];
     }
 
+    // Advance to next channel pair
     if (++_tscChannelCounter >= cTscChannelsPerGroup)
     {
       _tscChannelCounter = 0;
-
-      if (++_tscSampleCounter >= cTscSamplesToAverage)
-      {
-        _tscSampleCounter = 0;
-      }
     }
 
-    // select the next pair of channels to sample
+    // Select the next pair of channels to sample
     TSC_IOCCR = cTscChannelControlBits[_tscChannelCounter];
 
+    // Clear end-of-acquisition flag
     TSC_ICR = TSC_ICR_EOAIC;
 
-    /* kick off the next acquisition cycle */
+    // Kick off the next acquisition cycle
     TSC_CR |= TSC_CR_START;
   }
 
-  // deal with max count error if it happened
+  // Deal with max count error if it happened
   if (TSC_ISR & TSC_ISR_MCEF)
   {
     TSC_ICR = TSC_ICR_MCEIC;

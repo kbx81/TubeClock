@@ -135,7 +135,6 @@ namespace Hardware {
   static const auto cNssTemperaturePin = GPIO12;
 
   // driver blank I/O port & pin
-  //   on the TLC5951 this is named XBLNK
   static const auto cBlankDisplayPort = GPIOB;
   static const auto cBlankDisplayPin  = GPIO3;
 

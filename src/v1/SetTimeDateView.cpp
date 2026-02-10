@@ -59,7 +59,7 @@ void SetTimeDateView::enter()
   }
 
   // ...so we can highlight digits as necessary
-  Application::setIntensity(NixieGlyph::cGlyph100Percent);
+  Application::setIntensity(NixieGlyph::cGlyphMaximumIntensity);
 
   DisplayManager::setStatusLedAutoRefreshing(_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
 }

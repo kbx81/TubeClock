@@ -249,7 +249,7 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
 
 	// Reset SPI data and status registers
 	// First, ensure the SPI is not busy...
-  while (SPI_SR(_params.spi) & (SPI_SR_BSY));
+  while (SPI_SR(_params.spi) & (SPI_SR_BSY)) {}
   // ...now we purge the FIFO to ensure it's empty for the new inbound bits.
 	while (SPI_SR(_params.spi) & (SPI_SR_RXNE | SPI_SR_OVR))
   {

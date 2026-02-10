@@ -16,17 +16,193 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
+// ---------------------------------------------------------------------------
+// Settings Profiles:
+// Default settings are organized into profiles that can be selected at build
+// time using the SETTINGS_PROFILE macro (set via Makefile PROFILE variable).
+//
+// To build with a specific profile:
+//   make PROFILE=0  (Standard - US/North America defaults)
+//   make PROFILE=1  (European - 24hr, Celsius)
+//   make PROFILE=2  (Minimal - Silent, no effects)
+//   make PROFILE=3  (Kbx - kbx's preferred settings)
+//
+// To add a new profile, create a new SettingsProfile struct below and add it
+// to the cSettingsProfiles array. The compiler will validate the PROFILE value
+// at build time and show an error if it's out of range.
+// ---------------------------------------------------------------------------
+//
 #include "Application.h"
 #include "DateTime.h"
 #include "Hardware.h"
 #include "RgbLed.h"
 #include "Settings.h"
 
+// Linker-provided symbol for the settings flash address (must be outside namespace)
+extern "C" uint32_t __settings_flash_start;
 
 namespace kbxTubeClock {
 
+  // Default settings profiles
+  // Each profile contains default values for all 25 settings
+  // Profile selection is controlled by SETTINGS_PROFILE macro (set in Makefile)
+
+  struct SettingsProfile {
+    const char* name;
+    const uint16_t settings[Settings::Setting::DmxAddress + 1];
+  };
+
+  // Profile 0: Standard US/North America defaults (DST enabled, 12-hour, Fahrenheit)
+  static const SettingsProfile cProfileStandard = {
+    "Standard",
+    {
+      0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
+      0b11100000000, // BeepStates
+      0b11100000000, // BlinkStates
+      0b11111111,    // OnOffStates
+      26,            // TimeDisplayDuration
+      2,             // DateDisplayDuration
+      2,             // TemperatureDisplayDuration
+      100,           // FadeDuration
+      3,             // DstBeginMonth (March)
+      2,             // DstBeginDowOrdinal (2nd occurrence)
+      11,            // DstEndMonth (November)
+      1,             // DstEndDowOrdinal (1st occurrence)
+      0,             // DstSwitchDayOfWeek (Sunday)
+      2,             // DstSwitchHour (2 AM)
+      500,           // EffectDuration
+      300,           // EffectFrequency
+      20,            // MinimumIntensity
+      3,             // BeeperVolume
+      10,            // TemperatureCalibration
+      0,             // DisplayRefreshInterval
+      0,             // DateFormat
+      32,            // TimeZone
+      0,             // ColonBehavior
+      30,            // TimerResetValue
+      0              // DmxAddress
+    }
+  };
+
+  // Profile 1: European defaults (24-hour, Celsius, no DST handling)
+  static const SettingsProfile cProfileEuropean = {
+    "European",
+    {
+      0b1011101100,  // SystemOptions: 24hr, Celsius, auto intensity
+      0b11100000000, // BeepStates
+      0b11100000000, // BlinkStates
+      0b11111111,    // OnOffStates
+      26,            // TimeDisplayDuration
+      2,             // DateDisplayDuration
+      2,             // TemperatureDisplayDuration
+      100,           // FadeDuration
+      3,             // DstBeginMonth (not used)
+      2,             // DstBeginDowOrdinal
+      11,            // DstEndMonth (not used)
+      1,             // DstEndDowOrdinal
+      0,             // DstSwitchDayOfWeek
+      2,             // DstSwitchHour
+      500,           // EffectDuration
+      300,           // EffectFrequency
+      20,            // MinimumIntensity
+      3,             // BeeperVolume
+      10,            // TemperatureCalibration
+      0,             // DisplayRefreshInterval
+      1,             // DateFormat (DD.MM.YYYY)
+      56,            // TimeZone
+      0,             // ColonBehavior
+      30,            // TimerResetValue
+      0              // DmxAddress
+    }
+  };
+
+  // Profile 2: Minimal/Silent (no beeps, no effects, basic display)
+  static const SettingsProfile cProfileMinimal = {
+    "Minimal",
+    {
+      0b0000100000,  // SystemOptions: 24hr, auto intensity only
+      0b00000000000, // BeepStates: all disabled
+      0b00000000000, // BlinkStates: all disabled
+      0b11111111,    // OnOffStates
+      26,            // TimeDisplayDuration
+      2,             // DateDisplayDuration
+      2,             // TemperatureDisplayDuration
+      50,            // FadeDuration (faster)
+      3,             // DstBeginMonth
+      2,             // DstBeginDowOrdinal
+      11,            // DstEndMonth
+      1,             // DstEndDowOrdinal
+      0,             // DstSwitchDayOfWeek
+      2,             // DstSwitchHour
+      0,             // EffectDuration (effects disabled)
+      0,             // EffectFrequency (effects disabled)
+      20,            // MinimumIntensity
+      0,             // BeeperVolume (silent)
+      10,            // TemperatureCalibration
+      0,             // DisplayRefreshInterval
+      0,             // DateFormat
+      56,            // TimeZone
+      0,             // ColonBehavior
+      30,            // TimerResetValue
+      0              // DmxAddress
+    }
+  };
+
+  // Profile 3: kbx's preferred defaults (DST enabled, 12-hour, Fahrenheit)
+  static const SettingsProfile cProfileKbx = {
+    "Kbx",
+    {
+      0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
+      0b11100000000, // BeepStates
+      0b11100000000, // BlinkStates
+      0b11111111,    // OnOffStates
+      26,            // TimeDisplayDuration
+      2,             // DateDisplayDuration
+      2,             // TemperatureDisplayDuration
+      250,           // FadeDuration
+      3,             // DstBeginMonth (March)
+      2,             // DstBeginDowOrdinal (2nd occurrence)
+      11,            // DstEndMonth (November)
+      1,             // DstEndDowOrdinal (1st occurrence)
+      0,             // DstSwitchDayOfWeek (Sunday)
+      2,             // DstSwitchHour (2 AM)
+      500,           // EffectDuration
+      300,           // EffectFrequency
+      20,            // MinimumIntensity
+      2,             // BeeperVolume
+      10,            // TemperatureCalibration
+      0,             // DisplayRefreshInterval
+      0,             // DateFormat
+      32,            // TimeZone
+      0,             // ColonBehavior
+      30,            // TimerResetValue
+      0              // DmxAddress
+    }
+  };
+
+  // Array of all available profiles
+  static const SettingsProfile* const cSettingsProfiles[] = {
+    &cProfileStandard,
+    &cProfileEuropean,
+    &cProfileMinimal,
+    &cProfileKbx,
+  };
+
+  // Select the profile based on build-time macro (defaults to Standard)
+  #ifndef SETTINGS_PROFILE
+  #define SETTINGS_PROFILE 0
+  #endif
+
+  // Compile-time validation of SETTINGS_PROFILE range
+  #define NUM_PROFILES (sizeof(cSettingsProfiles) / sizeof(cSettingsProfiles[0]))
+  static_assert(SETTINGS_PROFILE >= 0 && SETTINGS_PROFILE < NUM_PROFILES,
+                "SETTINGS_PROFILE is out of range! Valid values are 0-"
+                "3" /* Update this when adding/removing profiles */);
+
+  static const SettingsProfile* const cActiveProfile = cSettingsProfiles[SETTINGS_PROFILE];
+
   // where settings will be read/written in FLASH
-  const uint32_t Settings::cSettingsFlashAddress = 0x0801f000;
+  const uint32_t Settings::cSettingsFlashAddress = reinterpret_cast<uint32_t>(&__settings_flash_start);
 
   // conatins a mask for bitfields and a maximum value for other types of data
   const uint16_t Settings::cSettingData[] = { 0x03ff,   // SystemOptions
@@ -53,7 +229,8 @@ namespace kbxTubeClock {
                                               112,      // TimeZone
                                               5,        // ColonBehavior
                                               65535,    // TimerResetValue
-                                              512 - 8 }; // DmxAddress
+                                              512 - 8,  // DmxAddress
+                                            };
 
   Settings::Settings()
   : _crc(0)
@@ -70,32 +247,12 @@ namespace kbxTubeClock {
       _time[i].setTime((3 * i) + 1, 30, 0);
     }
 
-    _setting[static_cast<uint8_t>(SystemOptions)] = 0b1011100000;
-    _setting[static_cast<uint8_t>(BeepStates)] = 0b11100000000;
-    _setting[static_cast<uint8_t>(BlinkStates)] = 0b11100000000;
-    _setting[static_cast<uint8_t>(OnOffStates)] = 0b11111111;
-    _setting[static_cast<uint8_t>(TimeDisplayDuration)] = 24;
-    _setting[static_cast<uint8_t>(DateDisplayDuration)] = 3;
-    _setting[static_cast<uint8_t>(TemperatureDisplayDuration)] = 3;
-    _setting[static_cast<uint8_t>(FadeDuration)] = 100;
-    _setting[static_cast<uint8_t>(DstBeginMonth)] = 3;
-    _setting[static_cast<uint8_t>(DstBeginDowOrdinal)] = 2;
-    _setting[static_cast<uint8_t>(DstEndMonth)] = 11;
-    _setting[static_cast<uint8_t>(DstEndDowOrdinal)] = 1;
-    _setting[static_cast<uint8_t>(DstSwitchDayOfWeek)] = 0;
-    _setting[static_cast<uint8_t>(DstSwitchHour)] = 2;
-    _setting[static_cast<uint8_t>(EffectDuration)] = 500;
-    _setting[static_cast<uint8_t>(EffectFrequency)] = 300;
-    _setting[static_cast<uint8_t>(MinimumIntensity)] = 30;
-    _setting[static_cast<uint8_t>(BeeperVolume)] = 7;
-    _setting[static_cast<uint8_t>(TemperatureCalibration)] = 10;
-    _setting[static_cast<uint8_t>(DisplayRefreshInterval)] = 0;
-    _setting[static_cast<uint8_t>(DateFormat)] = 0;
-    _setting[static_cast<uint8_t>(TimeZone)] = 56;
-    _setting[static_cast<uint8_t>(ColonBehavior)] = 0;
-    _setting[static_cast<uint8_t>(TimerResetValue)] = 30;
-    _setting[static_cast<uint8_t>(DmxAddress)] = 0;
-}
+    // Load settings from the active profile selected at build time
+    for (uint8_t i = 0; i <= static_cast<uint8_t>(Setting::DmxAddress); i++)
+    {
+      _setting[i] = cActiveProfile->settings[i];
+    }
+  }
 
 
   bool Settings::loadFromFlash()

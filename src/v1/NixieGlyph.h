@@ -29,16 +29,15 @@ class NixieGlyph
 public:
   /// @brief Create a new NixieGlyph instance with specified intensity and duration
   ///
-  /// @param intensity Initial value for glyph
+  /// @param intensity Initial value for glyph (0-255)
   /// @param duration Initial (fade) duration for this glyph
   ///
-  NixieGlyph(const uint16_t intensity = 0, const uint32_t duration = 0);
+  NixieGlyph(const uint8_t intensity = 0, const uint32_t duration = 0);
 
 public:
   /// Important constants
   ///
-  static const uint16_t cGlyph100Percent = 10000;
-  static const uint16_t cGlyphMaximumIntensity = 255;  // 2^8 - 1 for optimal PWM with uint8_t natural rollover
+  static const uint8_t cGlyphMaximumIntensity = 255;  // Maximum PWM intensity value
 
 
   /// @brief Compare this NixieGlyph to another
@@ -52,9 +51,9 @@ public:
   void setOff();
 
   /// @brief Set the intensity of the glyph element
-  /// @param intensity value for glyph
+  /// @param intensity value for glyph (0-255)
   ///
-  void setIntensity(const uint16_t intensity);
+  void setIntensity(const uint8_t intensity);
 
   /// @brief Set the duration over which the glyph should change
   /// @param duration value for glyph
@@ -62,40 +61,25 @@ public:
   void setDuration(const uint32_t duration);
 
   /// @brief Get the intensity of the glpyh element
-  /// @return intensity value for glyph
+  /// @return intensity value for glyph (0-255)
   ///
-  uint16_t getIntensity() const;
+  uint8_t getIntensity() const;
 
   /// @brief Get the duration over which the LED should change
   /// @return fade duration used by LED
   ///
   uint32_t getDuration() const;
 
-  /// @brief Adjusts the glyph to a percentage of its original value
-  /// @param percentageOfCurrentx100 percentage of original intensity. Percentages are times 100 -- e.g.: 8765 = 87.65%
+  /// @brief Sets the nixie glyph to a linear interpolation between two other glyphs
+  /// @param currentTick Current tick in the fade
+  /// @param totalTicks Total ticks for the fade
+  /// @param start Starting glyph intensity
+  /// @param target Target glyph intensity
   ///
-  void adjustIntensity(uint16_t percentageOfCurrentx100);
-
-  /// @brief Merges the nixie glyph with another.
-  /// @param percentageOfOriginalGlyphx100 percentage of original NixieGlyph. Percentages are times 100 -- e.g.: 8765 = 87.65%
-  ///
-  void mergeWithNixieGlyph(uint16_t percentageOfOriginalGlyphx100, const NixieGlyph &glyph);
-
-  /// @brief Sets the nixie tube to values obtained by merging two other NixieGlyph objects.
-  /// @param percentageOfGlyph0x100 percentage of first NixieGlyph. Percentages are times 100 -- e.g.: 8765 = 87.65%
-  ///
-  void setFromMergedNixieGlyphs(uint16_t percentageOfGlyph0x100, const NixieGlyph &glyph0, const NixieGlyph &glyph1);
-
-  /// @brief Gamma corrects the NixieGlyph object (based on 12-bit values only).
-  ///
-  void gammaCorrect12bit();
+  void setFromLinearInterpolation(uint32_t currentTick, uint32_t totalTicks, const NixieGlyph &start, const NixieGlyph &target);
 
 private:
-  /// 4096-step (12 bit) brightness table: gamma = 2.2
-  ///
-  static const uint16_t cGammaTable[4096];
-
-  uint16_t _intensity;      ///< Intensity of the glyph
+  uint8_t _intensity;       ///< Intensity of the glyph (0-255)
   uint32_t _duration;       ///< Duration over which this LED should transition
 };
 

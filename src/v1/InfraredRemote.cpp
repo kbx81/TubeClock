@@ -221,6 +221,7 @@ void tick()
     // we got the space. now it's time to start receiving bits! we expect a pulse of the IrRxBitHead length
     case IrRxSpace:
       _repeatStopCountdown = cRepeatCountdownStart;
+      [[fallthrough]];
     case IrRxNextBit:
       if ((timerValue > cIrPulseTimeLower[IrRxBitHead]) && (timerValue < cIrPulseTimeUpper[IrRxBitHead]) && (pinState == true))
       {

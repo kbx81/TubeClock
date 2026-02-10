@@ -222,7 +222,7 @@ void _executeAlarms()
     if (weBlinking == true)
     {
       // make the display bright!
-      Application::setIntensity(NixieGlyph::cGlyph100Percent);
+      Application::setIntensity(NixieGlyph::cGlyphMaximumIntensity);
       // blink based on seconds, or...
       // DisplayManager::setDisplayBlanking(current.second(false) & 1);
       // blink based on sub-seconds register for faster blinking

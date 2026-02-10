@@ -17,13 +17,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
 
-// As hardware version 4+ uses the TLC5951 drivers, "master" dimming is
-// implemented at the hardware level by leveraging the global brightness control
-// (BC) and dot control (DC) mechanisms. This makes crossfading at (very) low
-// intensity levels smoother and also reduces the workload on the CPU.
-//
-// That said, the display workflow might be the most confusing aspect of this
-// codebase. The following flow diagram should help clarify how it works:
+// The display workflow might be the most confusing aspect of this codebase.
+// The following flow diagram should help clarify how it works:
 //
 // writeDisplay()/writeStatusLed() (main loop) ->
 //   _loadCrossfaders() (loads new target values into crossfaders)
@@ -93,17 +88,18 @@ static const uint8_t cSpiBytesToSend = (cPwmChannelsPerDevice * cPwmNumberOfDevi
 //
 static uint8_t _pwmTickCounter = 0;
 
-// Double-buffered SoftPWM values for race-free updates
-// Buffer 0 and 1 swap roles: one is actively read by ISR, other is written by main loop
-// Organized as [buffer][device][channel] for better cache locality
+// Single PWM buffer - tick() writes directly, tickPWM() reads
+// No double buffering needed as tick() writes complete values atomically
+// Organized as [device][channel] for better cache locality
 // Aligned to 4-byte boundary for optimal ARM memory access
 //
-static uint16_t _pwmValues[2][cPwmNumberOfDevices][cPwmChannelsPerDevice] __attribute__((aligned(4)));
+static uint8_t _pwmValues[cPwmNumberOfDevices][cPwmChannelsPerDevice] __attribute__((aligned(4)));
 
-// Active buffer index - read by tickPWM() ISR, swapped atomically by tick() ISR
-// 0 or 1 indicating which buffer tickPWM() should read from
+// Master intensity lookup table (256 entries, uint8_t -> uint8_t)
+// Maps input intensity (0-255) to output intensity (0-255) with master dimming applied
+// Initialized by initialize() based on _masterIntensity setting
 //
-volatile static uint8_t _activeBuffer = 0;
+static uint8_t _intensityLUT[256];
 
 // HV562x buffers - aligned for DMA transfers
 //
@@ -126,9 +122,8 @@ static bool _autoRefreshStatusLed = false;
 //
 static bool _displayBlank = true;
 
-// master display intensity times 100
-//   10000 = 100%
-static uint16_t _intensityPercentage = 0;
+// master display intensity (0-255)
+static uint8_t _masterIntensity = 255;
 
 // set by tick() to true so refresh() will refresh the NixieTubeCrossfaders
 //
@@ -148,9 +143,9 @@ static uint8_t _slaveId = SpiMaster::cNoSlave;
 
 
 // Writes to PWM buffer corresponding to a glyph
-// Writes to the INACTIVE buffer (the one not being read by tickPWM ISR)
+// Applies master intensity via lookup table
 //
-void _setDisplayPwmValue(const uint8_t glyphNumber, const uint16_t glyphValue)
+void _setDisplayPwmValue(const uint8_t glyphNumber, const uint8_t glyphValue)
 {
   if (glyphNumber < cGlyphCount)
   {
@@ -160,15 +155,9 @@ void _setDisplayPwmValue(const uint8_t glyphNumber, const uint16_t glyphValue)
     uint8_t device = linearIndex >> 5;   // Fast divide by 32 (cPwmChannelsPerDevice)
     uint8_t channel = linearIndex & 0x1F; // Fast modulo 32
 
-    // Write to inactive buffer (opposite of what tickPWM is reading)
-    uint8_t inactiveBuffer = 1 - _activeBuffer;
-    _pwmValues[inactiveBuffer][device][channel] = glyphValue;
+    // Apply master intensity via lookup table and write to PWM buffer
+    _pwmValues[device][channel] = _intensityLUT[glyphValue];
   }
-  // status LED
-  // else if (ledNumber == Display::cPixelCount)
-  // {
-  //   _statusLed = ledValue;
-  // }
 }
 
 
@@ -191,18 +180,15 @@ void initialize()
     .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
   };
 
-  // Initialize the display drivers' global brightness and dot control levels
-  setMasterIntensity(NixieGlyph::cGlyph100Percent);
+  // Initialize master intensity to full brightness
+  setMasterIntensity(255);
 
-  // Initialize both PWM buffers to zero
-  for (uint8_t b = 0; b < 2; b++)
+  // Initialize PWM buffer to zero
+  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
   {
-    for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
+    for (uint8_t c = 0; c < cPwmChannelsPerDevice; c++)
     {
-      for (uint8_t c = 0; c < cPwmChannelsPerDevice; c++)
-      {
-        _pwmValues[b][d][c] = 0;
-      }
+      _pwmValues[d][c] = 0;
     }
   }
 
@@ -228,55 +214,57 @@ void initialize()
 
 void refresh()
 {
+  NixieGlyph activeGlyph;
+
+  // Update PWM buffer when tick() requests it
+  // The crossfader tick() calls happen in ISR for precise timing,
+  // but we read the results and update PWM here to minimize ISR time
   if (_refreshIntensitiesNow == true)
   {
-    NixieGlyph activeGlyph;
+    _refreshIntensitiesNow = false;
 
-    // Read crossfader states (already ticked in ISR), adjust intensities, write to PWM buffer
+    // Read crossfader states and update PWM buffer with master intensity applied
     for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
     {
       activeGlyph = _crossfader[glyphCrossfader].getActive();
-      // adjust the brightness based on _intensityPercentage
-      activeGlyph.adjustIntensity(_intensityPercentage);
-
-      // activeTube.gammaCorrect12bit();
-
       _setDisplayPwmValue(glyphCrossfader, activeGlyph.getIntensity());
     }
 
-    _refreshIntensitiesNow = false;  // all done...until the next tick...
+    // Refresh the status LED to play nicely with strobing via DMX-512
+    if (_autoRefreshStatusLed == true)
+    {
+      if (_displayBlank == true)
+      {
+        Hardware::setStatusLed(RgbLed());
+      }
+      else
+      {
+        RgbLed status = _statusLed;
+        // Apply master intensity to status LED using LUT
+        // Scale 12-bit RGB values (0-4095) to 8-bit (0-255) for LUT indexing
+        // Then scale 8-bit LUT output (0-254) back to 12-bit (0-4095) for hardware
+        status.setRed(((uint32_t)_intensityLUT[status.getRed() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+        status.setGreen(((uint32_t)_intensityLUT[status.getGreen() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+        status.setBlue(((uint32_t)_intensityLUT[status.getBlue() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+        Hardware::setStatusLed(status);
+      }
+    }
   }
 }
 
 
 void tick()
 {
-  // Tick all crossfaders here in the ISR for precise 1000 Hz timing
-  // This ensures fade duration values accurately represent milliseconds
+  // Called from systick ISR at 1000 Hz
+  // Tick all crossfaders here to maintain precise 1ms timing for fade durations
+  // But defer the PWM value updates to refresh() to minimize ISR time
   for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
   {
     _crossfader[glyphCrossfader].tick();
   }
 
-  // Atomically swap buffers - main loop's writes are now visible to tickPWM() ISR
-  // This single-byte write is atomic on ARM Cortex-M, ensuring race-free buffer swap
-  _activeBuffer = 1 - _activeBuffer;
-
+  // Set flag to request PWM buffer update in main loop
   _refreshIntensitiesNow = true;
-  // refresh the status LED here to play nicely with strobing via DMX-512
-  if (_autoRefreshStatusLed == true)
-  {
-    if (_displayBlank == true)
-    {
-      Hardware::setStatusLed(RgbLed());
-    }
-    else
-    {
-      RgbLed status = _statusLed;
-      status.adjustIntensity(_intensityPercentage);
-      Hardware::setStatusLed(status);
-    }
-  }
 }
 
 
@@ -286,30 +274,56 @@ void tickPWM()
 
   if (request != nullptr)
   {
-    // Read from active buffer (set by tick() ISR via atomic buffer swap)
-    uint8_t activeBuffer = _activeBuffer;
-
+    // Read then increment the tick counter - uint8_t naturally wraps at 256 (no masking needed!)
+    auto tickCount = _pwmTickCounter++;
     // Process all 3 devices with 8-bit unrolling to improve performance
     // Total of 12 iterations (3 devices × 4 bytes) instead of 96
     for (uint8_t device = 0; device < cPwmNumberOfDevices; device++)
     {
+      // Fully unrolled 32-bit PWM comparison for maximum performance
+      // PWM logic: output is ON when intensity > counter
+      // This handles all cases correctly:
+      //   intensity=0: always OFF (0 > counter is never true)
+      //   intensity=1: ON when counter=0 (1/256 duty cycle)
+      //   intensity=254: ON when counter=0-253 (254/256 = 99.2% duty cycle, perceptually full)
+      // Note: LUT clamps output to max 254 to work with > comparison
       uint32_t pwmBits = 0;
 
-      // Process 8 bits at a time (4 iterations per device: 32 bits / 8 = 4)
-      for (uint8_t byteIdx = 0; byteIdx < 4; byteIdx++)
-      {
-        uint8_t offset = byteIdx << 3;  // byteIdx * 8
+      pwmBits |= ((uint32_t)(_pwmValues[device][0] > tickCount)) << 0;
+      pwmBits |= ((uint32_t)(_pwmValues[device][1] > tickCount)) << 1;
+      pwmBits |= ((uint32_t)(_pwmValues[device][2] > tickCount)) << 2;
+      pwmBits |= ((uint32_t)(_pwmValues[device][3] > tickCount)) << 3;
+      pwmBits |= ((uint32_t)(_pwmValues[device][4] > tickCount)) << 4;
+      pwmBits |= ((uint32_t)(_pwmValues[device][5] > tickCount)) << 5;
+      pwmBits |= ((uint32_t)(_pwmValues[device][6] > tickCount)) << 6;
+      pwmBits |= ((uint32_t)(_pwmValues[device][7] > tickCount)) << 7;
 
-        // Unroll 8 bits manually for branchless performance
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 0] > _pwmTickCounter)) << (offset + 0);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 1] > _pwmTickCounter)) << (offset + 1);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 2] > _pwmTickCounter)) << (offset + 2);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 3] > _pwmTickCounter)) << (offset + 3);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 4] > _pwmTickCounter)) << (offset + 4);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 5] > _pwmTickCounter)) << (offset + 5);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 6] > _pwmTickCounter)) << (offset + 6);
-        pwmBits |= ((uint32_t)(_pwmValues[activeBuffer][device][offset + 7] > _pwmTickCounter)) << (offset + 7);
-      }
+      pwmBits |= ((uint32_t)(_pwmValues[device][8] > tickCount)) << 8;
+      pwmBits |= ((uint32_t)(_pwmValues[device][9] > tickCount)) << 9;
+      pwmBits |= ((uint32_t)(_pwmValues[device][10] > tickCount)) << 10;
+      pwmBits |= ((uint32_t)(_pwmValues[device][11] > tickCount)) << 11;
+      pwmBits |= ((uint32_t)(_pwmValues[device][12] > tickCount)) << 12;
+      pwmBits |= ((uint32_t)(_pwmValues[device][13] > tickCount)) << 13;
+      pwmBits |= ((uint32_t)(_pwmValues[device][14] > tickCount)) << 14;
+      pwmBits |= ((uint32_t)(_pwmValues[device][15] > tickCount)) << 15;
+
+      pwmBits |= ((uint32_t)(_pwmValues[device][16] > tickCount)) << 16;
+      pwmBits |= ((uint32_t)(_pwmValues[device][17] > tickCount)) << 17;
+      pwmBits |= ((uint32_t)(_pwmValues[device][18] > tickCount)) << 18;
+      pwmBits |= ((uint32_t)(_pwmValues[device][19] > tickCount)) << 19;
+      pwmBits |= ((uint32_t)(_pwmValues[device][20] > tickCount)) << 20;
+      pwmBits |= ((uint32_t)(_pwmValues[device][21] > tickCount)) << 21;
+      pwmBits |= ((uint32_t)(_pwmValues[device][22] > tickCount)) << 22;
+      pwmBits |= ((uint32_t)(_pwmValues[device][23] > tickCount)) << 23;
+
+      pwmBits |= ((uint32_t)(_pwmValues[device][24] > tickCount)) << 24;
+      pwmBits |= ((uint32_t)(_pwmValues[device][25] > tickCount)) << 25;
+      pwmBits |= ((uint32_t)(_pwmValues[device][26] > tickCount)) << 26;
+      pwmBits |= ((uint32_t)(_pwmValues[device][27] > tickCount)) << 27;
+      pwmBits |= ((uint32_t)(_pwmValues[device][28] > tickCount)) << 28;
+      pwmBits |= ((uint32_t)(_pwmValues[device][29] > tickCount)) << 29;
+      pwmBits |= ((uint32_t)(_pwmValues[device][30] > tickCount)) << 30;
+      pwmBits |= ((uint32_t)(_pwmValues[device][31] > tickCount)) << 31;
 
       _displayBufferOut[device] = pwmBits;
     }
@@ -325,9 +339,6 @@ void tickPWM()
     {
       _spiMaster->processQueue();
     }
-
-    // increment the tick counter - uint8_t naturally wraps at 256 (no masking needed!)
-    _pwmTickCounter++;
   }
 }
 
@@ -338,22 +349,28 @@ void setStatusLedAutoRefreshing(const bool autoRefreshEnabled)
 }
 
 
-uint16_t getMasterIntensity()
+uint8_t getMasterIntensity()
 {
-  return _intensityPercentage;
+  return _masterIntensity;
 }
 
 
-void setMasterIntensity(const uint16_t intensity)
+void setMasterIntensity(const uint8_t intensity)
 {
-  // ensure the passed intensity value is appropriate & safe
-  if (intensity < NixieGlyph::cGlyph100Percent)
+  _masterIntensity = intensity;
+
+  // Build the master intensity lookup table
+  // Maps input intensity (0-255) to output intensity (0-254) with master dimming applied
+  // Note: Output is clamped to 254 max because PWM uses > comparison
+  // With > comparison: value=254 gives 255/256 duty (99.6%), value=255 gives 255/256 duty
+  // So we map everything to 0-254 range to avoid the ambiguity
+  // Use rounding instead of truncation for better accuracy at low intensities
+  for (uint16_t i = 0; i < 256; i++)
   {
-    _intensityPercentage = intensity;
-  }
-  else
-  {
-    _intensityPercentage = NixieGlyph::cGlyph100Percent;
+    // Add 127 (half of 255) for rounding before division
+    uint16_t scaled = ((uint32_t)i * _masterIntensity + 127) / 255;
+    // Clamp to 254 maximum to work correctly with > comparison in PWM
+    _intensityLUT[i] = (scaled >= 254) ? 254 : scaled;
   }
 }
 

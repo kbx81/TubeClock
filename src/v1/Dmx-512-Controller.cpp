@@ -68,11 +68,14 @@ volatile static uint16_t _strobeCounter = 0;
 //  Time unit depends on frequency of calls to strobeTimer()
 volatile static uint16_t _strobeDelay = cStrobeMinimumRate;
 
+// Cached DMX512 active state to avoid function call overhead in ISR
+// Updated by setDmx512Active() when external control mode changes
+static bool _dmx512Active = false;
+
 
 void _dmxExtendedModeController(Dmx512Packet* packet, uint16_t address)
 {
   // RgbLed dmxLed[2];
-  uint32_t top = 0;
   uint16_t pitch = 0;
   uint8_t level = 0;
   const Application::OperatingMode opMode[] = { Application::OperatingMode::OperatingModeDmx512Display,
@@ -119,16 +122,15 @@ void _dmxExtendedModeController(Dmx512Packet* packet, uint16_t address)
   // determine and store the fade duration
   _fadeDuration = (packet->channel(address++) * cChannelMultiplier) + cChannelMultiplier;
  
-  // next, determine the master intensity level
-  top = (packet->channel(address) * NixieGlyph::cGlyph100Percent);
-  _masterIntensityLevel = static_cast<uint16_t>(top / 255);
+  // next, determine the master intensity level (DMX channel is already 0-255)
+  _masterIntensityLevel = packet->channel(address);
 }
 
 
 void _dmxStandardModeController(Dmx512Packet* packet, uint16_t address)
 {
-  uint32_t top = (packet->channel(address) * NixieGlyph::cGlyph100Percent);
-  _masterIntensityLevel = static_cast<uint16_t>(top / 255);
+  // DMX channel value is already 0-255, use directly
+  _masterIntensityLevel = packet->channel(address);
 }
 
 
@@ -166,7 +168,8 @@ uint16_t fadeDuration()
 
 void strobeTimer()
 {
-  if (Application::getExternalControlState() == Application::ExternalControl::Dmx512ExtControlEnum)
+  // Use cached state instead of function call to minimize ISR overhead
+  if (_dmx512Active)
   {
     if (_strobeDelay > 0)
     {
@@ -187,6 +190,12 @@ void strobeTimer()
       DisplayManager::setDisplayBlanking(true);
     }
   }
+}
+
+
+void setDmx512Active(const bool active)
+{
+  _dmx512Active = active;
 }
 
 

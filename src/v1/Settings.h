@@ -104,6 +104,8 @@ public:
 public:
 
   /// @brief Where settings will be written in FLASH
+  /// @note This address is provided by the linker script (__settings_flash_start)
+  ///       and is located at the end of flash memory to prevent conflicts with code
   ///
   static const uint32_t cSettingsFlashAddress;
 

@@ -52,6 +52,11 @@ uint16_t getTemperatureFractionalPart();
 ///
 SpiMaster::SpiReqAck refresh(const bool block = false);
 
+/// @brief Returns true if the last refresh() SPI transfer has completed
+/// @return true if transfer is complete and temperature data will be fresh
+///
+bool transferComplete();
+
 }
 
 }

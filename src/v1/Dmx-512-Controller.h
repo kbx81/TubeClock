@@ -43,6 +43,11 @@ uint16_t fadeDuration();
 ///
 void strobeTimer();
 
+/// @brief Sets the cached DMX512 active state to avoid function call overhead in strobeTimer()
+/// @param active true if DMX512 external control is active
+///
+void setDmx512Active(const bool active);
+
 
 }
 

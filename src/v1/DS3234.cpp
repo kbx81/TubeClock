@@ -433,6 +433,12 @@ SpiMaster::SpiReqAck refresh(const bool block)
 }
 
 
+bool transferComplete()
+{
+  return _spiMaster->transferComplete(_slaveId);
+}
+
+
 }
 
 }

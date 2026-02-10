@@ -37,6 +37,7 @@ namespace DisplayManager
   void initialize();
 
   /// @brief Refreshes intensities of tubes that are changing intensity levels due to (an) active crossfade(s)
+  /// @note This function is now a no-op. Refresh is integrated into tick() for better performance.
   ///
   void refresh();
 
@@ -54,14 +55,13 @@ namespace DisplayManager
   void setStatusLedAutoRefreshing(const bool autoRefreshEnabled);
 
   /// @brief Returns the current "master" intensity of the display
-  /// @return Current master intensity
+  /// @return Current master intensity (0-255)
   ///
-  uint16_t getMasterIntensity();
+  uint8_t getMasterIntensity();
 
-  /// @brief Sets the "master" intensity of the display, where 10000 = 100%.
-  ///   Values are gamma-corrected.
-  /// @param intensity New master intensity for display. Display is updated at next refresh()
-  void setMasterIntensity(const uint16_t intensity);
+  /// @brief Sets the "master" intensity of the display (0-255)
+  /// @param intensity New master intensity for display. Display is updated at next tick()
+  void setMasterIntensity(const uint8_t intensity);
 
   /// @brief Get the state of display blanking
   /// @return true if display is blank/off

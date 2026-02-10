@@ -31,10 +31,10 @@ public:
   /// @brief Create a new NixieTube instance; we assume 10 glyphs and 2 points
   ///
   /// @param glyph Initial active glyph (0 - 9)
-  /// @param intensity Initial intensity value for active glyph
+  /// @param intensity Initial intensity value for active glyph (0-255)
   /// @param duration Initial duration value for glyph transitions
   ///
-  NixieTube(const uint8_t glyph = 0, const uint16_t intensity = NixieGlyph::cGlyphMaximumIntensity, const uint32_t duration = 0);
+  NixieTube(const uint8_t glyph = 0, const uint8_t intensity = NixieGlyph::cGlyphMaximumIntensity, const uint32_t duration = 0);
 
 public:
   /// Important constants
@@ -55,11 +55,11 @@ public:
   void setGlyph(const uint8_t glyph);
 
   /// @brief Sets the (active) glyph's intensity
-  /// @param intensity value for glyph
+  /// @param intensity value for glyph (0-255)
   /// @param glyph Glyph number to set
   ///
-  void setIntensity(const uint16_t intensity);
-  void setIntensity(const uint8_t glyph, const uint16_t intensity);
+  void setIntensity(const uint8_t intensity);
+  void setIntensity(const uint8_t glyph, const uint8_t intensity);
 
   /// @brief Set the duration over which the tube should transition glyphs
   /// @param duration New value for glyph transitions
@@ -115,7 +115,7 @@ public:
 private:
   uint8_t  _activeGlyph;
   uint32_t _duration;       ///< Duration over which this LED should transition
-  uint16_t _intensity[cGlyphsPerTube];
+  uint8_t  _intensity[cGlyphsPerTube];
 };
 
 }
