@@ -34,10 +34,12 @@ class SystemStatusView : public View {
   enum DisplayItem : uint8_t
   {
     TubeLifetime      = ViewMode::ViewMode0,
-    PeripheralStatus  = ViewMode::ViewMode1,
-    GpsStatus         = ViewMode::ViewMode2,
-    VoltageVddA       = ViewMode::ViewMode3,
-    VoltageBattery    = ViewMode::ViewMode4
+    GpsStatus         = ViewMode::ViewMode1,
+    StatusDS3234      = ViewMode::ViewMode2,
+    StatusDS1722      = ViewMode::ViewMode3,
+    StatusLM74        = ViewMode::ViewMode4,
+    VoltageVddA       = ViewMode::ViewMode5,
+    VoltageBattery    = ViewMode::ViewMode6
   };
 
 

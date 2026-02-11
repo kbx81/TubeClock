@@ -19,8 +19,11 @@
 #include "Application.h"
 #include "DateTime.h"
 #include "DisplayManager.h"
-#include "Hardware.h"
+#include "DS1722.h"
+#include "DS3234.h"
 #include "GpsReceiver.h"
+#include "Hardware.h"
+#include "LM74.h"
 #include "Settings.h"
 #include "SystemStatusView.h"
 
@@ -116,39 +119,13 @@ void SystemStatusView::loop()
       {
         tcDisp.setDisplayFromWord(Hardware::onTimeSeconds() / Application::cSecondsInAnHour);
       }
-      break;
-
-    case DisplayItem::PeripheralStatus:
-      if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS1722)
-      {
-        tcDisp.setTubeToValue(0, 1);
-      }
-
-      if (Hardware::getTempSensorType() == Hardware::TempSensorType::LM74)
-      {
-        tcDisp.setTubeToValue(1, 1);
-      }
-
-      if (Hardware::getRTCType() == Hardware::RtcType::DS323x)
-      {
-        tcDisp.setTubeToValue(2, 1);
-      }
-
-      if (GpsReceiver::isConnected() == true)
-      {
-        tcDisp.setTubeToValue(3, 1);
-      }
-
+      // If the PPS trigger is selected, light the status LED when the PPS signal is high
       if (Hardware::getPeripheralRefreshTrigger() == Hardware::PeripheralRefreshTrigger::PpsExti)
       {
         if (Hardware::getPpsInputState() == true)
         {
-          statusLed = Application::green;
+          statusLed = Application::orange;
         }
-      }
-      else
-      {
-        statusLed = Application::yellow;
       }
       break;
 
@@ -169,6 +146,52 @@ void SystemStatusView::loop()
       else
       {
         tubeIntensityBitmap = 0b110000;
+      }
+      break;
+
+    case DisplayItem::StatusDS3234:
+      tubeIntensityBitmap = 0b111111;
+      tcDisp.setTubeToValue(0, 4);
+      tcDisp.setTubeToValue(1, 3);
+      tcDisp.setTubeToValue(2, 2);
+      tcDisp.setTubeToValue(3, 3);
+      if (DS3234::isConnected() == true)
+      {
+        statusLed = Application::green;
+      }
+      else
+      {
+        statusLed = Application::red;
+      }
+      break;
+
+    case DisplayItem::StatusDS1722:
+      tubeIntensityBitmap = 0b111111;
+      tcDisp.setTubeToValue(0, 2);
+      tcDisp.setTubeToValue(1, 2);
+      tcDisp.setTubeToValue(2, 7);
+      tcDisp.setTubeToValue(3, 1);
+      if (DS1722::isConnected() == true)
+      {
+        statusLed = Application::green;
+      }
+      else
+      {
+        statusLed = Application::red;
+      }
+      break;
+
+    case DisplayItem::StatusLM74:
+      tubeIntensityBitmap = 0b110011;
+      tcDisp.setTubeToValue(0, 4);
+      tcDisp.setTubeToValue(1, 7);
+      if (LM74::isConnected() == true)
+      {
+        statusLed = Application::green;
+      }
+      else
+      {
+        statusLed = Application::red;
       }
       break;
 
