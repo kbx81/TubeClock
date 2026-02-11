@@ -29,31 +29,17 @@ namespace Keys {
   //
   static const uint8_t cKeyCount = 6;
 
-  // The number of defined IR remote keys
-  //
-  static const uint8_t cKeyCountIR = 6;
-
   // The key masks for all tested keys
   //
   static const Key cKeyMasks[cKeyCount] = { A, B, C, E, D, U };
 
-  // The key masks for all tested keys
-  //
-  static const InfraredRemote::InfraredRemoteKey cKeyMasksIR[cKeyCountIR] =
-    { InfraredRemote::InfraredRemoteKey::ENTER,
-      InfraredRemote::InfraredRemoteKey::RIGHT,
-      InfraredRemote::InfraredRemoteKey::LEFT,
-      InfraredRemote::InfraredRemoteKey::STOPMODE,
-      InfraredRemote::InfraredRemoteKey::DOWN,
-      InfraredRemote::InfraredRemoteKey::UP };
-
   // The size of the key queue
   //
-  static const uint8_t cKeyQueueSize = 16;
+  static const uint8_t cKeyQueueSize = 8;
 
   // The initial delay until repeat starts
   //
-  static const uint16_t cRepeatDelay = 1500;
+  static const uint16_t cRepeatDelay = 1000;
 
   // The speed of the repeat
   //
@@ -72,13 +58,14 @@ namespace Keys {
   //
   static bool _repeatMode = false;
 
-  // Key queue for received keys
+  // Key queue for received keys (circular buffer)
   //
   static uint8_t _keyQueue[cKeyQueueSize];
 
-  // The current size of the key queue
+  // Circular buffer head (read) and tail (write) indices
   //
-  static uint8_t _currentKeyQueueSize = 0;
+  static uint8_t _queueHead = 0;
+  static uint8_t _queueTail = 0;
 
 
   // Get the current pressed key
@@ -99,12 +86,10 @@ namespace Keys {
 
     if (InfraredRemote::hasKeyPress())
     {
-      for (i = 0; i < cKeyCountIR; ++i)
+      auto irKey = InfraredRemote::getKeyPress();
+      if (irKey < InfraredRemote::IrKey::Count)
       {
-        if (InfraredRemote::getKeyPress() == cKeyMasksIR[i])
-        {
-          return cKeyMasks[i];
-        }
+        return cKeyMasks[irKey];
       }
     }
 
@@ -116,10 +101,11 @@ namespace Keys {
   //
   void addKeyPress(Key key)
   {
-    if (_currentKeyQueueSize < cKeyQueueSize)
+    uint8_t nextTail = (_queueTail + 1) & (cKeyQueueSize - 1);
+    if (nextTail != _queueHead)
     {
-      _keyQueue[_currentKeyQueueSize] = key;
-      ++_currentKeyQueueSize;
+      _keyQueue[_queueTail] = key;
+      _queueTail = nextTail;
     }
   }
 
@@ -164,17 +150,16 @@ namespace Keys {
 
   bool hasKeyPress()
   {
-    return (_currentKeyQueueSize > 0);
+    return (_queueHead != _queueTail);
   }
 
 
   Key getKeyPress()
   {
-    if (_currentKeyQueueSize > 0)
+    if (_queueHead != _queueTail)
     {
-      auto key = _keyQueue[0];
-      memmove(_keyQueue, _keyQueue + 1, cKeyQueueSize - 1);
-      --_currentKeyQueueSize;
+      auto key = _keyQueue[_queueHead];
+      _queueHead = (_queueHead + 1) & (cKeyQueueSize - 1);
       return (Key)key;
     }
     else

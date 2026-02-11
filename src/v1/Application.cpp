@@ -385,7 +385,7 @@ void refreshSettings()
 }
 
 
-void setSettings(Settings settings)
+void setSettings(const Settings &settings)
 {
   _settings = settings;
 

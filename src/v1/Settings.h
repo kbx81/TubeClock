@@ -159,8 +159,8 @@ public:
 
   /// @brief Set a time value in the settings
   ///
-  void setTime(const Slot setting, const DateTime time);
-  void setTime(const uint8_t setting, const DateTime time);
+  void setTime(const Slot setting, const DateTime &time);
+  void setTime(const uint8_t setting, const DateTime &time);
 
   /// @brief Returns the desired HV state based on the time
   /// @return true if HV should be on, false otherwise

@@ -155,7 +155,7 @@ void Display::setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, co
 }
 
 
-void Display::setDisplayFromDateTime(const DateTime dateTime, const uint8_t item, const bool bcd)
+void Display::setDisplayFromDateTime(const DateTime &dateTime, const uint8_t item, const bool bcd)
 {
   switch (item)
   {
@@ -181,7 +181,7 @@ void Display::setDisplayFromDateTime(const DateTime dateTime, const uint8_t item
 }
 
 
-void Display::setDisplayFromDateTime(const DateTime dateTime, const dateTimeDisplaySelection item, const bool bcd)
+void Display::setDisplayFromDateTime(const DateTime &dateTime, const dateTimeDisplaySelection item, const bool bcd)
 {
   setDisplayFromDateTime(dateTime, static_cast<uint8_t>(item), bcd);
 }
@@ -196,7 +196,7 @@ void Display::setTubeToValue(const uint8_t tubeNumber, const uint8_t tubeValue)
 }
 
 
-void Display::setTubeFromRaw(const uint8_t tubeNumber, const NixieTube tube)
+void Display::setTubeFromRaw(const uint8_t tubeNumber, const NixieTube &tube)
 {
   if (tubeNumber < cTubeCount)
   {
@@ -205,7 +205,7 @@ void Display::setTubeFromRaw(const uint8_t tubeNumber, const NixieTube tube)
 }
 
 
-void Display::setDot(const uint8_t dotNumber, NixieGlyph dot)
+void Display::setDot(const uint8_t dotNumber, const NixieGlyph &dot)
 {
   if (dotNumber < cDotCount)
   {
@@ -214,7 +214,7 @@ void Display::setDot(const uint8_t dotNumber, NixieGlyph dot)
 }
 
 
-void Display::setDots(const uint32_t bitmap, const NixieGlyph dot, const bool setAllDotDurations)
+void Display::setDots(const uint32_t bitmap, const NixieGlyph &dot, const bool setAllDotDurations)
 {
   for (uint8_t i = 0; (i < cDotCount) && (((bitmap >> i) != 0) || (setAllDotDurations == true)); i++)
   {
@@ -230,7 +230,7 @@ void Display::setDots(const uint32_t bitmap, const NixieGlyph dot, const bool se
 }
 
 
-void Display::setDots(const uint32_t bitmap, const NixieGlyph dotOn, const NixieGlyph dotOff)
+void Display::setDots(const uint32_t bitmap, const NixieGlyph &dotOn, const NixieGlyph &dotOff)
 {
   for (uint8_t i = 0; i < cDotCount; i++)
   {

@@ -56,9 +56,9 @@ static const uint8_t cToneDuration = 60;
 //
 static uint16_t _fadeDuration = 0;
 
-// Master intensity level
-//  10000 = 100%
-volatile static uint16_t _masterIntensityLevel = 0;
+// Master intensity level (0-255, sourced from DMX channel value)
+//
+volatile static uint8_t _masterIntensityLevel = 0;
 
 // Counter for strobe delays
 //
@@ -176,8 +176,7 @@ void strobeTimer()
       _strobeCounter++;
     }
 
-    if (((_masterIntensityLevel > 0) && (_strobeDelay == 0)) ||
-        ((_masterIntensityLevel > 0) && (_strobeDelay > 0) && (_strobeCounter > _strobeDelay)))
+    if ((_masterIntensityLevel > 0) && ((_strobeDelay == 0) || (_strobeCounter > _strobeDelay)))
     {
       DisplayManager::setDisplayBlanking(false);
       if (_strobeCounter > _strobeDelay + cStrobeDuration)

@@ -43,9 +43,9 @@ namespace kbxTubeClock {
 
 
   NixieTube::NixieTube(const uint8_t glyph, const uint8_t intensity, const uint32_t duration)
-    : _activeGlyph(glyph),
-      _duration(duration),
-      _intensity()
+    : _duration(duration),
+      _intensity(),
+      _activeGlyph(glyph)
   {
     for (uint8_t i = 0; i < cGlyphsPerTube; i++)
     {

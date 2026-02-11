@@ -65,70 +65,82 @@ namespace InfraredRemote
 static const uint16_t cIrPulseTimeUpper[] = { 10800, 5400, 2700, 675, 2025, 675, 675 };
 static const uint16_t cIrPulseTimeLower[] = {  7200, 3600, 1800, 450, 1350, 450, 450 };
 
-// data packet size in bytes
-//
-static const uint8_t cPacketSize = 4;
-
 // value at which the repeat countdown starts
 //
 static const uint8_t cRepeatCountdownStart = 12;
 
+// Key codes from the remote (address = 0xBF00 for all):
+//  VOLUMEDOWN  command = 0xFF00
+//  PLAY/PAUSE  command = 0xFE01
+//  VOLUMEUP    command = 0xFD02
+//  SETUP       command = 0xFB04
+//  UP          command = 0xFA05
+//  STOP/MODE   command = 0xF906
+//  LEFT        command = 0xF708
+//  ENTER/SAVE  command = 0xF609
+//  RIGHT       command = 0xF50A
+//  ZERO/TEN    command = 0xF30C
+//  DOWN        command = 0xF20D
+//  BACK        command = 0xF10E
+//  ONE         command = 0xEF10
+//  TWO         command = 0xEE11
+//  THREE       command = 0xED12
+//  FOUR        command = 0xEB14
+//  FIVE        command = 0xEA15
+//  SIX         command = 0xE916
+//  SEVEN       command = 0xE718
+//  EIGHT       command = 0xE619
+//  NINE        command = 0xE51A
 
-// the bit we're currently receving
+// runtime-modifiable key code table (initialized with defaults)
+// TODO: allow runtime user-defined values and initialize from flash/preferences
+//
+static IrKeyCode _keyCodeTable[IrKey::Count] = {
+  { 0xBF00, 0xF609 },  // A (remote: Enter/Save)
+  { 0xBF00, 0xF50A },  // B (remote: Right)
+  { 0xBF00, 0xF708 },  // C (remote: Left)
+  { 0xBF00, 0xF906 },  // E (remote: Stop/Mode)
+  { 0xBF00, 0xF20D },  // D (remote: Down)
+  { 0xBF00, 0xFA05 },  // U (remote: Up)
+};
+
+
+// the bit we're currently receiving
 //
 volatile static uint8_t _incomingBit = 0;
 
-// the packet we're currently receving or just received
+// the packet we're currently receiving
 //
-volatile static uint8_t _incomingPacket[cPacketSize];
+volatile static uint32_t _incomingPacket = 0;
 
 // true if a key press is available
 //
 volatile static bool _keypressAvailable = 0;
 
-// the last-received address
+// the last-received address (full 16-bit NEC address word)
 //
-volatile static uint8_t _lastRxAddress = 0;
+volatile static uint16_t _lastRxAddress = 0;
 
-// the last-received command
+// the last-received command (full 16-bit NEC command word)
 //
-volatile static uint8_t _lastRxCommand = 0;
+volatile static uint16_t _lastRxCommand = 0;
 
 // counts down to zero at which time repeating is considered to have stopped
 //
 volatile static uint8_t _repeatStopCountdown = 0;
-
-// the byte in the packet we're receving now
-//
-volatile static uint8_t _rxPacketByte = 0;
 
 // tracks the receiver state machine's state
 //
 volatile static IrRxState _rxState = IrRxState::IrRxIdle;
 
 
-/// @brief Rolls a bit into the buffers
-/// @return True if receive is complete
+/// @brief Rolls a bit into the accumulator
+/// @return True if receive is complete (32 bits)
 ///
 bool _rxBit(const uint8_t bit)
 {
-  if (_incomingBit >= 8)
-  {
-    _incomingBit = 0;
-
-    if (++_rxPacketByte >= cPacketSize)
-    {
-      return true;
-    }
-  }
-
-  _incomingPacket[_rxPacketByte] |= (bit << _incomingBit++);
-
-  if ((_incomingBit >= 7) && (_rxPacketByte >= cPacketSize - 1))
-  {
-    return true;
-  }
-  return false;
+  _incomingPacket |= ((uint32_t)bit << _incomingBit);
+  return (++_incomingBit >= 32);
 }
 
 
@@ -138,34 +150,16 @@ void _setRxIdle()
 {
   _rxState = IrRxIdle;
   _incomingBit = 0;
-  _rxPacketByte = 0;
-  _incomingPacket[0] = 0;
-  _incomingPacket[1] = 0;
-  _incomingPacket[2] = 0;
-  _incomingPacket[3] = 0;
+  _incomingPacket = 0;
 }
 
 
-/// @brief Checks the received packet for validity
-/// @return True if valid
-///
-bool _verifyRx()
-{
-  uint8_t inverted = (~_incomingPacket[3]) & 0x7f;
-
-  return (_incomingPacket[2] == inverted);
-
-  // per the NEC spec, we should be doing this but the Adafruit remote is...weird...
-  // return ((_incomingPacket[0] == ~(_incomingPacket[1])) && (_incomingPacket[2] == ~(_incomingPacket[3])));
-}
-
-
-/// @brief Sets the receiver state machine to idle/default
+/// @brief Stores the received packet as 16-bit address and command words
 ///
 void _storeRx()
 {
-  _lastRxAddress = _incomingPacket[0];
-  _lastRxCommand = _incomingPacket[2];
+  _lastRxAddress = (uint16_t)_incomingPacket;
+  _lastRxCommand = (uint16_t)(_incomingPacket >> 16);
 }
 
 
@@ -181,9 +175,19 @@ bool hasKeyPress()
 }
 
 
-InfraredRemoteKey getKeyPress()
+IrKey getKeyPress()
 {
-  return (InfraredRemoteKey)_lastRxCommand;
+  uint16_t addr = _lastRxAddress;
+  uint16_t cmd = _lastRxCommand;
+
+  for (uint8_t i = 0; i < IrKey::Count; ++i)
+  {
+    if (_keyCodeTable[i].address == addr && _keyCodeTable[i].command == cmd)
+    {
+      return static_cast<IrKey>(i);
+    }
+  }
+  return IrKey::None;
 }
 
 
@@ -243,47 +247,37 @@ void tick()
         _setRxIdle();                 // nothing matched so reset the state machine
       }
       break;
-    // if we got the correct bit-leading pulse, we'll determine the length of the following pulse to determine whether it was a 0 bit or a 1 bit
+    // if we got the correct bit-leading pulse, determine the space length to decode the bit value
     case IrRxBitHead:
-      if ((timerValue > cIrPulseTimeLower[IrRxBitHigh]) && (timerValue < cIrPulseTimeUpper[IrRxBitHigh]) && (pinState == false))
+      if (pinState == false)
       {
-        // it was a '1' bit
-        if (_rxBit(1) == false)
+        uint8_t bit;
+        if ((timerValue > cIrPulseTimeLower[IrRxBitHigh]) && (timerValue < cIrPulseTimeUpper[IrRxBitHigh]))
         {
-          _rxState = IrRxNextBit;     // advance to the next state
+          bit = 1;
+        }
+        else if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]))
+        {
+          bit = 0;
         }
         else
         {
-          _rxState = IrRxEndSpace;    // advance to the next state
+          _setRxIdle();
+          break;
         }
-      }
-      else if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) && (pinState == false))
-      {
-        // it was a '0' bit
-        if (_rxBit(0) == false)
-        {
-          _rxState = IrRxNextBit;     // advance to the next state
-        }
-        else
-        {
-          _rxState = IrRxEndSpace;    // advance to the next state
-        }
+        _rxState = _rxBit(bit) ? IrRxEndSpace : IrRxNextBit;
       }
       else
       {
-        // it was invalid
-        _setRxIdle();                 // nothing matched so reset the state machine
+        _setRxIdle();
       }
       break;
 
     case IrRxEndSpace:
       if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) && (pinState == true))
       {
-        if (_verifyRx() == true)
-        {
-          _storeRx();
-          _keypressAvailable = true;
-        }
+        _storeRx();
+        _keypressAvailable = true;
         _setRxIdle();                 // we are done! reset the state machine
       }
       break;
@@ -314,7 +308,10 @@ void overflow()
     _repeatStopCountdown--;
   }
 
-  _setRxIdle();
+  if (_rxState != IrRxIdle)
+  {
+    _setRxIdle();
+  }
 }
 
 

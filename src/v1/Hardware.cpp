@@ -106,21 +106,21 @@ static const Usart::UsartParams _usartParams[cNumberOfUsarts] = {
 //
 static const Usart::UsartTransferParams _usartTransferParams[cNumberOfUsarts] = {
   {   cUsart1BaudRate,      // Baud rate
-      cUsart1DataBits,      // Number of data bits
       cUsart1StopBits,      // Number of stop bits
       cUsart1Parity,        // Parity
       cUsart1Mode,          // Mode (Tx, Rx, Tx+Rx)
       cUsart1FlowControl,   // Flow control
       cUsart1AutoBaud,      // Enable auto-baud rate detection
+      cUsart1DataBits,      // Number of data bits
       cUsart1DriverEnable   // Enable hardware DE output (for RS-485)
   },
   {   cUsart2BaudRate,      // Baud rate
-      cUsart2DataBits,      // Number of data bits
       cUsart2StopBits,      // Number of stop bits
       cUsart2Parity,        // Parity
       cUsart2Mode,          // Mode (Tx, Rx, Tx+Rx)
       cUsart2FlowControl,   // Flow control
       cUsart2AutoBaud,      // Enable auto-baud rate detection
+      cUsart2DataBits,      // Number of data bits
       cUsart2DriverEnable   // Enable hardware DE output (for RS-485)
   }
 };
@@ -753,7 +753,7 @@ void _spiSetup()
 
   // Setup SPI1 pins as alternate function zero
   gpio_set_af(cSpi1Port, GPIO_AF0, cSpi1SckPin | cSpi1MisoPin | cSpi1MosiPin);
-  // MISO=PB4 from LED drivers
+  // MISO=PB4 from HV drivers
   gpio_set_af(cSpi1AltPort, GPIO_AF0, cSpi1MisoDisplayPin);
   // Configure GPIOs
   gpio_mode_setup(cSpi1Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1SckPin | cSpi1MosiPin);
@@ -2028,7 +2028,7 @@ void setRedLed(const uint32_t intensity)
 }
 
 
-void setStatusLed(const RgbLed led)
+void setStatusLed(const RgbLed &led)
 {
   setBlueLed(led.getBlue());
   setGreenLed(led.getGreen());
@@ -2036,7 +2036,7 @@ void setStatusLed(const RgbLed led)
 }
 
 
-void blinkStatusLed(const RgbLed led1, const RgbLed led2, uint32_t numberOfBlinks, const uint32_t delayLength)
+void blinkStatusLed(const RgbLed &led1, const RgbLed &led2, uint32_t numberOfBlinks, const uint32_t delayLength)
 {
   // be sure this is off so blinking is visible
   DisplayManager::setStatusLedAutoRefreshing(false);

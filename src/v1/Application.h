@@ -199,7 +199,7 @@ namespace Application {
   /// @brief Set new application settings, also calls refreshSettings()
   /// @param settings New settings to apply to the applications and hardware
   ///
-  void setSettings(Settings settings);
+  void setSettings(const Settings &settings);
 
   /// @brief Handles DST date/time computation; maintains clock's DST state machine.
   ///  Intended for tracking DST clock adjustments, not for arbitrary use!

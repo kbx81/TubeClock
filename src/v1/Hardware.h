@@ -278,8 +278,8 @@ namespace Hardware {
   void     setBlueLed(const uint32_t intensity);
   void     setGreenLed(const uint32_t intensity);
   void     setRedLed(const uint32_t intensity);
-  void     setStatusLed(const RgbLed led);
-  void     blinkStatusLed(const RgbLed led1, const RgbLed led2, uint32_t numberOfBlinks, const uint32_t delayLength);
+  void     setStatusLed(const RgbLed &led);
+  void     blinkStatusLed(const RgbLed &led1, const RgbLed &led2, uint32_t numberOfBlinks, const uint32_t delayLength);
 
   /// @brief Creates a delay of length based on systick (configured for milliseconds)
   ///

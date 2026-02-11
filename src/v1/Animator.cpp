@@ -149,8 +149,8 @@ Display _frameGenerator2()
 {
   Display frame;
   uint32_t frameNumber = _currentFrame(10 * 6); // 10 digits by 6 tubes
-  uint8_t  workingTube = frameNumber / 10,  // gives us 0 to (Display::cGlyphCount - 1)
-           workingValue = frameNumber % 10, // gives us 0 - 9
+  uint8_t  workingTube = (frameNumber * 0xCCCDu) >> 19,  // gives us 0 to (Display::cGlyphCount - 1)
+           workingValue = frameNumber - workingTube * 10, // gives us 0 - 9
            t = 0;
 
   // set from _initial -- does not run when frameNumber == 6
@@ -180,8 +180,8 @@ Display _frameGenerator3()
 {
   Display frame;
   uint32_t frameNumber = _currentFrame(10 * 2); // 10 digits by 2 groups
-  uint8_t  workingTube = frameNumber / 10,  // gives us 0 or 1 (evens or odds)
-           workingValue = frameNumber % 10, // gives us 0 - 9
+  uint8_t  workingTube = (frameNumber * 0xCCCDu) >> 19,  // gives us 0 or 1 (evens or odds)
+           workingValue = frameNumber - workingTube * 10, // gives us 0 - 9
            t = 0;
 
   for (t = 0; t < Display::cTubeCount; t++)
@@ -223,7 +223,7 @@ Display _frameGenerator4()
 {
   Display frame;
   uint32_t frameNumber = _currentFrame(10 * 3); // 10 digits by 3 groups
-  uint8_t  workingValue = frameNumber % 10, // gives us 0 - 9
+  uint8_t  workingValue = frameNumber - ((frameNumber * 0xCCCDu) >> 19) * 10, // gives us 0 - 9
            t = 0, f = 0;
 
   for (t = 0; t < Display::cTubeCount / 2; t++)
@@ -313,13 +313,13 @@ void setAnimationDuration(const uint16_t duration)
 }
 
 
-void setFinalDisplay(const Display display)
+void setFinalDisplay(const Display &display)
 {
   _final = display;
 }
 
 
-void setInitialDisplay(const Display display)
+void setInitialDisplay(const Display &display)
 {
   _initial = display;
 }

@@ -31,33 +31,26 @@ namespace kbxTubeClock {
 
 namespace InfraredRemote
 {
-  // key scan codes
+  // NEC IR code: full 16-bit address and command words
   //
-  enum InfraredRemoteKey : uint8_t {
-    None        = 0xff,
-    VOLUMEDOWN  = 0x00,
-    PLAYPAUSE   = 0x01,
-    VOLUMEUP    = 0x02,
-    SETUP       = 0x04,
-    UP          = 0x05,
-    STOPMODE    = 0x06,
-    LEFT        = 0x08,
-    ENTER       = 0x09,
-    RIGHT       = 0x0a,
-    ZERO        = 0x0c,
-    DOWN        = 0x0d,
-    BACK        = 0x0e,
-    ONE         = 0x10,
-    TWO         = 0x11,
-    THREE       = 0x12,
-    FOUR        = 0x14,
-    FIVE        = 0x15,
-    SIX         = 0x16,
-    SEVEN       = 0x18,
-    EIGHT       = 0x19,
-    NINE        = 0x1a
+  struct IrKeyCode {
+    uint16_t address;
+    uint16_t command;
   };
 
+  // Logical IR key indices — identifies which key was pressed.
+  //  The order here determines the mapping to physical keys in Keys.cpp.
+  //
+  enum IrKey : uint8_t {
+    A     = 0,
+    B     = 1,
+    C     = 2,
+    E     = 3,
+    D     = 4,
+    U     = 5,
+    Count = 6,
+    None  = 0xff
+  };
 
   // timer period - 48 gives us one microsecond ticks on the STM32
   //
@@ -76,7 +69,7 @@ namespace InfraredRemote
   /// @brief Get the next key from the queue
   /// @return Key pressed
   ///
-  InfraredRemoteKey getKeyPress();
+  IrKey getKeyPress();
 
   /// @brief Check if the key pressed is being held down
   /// @return True if the key pressed is being held

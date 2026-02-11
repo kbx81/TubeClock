@@ -113,9 +113,9 @@ public:
   void setFromMergedNixieTubes(uint16_t percentageOfTube0x100, const NixieTube &tube0, const NixieTube &tube1);
 
 private:
-  uint8_t  _activeGlyph;
   uint32_t _duration;       ///< Duration over which this LED should transition
   uint8_t  _intensity[cGlyphsPerTube];
+  uint8_t  _activeGlyph;
 };
 
 }

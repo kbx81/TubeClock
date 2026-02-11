@@ -116,8 +116,8 @@ public:
   /// @param dateTime DateTime object to be used to set the display
   /// @param item Selects time or date display (and date format if date)
   ///
-  void setDisplayFromDateTime(const DateTime dateTime, const uint8_t item, const bool bcd = false);
-  void setDisplayFromDateTime(const DateTime dateTime, const dateTimeDisplaySelection item, const bool bcd = false);
+  void setDisplayFromDateTime(const DateTime &dateTime, const uint8_t item, const bool bcd = false);
+  void setDisplayFromDateTime(const DateTime &dateTime, const dateTimeDisplaySelection item, const bool bcd = false);
 
   /// @brief Set a single tube's state
   ///
@@ -131,14 +131,14 @@ public:
   /// @param tubeNumber Number of tube to set (0 through 5)
   /// @param tube NixieTube object used to set this tube's state
   ///
-  void setTubeFromRaw(const uint8_t tubeNumber, const NixieTube tube);
+  void setTubeFromRaw(const uint8_t tubeNumber, const NixieTube &tube);
 
   /// @brief Set (tube) dot
   ///
   /// @param dotNumber Number of dot to set (0 through 16, first four are colons)
   /// @param dot NixieGlyph object used to set this dot's state
   ///
-  void setDot(const uint8_t dotNumber, NixieGlyph dot);
+  void setDot(const uint8_t dotNumber, const NixieGlyph &dot);
 
   /// @brief Set multiple (tube) dots
   ///
@@ -146,7 +146,7 @@ public:
   /// @param dot NixieGlyph object used to set the selected dot(s) state
   /// @param setAllDotDurations If true, set *all* dot durations
   ///
-  void setDots(const uint32_t bitmap, const NixieGlyph dot, const bool setAllDotDurations = false);
+  void setDots(const uint32_t bitmap, const NixieGlyph &dot, const bool setAllDotDurations = false);
 
   /// @brief Set all (tube) dots
   ///
@@ -154,7 +154,7 @@ public:
   /// @param dotOn NixieGlyph object used to set the "on" dot(s) state
   /// @param dotOff NixieGlyph object used to set the "off" dot(s) state
   ///
-  void setDots(const uint32_t bitmap, const NixieGlyph dotOn, const NixieGlyph dotOff);
+  void setDots(const uint32_t bitmap, const NixieGlyph &dotOn, const NixieGlyph &dotOff);
 
   /// @brief Set a single tube's (fade) duration
   ///

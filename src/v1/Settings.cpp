@@ -345,13 +345,13 @@ namespace kbxTubeClock {
   }
 
 
-  void Settings::setTime(const Slot setting, const DateTime time)
+  void Settings::setTime(const Slot setting, const DateTime &time)
   {
     return setTime(static_cast<uint8_t>(setting), time);
   }
 
 
-  void Settings::setTime(const uint8_t setting, const DateTime time)
+  void Settings::setTime(const uint8_t setting, const DateTime &time)
   {
     if (setting <= static_cast<uint8_t>(Slot::Slot8))
     {

@@ -53,12 +53,12 @@ namespace Animator {
   /// @brief Sets the final display for the animation
   /// @param display Animation's final display
   ///
-  void setFinalDisplay(const Display display);
+  void setFinalDisplay(const Display &display);
 
   /// @brief Sets the initial display for the animation
   /// @param display Animation's initial display
   ///
-  void setInitialDisplay(const Display display);
+  void setInitialDisplay(const Display &display);
 
   /// @brief Check if an animation is running/active
   /// @return true if an animation is in progress

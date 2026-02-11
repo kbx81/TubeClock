@@ -50,12 +50,12 @@ public:
   ///
   struct UsartTransferParams {
     uint32_t baudRate;          // Baud rate
-    uint8_t  dataBits;          // Number of data bits
     uint32_t stopBits;          // Number of stop bits
     uint32_t parity;            // Parity
     uint32_t mode;              // Mode (Tx, Rx, Tx+Rx)
     uint32_t flowControl;       // Flow control
     uint32_t autoBaudMode;      // Enable auto-baud rate detection
+    uint8_t  dataBits;          // Number of data bits
     bool     driverEnableMode;  // Enable hardware DE output (for RS-485)
   };
 

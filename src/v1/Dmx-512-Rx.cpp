@@ -74,11 +74,12 @@ static const uint16_t cNumberOfRxBytes = 512 + 1;
 //
 static const uint32_t cUsartPort = GPIOA;
 
-// DMX-512 received data buffers
+// DMX-512 received data buffers (static pool, no dynamic allocation)
 //
-static Dmx512Packet* _pDmxPacketActive = new Dmx512Packet;
-static Dmx512Packet* _pDmxPacketReady = new Dmx512Packet;
-static Dmx512Packet* _pDmxPacketLast = new Dmx512Packet;
+static Dmx512Packet _dmxPackets[3];
+static Dmx512Packet* _pDmxPacketActive = &_dmxPackets[0];
+static Dmx512Packet* _pDmxPacketReady = &_dmxPackets[1];
+static Dmx512Packet* _pDmxPacketLast = &_dmxPackets[2];
 
 // state of the DMX-512 receive process
 //
@@ -182,15 +183,11 @@ Dmx512Packet* getLastPacket()
   // check if the "Ready" packet is actually ready
   if (_pDmxPacketReady->getBufferState() == Dmx512Packet::DmxBufferValid)
   {
-    // clean up the old object if it exists
-    if (_pDmxPacketLast != nullptr)
-    {
-      delete _pDmxPacketLast;
-    }
-    // save the current "Ready" packet as the "Last" (returnetd) packet
+    // Rotate pointers: old Last becomes the new Ready buffer,
+    // old Ready (now valid) becomes the new Last
+    Dmx512Packet* temp = _pDmxPacketLast;
     _pDmxPacketLast = _pDmxPacketReady;
-    // create a new Dmx512Packet object for the next "Ready" packet
-    _pDmxPacketReady = new Dmx512Packet;
+    _pDmxPacketReady = temp;
   }
 
   return _pDmxPacketLast;

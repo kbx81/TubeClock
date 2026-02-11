@@ -297,9 +297,10 @@ void SetTimeDateView::loop()
     }
   }
   // set tube highlights/lowlights as appropriate
+  const uint8_t highlightTube = highlightStart << 1;
   for (uint8_t t = 0; t < Display::cTubeCount; t++)
   {
-    if ((t != highlightStart * 2) && (t != (highlightStart * 2) + 1))
+    if ((t != highlightTube) && (t != highlightTube + 1))
     {
       tube = tcDisp.getTubeRaw(t);
       tube.adjustIntensity(cLowlightPercentage);
