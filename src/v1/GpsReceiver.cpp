@@ -18,8 +18,6 @@
 //
 #include <string.h>
 
-#include <libopencm3/stm32/usart.h>
-
 #include "Hardware.h"
 #include "GpsReceiver.h"
 
@@ -124,6 +122,16 @@ static DateTime _gpsTime;
 //
 static uint8_t _numSatellites = 0;
 
+// cached Usart pointer for GPS USART
+//
+static Usart* _gpsUsart = nullptr;
+
+
+void initialize()
+{
+  _gpsUsart = Hardware::getUsart(0);  // USART1
+}
+
 
 /// @brief Updates _numSatellites based on the receive buffer
 ///
@@ -190,7 +198,9 @@ void setTimeZone(const int16_t offsetInMinutes)
 
 void rxIsr()
 {
-  uint8_t rxChar = USART1_RDR;
+  if (_gpsUsart == nullptr || !_gpsUsart->rxReady()) return;
+
+  uint8_t rxChar = _gpsUsart->readByte();
 
   switch (_rxState)
   {

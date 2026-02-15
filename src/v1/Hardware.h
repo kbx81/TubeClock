@@ -66,25 +66,33 @@ namespace Hardware {
   ///
   enum TempSensorType : uint8_t {
     NoTempSensor,
-    DS3231,
     DS3234,
     DS1722,
     LM74,
-    LM75,
-    MCP9808
+    ExternalSerial
   };
+
+  // Number of temperature sensor types
+  //
+  static const uint8_t cTempSensorCount = 5;
+
+  // Sentinel value for undetected/unavailable sensors (Cx10)
+  //
+  static const int32_t cTempSentinel = 32767;
 
 
   // Number of USARTs to configure
   //
-  static const uint8_t cNumberOfUsarts = 2;
+  static const uint8_t cNumberOfUsarts = 4;
 
   // USART default/initial baud rates
   //
   static const uint32_t cUsart1BaudRate = 115200;
   static const uint32_t cUsart2BaudRate = 250000;
+  static const uint32_t cUsart3BaudRate = 115200;
+  static const uint32_t cUsart4BaudRate = 115200;
 
-  // USART1 data transnfer parameters
+  // USART1 data transfer parameters
   //
   static const uint8_t cUsart1DataBits  = 8;                      // Number of data bits
   static const auto cUsart1StopBits     = USART_STOPBITS_1;       // Number of stop bits
@@ -93,8 +101,9 @@ namespace Hardware {
   static const auto cUsart1FlowControl  = USART_FLOWCONTROL_NONE; // Flow control
   static const auto cUsart1AutoBaud     = USART_CR2_ABRMOD_FALL_EDGE | USART_CR2_ABREN; // Enable auto-baud rate detection
   static const auto cUsart1DriverEnable = false;                  // Enable hardware DE output (for RS-485)
+  static const bool cUsart1SwapTxRx     = false;                  // TX/RX pin swap
 
-  // USART1 data transnfer parameters
+  // USART2 data transfer parameters
   //
   static const uint8_t cUsart2DataBits  = 8;                      // Number of data bits
   static const auto cUsart2StopBits     = USART_STOPBITS_2;       // Number of stop bits
@@ -103,6 +112,29 @@ namespace Hardware {
   static const auto cUsart2FlowControl  = USART_FLOWCONTROL_NONE; // Flow control
   static const auto cUsart2AutoBaud     = 0;                      // Enable auto-baud rate detection
   static const auto cUsart2DriverEnable = true;                   // Enable hardware DE output (for RS-485)
+  static const bool cUsart2SwapTxRx     = false;                  // TX/RX pin swap
+
+  // USART3 data transfer parameters (serial remote RX, interrupt-driven, no DMA)
+  //
+  static const uint8_t cUsart3DataBits  = 8;
+  static const auto cUsart3StopBits     = USART_STOPBITS_1;
+  static const auto cUsart3Parity       = USART_PARITY_NONE;
+  static const auto cUsart3Mode         = USART_MODE_RX;
+  static const auto cUsart3FlowControl  = USART_FLOWCONTROL_NONE;
+  static const auto cUsart3AutoBaud     = 0;
+  static const auto cUsart3DriverEnable = false;
+  static const bool cUsart3SwapTxRx     = true;
+
+  // USART4 data transfer parameters (serial remote TX, interrupt-driven, no DMA)
+  //
+  static const uint8_t cUsart4DataBits  = 8;
+  static const auto cUsart4StopBits     = USART_STOPBITS_1;
+  static const auto cUsart4Parity       = USART_PARITY_NONE;
+  static const auto cUsart4Mode         = USART_MODE_TX;
+  static const auto cUsart4FlowControl  = USART_FLOWCONTROL_NONE;
+  static const auto cUsart4AutoBaud     = 0;
+  static const auto cUsart4DriverEnable = false;
+  static const bool cUsart4SwapTxRx     = false;
 
   /// @brief Hardware version to build for
   ///
@@ -177,6 +209,18 @@ namespace Hardware {
   ///  (in fahrenheit if fahrenheit == true; in BCD if bcd == true)
   int32_t  temperature(const bool fahrenheit, const bool bcd = false);
 
+  /// @brief Returns the active sensor's temperature in tenths of degrees Celsius
+  ///
+  int32_t  temperatureCx10();
+
+  /// @brief Returns the temperature for a specific sensor type in tenths of degrees Celsius
+  ///  Returns cTempSentinel (32767) for undetected/unavailable sensors
+  int32_t  temperatureCx10(TempSensorType type);
+
+  /// @brief Returns true if any temperature reading has been updated since last call
+  ///  Clears the flag on read.
+  bool     temperatureUpdated();
+
   /// @brief Returns the level of light seen by the phototransistor (0 = min, 4095 = max)
   ///
   uint16_t lightLevel();
@@ -197,6 +241,10 @@ namespace Hardware {
   ///
   uint16_t voltageVddA();
 
+  /// @brief Returns true if ADC filtered values have been updated since last call
+  ///  Clears the flag on read.
+  bool     adcValuesUpdated();
+
   /// @brief Adjusts the clock for daylight savings
   ///
   // void     setDstState(const bool enableDst, const bool adjustRtcHardware);
@@ -208,6 +256,10 @@ namespace Hardware {
   /// @brief Sets the calibration value used for the temperature calculation
   ///
   void     setTemperatureCalibration(const int8_t value);
+
+  /// @brief Sets the temperature from an external source (Celsius x10)
+  ///
+  void     setTemperature(const int32_t temperatureCx10);
 
   /// @brief Sets the volume of tones emitted from the buzzer
   ///  Valid range is 0 (muted/minimum) to 7 (maximum/default)
@@ -232,6 +284,10 @@ namespace Hardware {
   /// @brief Returns the active temperature sensor type/source
   ///
   TempSensorType getTempSensorType();
+
+  /// @brief Sets the temperature sensor type/source
+  /// @return true if successful, false if the sensor is not available
+  bool setTempSensorType(TempSensorType type);
 
   /// @brief Erases the FLASH area used for app data
   /// @return 0xff if startAddress is out of range, flash_get_status_flags() if
@@ -314,6 +370,7 @@ namespace Hardware {
   void     tscIsr();
   void     usart1Isr();
   void     usart2Isr();
+  void     usart3_4Isr();
 
 }
 

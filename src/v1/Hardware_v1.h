@@ -36,6 +36,8 @@ namespace Hardware {
   //
   static const auto cGpsUsart = USART1;
   static const auto cDmxUsart = USART2;
+  static const auto cSerialRemoteUsartRx = USART3;
+  static const auto cSerialRemoteUsartTx = USART4;
 
   // USART Tx and Rx ports, pins, & IRQs
   //
@@ -60,6 +62,17 @@ namespace Hardware {
   // static const auto cUsart2DeAF   = GPIO_AF1;
   static const auto cUsart2AF     = GPIO_AF1;
   static const auto cUsart2Irq    = NVIC_USART2_IRQ;
+
+  // USART3: Serial remote control RX (PB10 with TX/RX swap)
+  static const auto cUsart3RxPort = GPIOB;
+  static const auto cUsart3RxPin  = GPIO10;
+  static const auto cUsart3RxAF   = GPIO_AF4;
+  // USART4: Serial remote control TX (PA0)
+  static const auto cUsart4TxPort = GPIOA;
+  static const auto cUsart4TxPin  = GPIO0;
+  static const auto cUsart4TxAF   = GPIO_AF4;
+  // USART3 and USART4 share a single IRQ on STM32F072
+  static const auto cUsart3_4Irq  = NVIC_USART3_4_IRQ;
 
   // external alarm input port(s) & pins
   //
@@ -142,6 +155,11 @@ namespace Hardware {
   //
   static const auto cHvShutdownPort = GPIOA;
   static const auto cHvShutdownPin  = GPIO4;
+
+  // ISR profiling I/O port & pin (active when ENABLE_PROFILING is defined)
+  //
+  static const auto cProfilingPort = GPIOB;
+  static const auto cProfilingPin  = GPIO5;
 
   // DMA channel assignments and remapping via SYSCFG_CFGR1
   //

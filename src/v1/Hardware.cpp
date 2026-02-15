@@ -99,6 +99,16 @@ static const Usart::UsartParams _usartParams[cNumberOfUsarts] = {
       DMA1,                 // dmaController
       cUsart2RxDmaChannel,  // channelRx
       cUsart2TxDmaChannel   // channelTx
+  },
+  {   cSerialRemoteUsartRx, // USART
+      0,                    // dmaController (no DMA)
+      0,                    // channelRx (no DMA)
+      0                     // channelTx (no DMA)
+  },
+  {   cSerialRemoteUsartTx, // USART
+      0,                    // dmaController (no DMA)
+      0,                    // channelRx (no DMA)
+      0                     // channelTx (no DMA)
   }
 };
 
@@ -112,7 +122,8 @@ static const Usart::UsartTransferParams _usartTransferParams[cNumberOfUsarts] = 
       cUsart1FlowControl,   // Flow control
       cUsart1AutoBaud,      // Enable auto-baud rate detection
       cUsart1DataBits,      // Number of data bits
-      cUsart1DriverEnable   // Enable hardware DE output (for RS-485)
+      cUsart1DriverEnable,  // Enable hardware DE output (for RS-485)
+      cUsart1SwapTxRx       // TX/RX pin swap
   },
   {   cUsart2BaudRate,      // Baud rate
       cUsart2StopBits,      // Number of stop bits
@@ -121,7 +132,28 @@ static const Usart::UsartTransferParams _usartTransferParams[cNumberOfUsarts] = 
       cUsart2FlowControl,   // Flow control
       cUsart2AutoBaud,      // Enable auto-baud rate detection
       cUsart2DataBits,      // Number of data bits
-      cUsart2DriverEnable   // Enable hardware DE output (for RS-485)
+      cUsart2DriverEnable,  // Enable hardware DE output (for RS-485)
+      cUsart2SwapTxRx       // TX/RX pin swap
+  },
+  {   cUsart3BaudRate,      // Baud rate
+      cUsart3StopBits,      // Number of stop bits
+      cUsart3Parity,        // Parity
+      cUsart3Mode,          // Mode (Rx only)
+      cUsart3FlowControl,   // Flow control
+      cUsart3AutoBaud,      // Auto-baud (disabled)
+      cUsart3DataBits,      // Number of data bits
+      cUsart3DriverEnable,  // DE output (disabled)
+      cUsart3SwapTxRx       // TX/RX pin swap (PB10 is normally TX, swapped to RX)
+  },
+  {   cUsart4BaudRate,      // Baud rate
+      cUsart4StopBits,      // Number of stop bits
+      cUsart4Parity,        // Parity
+      cUsart4Mode,          // Mode (Tx only)
+      cUsart4FlowControl,   // Flow control
+      cUsart4AutoBaud,      // Auto-baud (disabled)
+      cUsart4DataBits,      // Number of data bits
+      cUsart4DriverEnable,  // DE output (disabled)
+      cUsart4SwapTxRx       // TX/RX pin swap (disabled)
   }
 };
 
@@ -145,9 +177,9 @@ static const uint16_t cAdcSampleIntervalSlow = 2000;   // Temp/voltage sampling 
 // Lower shift = faster response but more noise; Higher shift = slower but smoother
 // We use upscaling to maintain precision in integer math
 //
-static const uint8_t cAdcLightFilterShift = 4;       // 1/16 weight (~8s time constant @ 500ms sample rate)
+static const uint8_t cAdcLightFilterShift = 5;       // 1/32 weight (~16s time constant @ 500ms sample rate)
 static const uint8_t cAdcTempVoltageFilterShift = 3;  // 1/8 weight (~16s time constant @ 2000ms sample rate)
-static const uint8_t cAdcFilterUpscale = 4;          // Scale factor for precision (multiply by 16)
+static const uint8_t cAdcFilterUpscale = 8;          // Scale factor for precision (multiply by 256)
 
 // value used to increase precision in our maths
 //
@@ -234,6 +266,10 @@ static uint32_t _adcFilteredVoltageBatt = 0;
 // Cached light level result (0-4095) to avoid redundant calculation
 //
 static uint16_t _cachedLightLevel = 0;
+
+// Flag set by systickIsr when ADC filtered values are updated
+//
+static volatile bool _adcValuesUpdated = false;
 
 // threshold above which we do not BLANK during display refreshes
 //  used when autoAdjustIntensities is true
@@ -337,6 +373,15 @@ static DateTime _currentDateTime;
 //
 static int32_t _temperatureXcBaseMultiplier = 0;
 
+// per-sensor temperature cache in tenths of degrees Celsius (Cx10)
+//  sentinel value (cTempSentinel) indicates sensor not detected/available
+static int32_t _temperatureCx10Cached[cTempSensorCount] = {
+  cTempSentinel, cTempSentinel, cTempSentinel, cTempSentinel, cTempSentinel
+};
+
+// flag set when any temperature reading is updated; cleared by temperatureUpdated()
+static volatile bool _temperatureUpdated = false;
+
 // state of the BLANK pin
 //
 static bool _displayBlankingState = false;
@@ -385,6 +430,11 @@ static bool _rtcIsSet = false;
 //
 static TempSensorType _externalTemperatureSensor = TempSensorType::NoTempSensor;
 
+// Bitmask of temperature sensors detected at init (bit = 1 << TempSensorType)
+// NoTempSensor (internal ADC) and ExternalSerial are always available
+//
+static uint8_t _detectedTempSensorsMask = (1 << TempSensorType::NoTempSensor) | (1 << TempSensorType::ExternalSerial);
+
 // a string and some bits used for printf debugging :)
 //
 // char _buffer[80];
@@ -392,7 +442,7 @@ static TempSensorType _externalTemperatureSensor = TempSensorType::NoTempSensor;
 // request.state = Usart::UsartReqAck::UsartReqAckQueued;
 // request.length = sprintf(_buffer, "date: %lx\r\n", dr);
 // request.buffer = (uint8_t*)_buffer;
-// _usart[0].transmit(&request);
+// _usart[0].transmitDma(&request);
 
 
 // set up the ADC
@@ -471,6 +521,8 @@ void _clockSetup()
   rcc_periph_clock_enable(RCC_SPI2);
   rcc_periph_clock_enable(RCC_USART1);
   rcc_periph_clock_enable(RCC_USART2);
+  rcc_periph_clock_enable(RCC_USART3);
+  rcc_periph_clock_enable(RCC_USART4);
 
   rcc_periph_clock_enable(RCC_TSC);
 }
@@ -511,9 +563,9 @@ void _dmaSetup()
 void _gpioSetup()
 {
 #ifdef ENABLE_PROFILING
-  // Configure PA0 as output for ISR profiling (scope probe)
-  gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);
-  gpio_clear(GPIOA, GPIO0);
+  // Configure profiling pin as output for ISR profiling (scope probe)
+  gpio_mode_setup(cProfilingPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, cProfilingPin);
+  gpio_clear(cProfilingPort, cProfilingPin);
 #endif
 
   // Configure the SPI NSS pins for the HV drivers, RTC, and temp sensor
@@ -665,11 +717,15 @@ void _nvicSetup()
   // TSC interrupt
   nvic_set_priority(cTscIrq, 128);
   nvic_enable_irq(cTscIrq);
-  // USART interrupts
+  // USART1 interrupts
   nvic_set_priority(cUsart1Irq, 64);
 	nvic_enable_irq(cUsart1Irq);
+  // USART2 interrupts
   nvic_set_priority(cUsart2Irq, 64);
 	nvic_enable_irq(cUsart2Irq);
+  // USART3/4 shared interrupt (serial remote control)
+  nvic_set_priority(cUsart3_4Irq, 64);
+  nvic_enable_irq(cUsart3_4Irq);
 }
 
 
@@ -982,10 +1038,19 @@ void _usartSetup()
   // Setup USART1 TX & RX pins as alternate function
   gpio_set_af(cUsart1TxPort, cUsart1TxAF, cUsart1TxPin);
   gpio_set_af(cUsart1RxPort, cUsart1RxAF, cUsart1RxPin);
-  // Setup USART2 TX & RX pins as alternate function
+  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
+  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
+  // Setup USART2 TX, RX, and DE pins as alternate function
   gpio_set_af(cUsart2Port, cUsart2AF, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
+  gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
+  // Setup USART3 RX pin as alternate function
+  gpio_set_af(cUsart3RxPort, cUsart3RxAF, cUsart3RxPin);
+  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart3RxPin);
+  // Setup USART4 TX pin as alternate function
+  gpio_set_af(cUsart4TxPort, cUsart4TxAF, cUsart4TxPin);
+  gpio_mode_setup(cUsart4TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart4TxPin);
 
-  // Configure Usart instances with USART hardware and DMA channels
+  // Configure all Usart instances
   for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
   {
     _usart[usart].initialize(&_usartParams[usart]);
@@ -993,23 +1058,16 @@ void _usartSetup()
   }
 
   // Enable relevant interrupts
-  usart_enable_rx_interrupt(cGpsUsart);
-  // usart_enable_tx_interrupt(cGpsUsart);
+  _usart[0].enableRxInterrupt();          // USART1 GPS RX
   usart_enable_error_interrupt(cGpsUsart);
-
-  // usart_enable_rx_interrupt(cDmxUsart);
-  // usart_enable_tx_interrupt(cDmxUsart);
   usart_enable_error_interrupt(cDmxUsart);
+  _usart[2].enableRxInterrupt();          // USART3 serial remote RX
 
-  // Enable the USARTs
-  usart_enable(cGpsUsart);
-  usart_enable(cDmxUsart);
-
-  // Setup GPIO pins for USART1 transmit and recieve
-  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
-  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
-  // Setup GPIO pins for USART2 transmit, recieve, and direction
-  gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
+  // Enable all USARTs
+  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
+  {
+    _usart[usart].enable();
+  }
 }
 
 
@@ -1041,74 +1099,94 @@ void _incrementOnTimeSecondsCounter()
 
 void _refreshTemp()
 {
-  // Determine where to get the temperature from and get it
-  switch (_externalTemperatureSensor)
+  // Read ALL detected temperature sensors (not just the active one) so the
+  // serial remote can report every sensor's value.  Phase 1 handles immediate
+  // reads (internal ADC, DS3234 cached registers) and queues SPI reads.
+  // Phase 2 harvests SPI results on subsequent calls.
+
+  // --- Phase 1: immediate reads + queue SPI ---
+  if ((_refreshTempNow == true) && (_tempReadPending == false))
   {
-    case TempSensorType::DS3234:
-      // Temperature comes from the DS3234 registers, which are refreshed by
-      //  _refreshRTC(). Only read once the RTC DMA transfer has completed.
-      if ((_refreshTempNow == true) && (_rtcReadPending == false))
-      {
-        _temperatureXcBaseMultiplier =  DS3234::getTemperatureWholePart() * cBaseMultiplier;
-        _temperatureXcBaseMultiplier += ((DS3234::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-        _refreshTempNow = false;
-      }
-      break;
+    // Internal ADC temperature (always available)
+    {
+      int32_t averageTemp = _adcFilteredTemp >> cAdcFilterUpscale;
+      int32_t t = (averageTemp * voltageVddA() / cVddCalibrationVoltage) - ST_TSENSE_CAL1_30C;
+      t = t * (110 - 30) * cBaseMultiplier;
+      t = t / (ST_TSENSE_CAL2_110C - ST_TSENSE_CAL1_30C);
+      t = t + 30000 + (_temperatureAdjustment * cBaseMultiplier);
+      _temperatureCx10Cached[TempSensorType::NoTempSensor] = t / (cBaseMultiplier / 10);
+    }
 
-    case TempSensorType::LM74:
-      // Phase 1: queue the SPI refresh (non-blocking)
-      if (_refreshTempNow == true)
-      {
-        SpiMaster::SpiReqAck status = LM74::refresh();
-        if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
-            || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
-        {
-          _tempReadPending = true;
-          _refreshTempNow = false;
-        }
-      }
-      // Phase 2: harvest the result once DMA completes
-      if ((_tempReadPending == true) && (LM74::transferComplete() == true))
-      {
-        _temperatureXcBaseMultiplier =  LM74::getTemperatureWholePart() * cBaseMultiplier;
-        _temperatureXcBaseMultiplier += ((LM74::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-        _tempReadPending = false;
-      }
-      break;
+    // DS3234 (reads cached values populated by _refreshRTC() DMA transfer)
+    if ((_detectedTempSensorsMask & (1 << TempSensorType::DS3234)) && (_rtcReadPending == false))
+    {
+      int32_t t =  DS3234::getTemperatureWholePart() * cBaseMultiplier;
+      t += ((DS3234::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      _temperatureCx10Cached[TempSensorType::DS3234] = t / (cBaseMultiplier / 10);
+    }
 
-    case TempSensorType::DS1722:
-      // Phase 1: queue the SPI refresh (non-blocking)
-      if (_refreshTempNow == true)
+    // SPI temperature sensor -- LM74 and DS1722 are mutually exclusive
+    if (_detectedTempSensorsMask & (1 << TempSensorType::LM74))
+    {
+      SpiMaster::SpiReqAck status = LM74::refresh();
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
+          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
       {
-        SpiMaster::SpiReqAck status = DS1722::refresh();
-        if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
-            || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
-        {
-          _tempReadPending = true;
-          _refreshTempNow = false;
-        }
+        _tempReadPending = true;
       }
-      // Phase 2: harvest the result once DMA completes
-      if ((_tempReadPending == true) && (DS1722::transferComplete() == true))
+    }
+    else if (_detectedTempSensorsMask & (1 << TempSensorType::DS1722))
+    {
+      SpiMaster::SpiReqAck status = DS1722::refresh();
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
+          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
       {
-        _temperatureXcBaseMultiplier =  DS1722::getTemperatureWholePart() * cBaseMultiplier;
-        _temperatureXcBaseMultiplier += ((DS1722::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-        _tempReadPending = false;
+        _tempReadPending = true;
       }
-      break;
+    }
 
-    default:
-      // Internal ADC temperature -- no SPI involved, can read immediately
-      if (_refreshTempNow == true)
+    _refreshTempNow = false;
+
+    if (!_tempReadPending)
+    {
+      // No SPI read queued -- all readings are complete this cycle
+      if (_externalTemperatureSensor != TempSensorType::ExternalSerial)
       {
-        int32_t averageTemp = _adcFilteredTemp >> cAdcFilterUpscale;
-        // Now we can compute the temperature based on RM's formula, * cBaseMultiplier
-        _temperatureXcBaseMultiplier = (averageTemp * voltageVddA() / cVddCalibrationVoltage) - ST_TSENSE_CAL1_30C;
-        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier * (110 - 30) * cBaseMultiplier;
-        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier / (ST_TSENSE_CAL2_110C - ST_TSENSE_CAL1_30C);
-        _temperatureXcBaseMultiplier = _temperatureXcBaseMultiplier + 30000 + (_temperatureAdjustment * cBaseMultiplier);
-        _refreshTempNow = false;
+        _temperatureXcBaseMultiplier = _temperatureCx10Cached[_externalTemperatureSensor] * (cBaseMultiplier / 10);
       }
+      _temperatureUpdated = true;
+    }
+  }
+
+  // --- Phase 2: harvest SPI result ---
+  if (_tempReadPending == true)
+  {
+    bool harvested = false;
+
+    if ((_detectedTempSensorsMask & (1 << TempSensorType::LM74)) && (LM74::transferComplete() == true))
+    {
+      int32_t t =  LM74::getTemperatureWholePart() * cBaseMultiplier;
+      t += ((LM74::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      _temperatureCx10Cached[TempSensorType::LM74] = t / (cBaseMultiplier / 10);
+      harvested = true;
+    }
+    else if ((_detectedTempSensorsMask & (1 << TempSensorType::DS1722)) && (DS1722::transferComplete() == true))
+    {
+      int32_t t =  DS1722::getTemperatureWholePart() * cBaseMultiplier;
+      t += ((DS1722::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
+      _temperatureCx10Cached[TempSensorType::DS1722] = t / (cBaseMultiplier / 10);
+      harvested = true;
+    }
+
+    if (harvested)
+    {
+      _tempReadPending = false;
+      if (_externalTemperatureSensor != TempSensorType::ExternalSerial)
+      {
+        _temperatureXcBaseMultiplier = _temperatureCx10Cached[_externalTemperatureSensor] * (cBaseMultiplier / 10);
+      }
+      _temperatureUpdated = true;
+    }
   }
 }
 
@@ -1243,6 +1321,7 @@ void initialize()
   if (LM74::isConnected() == true)
   {
     _externalTemperatureSensor = TempSensorType::LM74;
+    _detectedTempSensorsMask |= (1 << TempSensorType::LM74);
   }
   else
   {
@@ -1251,6 +1330,7 @@ void initialize()
     if (DS1722::isConnected() == true)
     {
       _externalTemperatureSensor = TempSensorType::DS1722;
+      _detectedTempSensorsMask |= (1 << TempSensorType::DS1722);
     }
   }
 
@@ -1264,6 +1344,7 @@ void initialize()
     _rtcIsSet = DS3234::isValid();
     // enable PPS and 32 kHz outputs
     while (DS3234::setRegister(0x0e, buffer, 2, true) != SpiMaster::SpiReqAck::SpiReqAckOk);
+    _detectedTempSensorsMask |= (1 << TempSensorType::DS3234);
     if (_externalTemperatureSensor == TempSensorType::NoTempSensor)
     {
       _externalTemperatureSensor = TempSensorType::DS3234;
@@ -1403,6 +1484,7 @@ void buttonsRefresh()
 
 void setHvState(const bool hvEnabled)
 {
+  if (_hvState == hvEnabled) return;
   _hvState = hvEnabled;
 
   if (hvEnabled == false)
@@ -1523,6 +1605,33 @@ int32_t temperature(const bool fahrenheit, const bool bcd)
 }
 
 
+int32_t temperatureCx10()
+{
+  return _temperatureCx10Cached[_externalTemperatureSensor];
+}
+
+
+int32_t temperatureCx10(TempSensorType type)
+{
+  if (type < cTempSensorCount)
+  {
+    return _temperatureCx10Cached[type];
+  }
+  return cTempSentinel;
+}
+
+
+bool temperatureUpdated()
+{
+  if (_temperatureUpdated)
+  {
+    _temperatureUpdated = false;
+    return true;
+  }
+  return false;
+}
+
+
 uint16_t lightLevel()
 {
   // Return cached IIR-filtered light level (updated in systickIsr)
@@ -1561,6 +1670,17 @@ uint16_t voltageVddA()
   int32_t adcSampleAverage = _adcFilteredVoltageVddA >> cAdcFilterUpscale;
   // Determine the voltage as it affects the temperature calculation
   return cVddCalibrationVoltage * (int32_t)ST_VREFINT_CAL / adcSampleAverage;
+}
+
+
+bool adcValuesUpdated()
+{
+  if (_adcValuesUpdated)
+  {
+    _adcValuesUpdated = false;
+    return true;
+  }
+  return false;
 }
 
 
@@ -1625,6 +1745,15 @@ void setTemperatureCalibration(const int8_t value)
 }
 
 
+void setTemperature(const int32_t temperatureCx10)
+{
+  _temperatureCx10Cached[TempSensorType::ExternalSerial] = temperatureCx10;
+  _temperatureXcBaseMultiplier = temperatureCx10 * (cBaseMultiplier / 10);
+  _externalTemperatureSensor = TempSensorType::ExternalSerial;
+  _temperatureUpdated = true;
+}
+
+
 void setVolume(const uint8_t volumeLevel)
 {
   if (volumeLevel > cToneVolumeMaximum)
@@ -1676,6 +1805,17 @@ RtcType getRTCType()
 TempSensorType getTempSensorType()
 {
   return _externalTemperatureSensor;
+}
+
+
+bool setTempSensorType(TempSensorType type)
+{
+  if (_detectedTempSensorsMask & (1 << type))
+  {
+    _externalTemperatureSensor = type;
+    return true;
+  }
+  return false;
 }
 
 
@@ -2295,6 +2435,8 @@ void systickIsr()
 
     // Update cached light level (downscale back to actual ADC range)
     _cachedLightLevel = _adcFilteredLight >> cAdcFilterUpscale;
+
+    _adcValuesUpdated = true;
   }
 
   // Temperature and voltage sampling (2000ms interval = 0.5 Hz - they change very slowly)
@@ -2316,6 +2458,8 @@ void systickIsr()
     _adcFilteredVoltageBatt = _adcFilteredVoltageBatt
                               - (_adcFilteredVoltageBatt >> cAdcTempVoltageFilterShift)
                               + (((uint32_t)_bufferADC[cAdcVbat] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+
+    _adcValuesUpdated = true;
   }
 
   // update the tone timer and turn off the tone if the timer has expired
@@ -2463,20 +2607,36 @@ void tscIsr()
 void usart1Isr()
 {
   // brute-force approace to USART errors here... :/
-  if ((USART1_ISR & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE | USART_ISR_RXNE | USART_ISR_ABRE)) != 0)
+  if (_usart[0].hasErrors() || _usart[0].rxReady()
+      || (USART_ISR(_usart[0].peripheral()) & USART_ISR_ABRE))
   {
-    USART1_ICR = USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE;
+    _usart[0].clearErrors();
     // Clear the RXNE and ABRE flags -- they may be set with the flags above
-    USART1_RQR = USART_RQR_ABKRQ | USART_RQR_RXFRQ;
+    USART_RQR(_usart[0].peripheral()) = USART_RQR_ABKRQ | USART_RQR_RXFRQ;
   }
 }
 
 
 void usart2Isr()
 {
-  if (USART2_ISR & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE | USART_ISR_RXNE))
+  if (_usart[1].hasErrors() || _usart[1].rxReady())
   {
-    USART2_ICR = USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE;
+    _usart[1].clearErrors();
+  }
+}
+
+
+void usart3_4Isr()
+{
+  // Clear error flags on USART3 (serial remote RX)
+  if (_usart[2].hasErrors())
+  {
+    _usart[2].clearErrors();
+  }
+  // Clear error flags on USART4 (serial remote TX)
+  if (_usart[3].hasErrors())
+  {
+    _usart[3].clearErrors();
   }
 }
 

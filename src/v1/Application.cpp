@@ -29,6 +29,7 @@
 #include "Dmx-512-View.h"
 #include "GpsReceiver.h"
 #include "Keys.h"
+#include "SerialRemote.h"
 #include "Settings.h"
 #include "MainMenuView.h"
 #include "TestDisplayView.h"
@@ -47,6 +48,21 @@ void* __dso_handle;
 namespace kbxTubeClock {
 
 namespace Application {
+
+  // Color constant definitions (declared extern in Application.h)
+  const RgbLed
+    red(RgbLed::cLedMaxIntensity, 0, 0),
+    orange(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity / 4, 0),
+    yellow(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, 0),
+    green(0, RgbLed::cLedMaxIntensity, 0),
+    cyan(0, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
+    blue(0, 0, RgbLed::cLedMaxIntensity),
+    violet(RgbLed::cLedMaxIntensity / 8, 0, RgbLed::cLedMaxIntensity),
+    magenta(RgbLed::cLedMaxIntensity, 0, RgbLed::cLedMaxIntensity),
+    white(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
+    gray(RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8),
+    darkGray(RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24),
+    nixieOrange(256, 32, 2);
 
 
 // An array with all views for the application; must correspond with ViewEnum!
@@ -176,6 +192,8 @@ static bool _previousDmxState = false;
 //
 static bool _settingsModified = false;
 
+static bool _wasIdle = false;
+
 
 void initialize()
 {
@@ -186,6 +204,9 @@ void initialize()
     Hardware::delay(500);
     Hardware::setStatusLed(RgbLed());
   }
+
+  GpsReceiver::initialize();
+  SerialRemote::initialize();
 
   // _currentTime = Hardware::getDateTime();
   _currentTime = Application::dateTime();
@@ -254,6 +275,24 @@ int32_t temperature(const bool fahrenheit, const bool bcd)
 }
 
 
+int32_t temperatureCx10()
+{
+  return Hardware::temperatureCx10();
+}
+
+
+int32_t temperatureCx10(Hardware::TempSensorType type)
+{
+  return Hardware::temperatureCx10(type);
+}
+
+
+bool temperatureUpdated()
+{
+  return Hardware::temperatureUpdated();
+}
+
+
 uint8_t getModeDisplayNumber(OperatingMode mode)
 {
   return cViewDescriptor[static_cast<uint8_t>(mode)].menuItemDisplayNumber;
@@ -305,16 +344,18 @@ void setOperatingMode(OperatingMode mode)
     _viewMode = ViewMode::ViewMode0;
     _currentView = cModeViews[static_cast<uint8_t>(cViewDescriptor[static_cast<uint8_t>(mode)].view)];
     _currentView->enter();
-    // if something kicks back to the main menu, make sure we wait a full cycle
-    if (mode == OperatingMode::OperatingModeMainMenu)
-    {
-      _idleCounter = 0;
-    }
+    // reset idle counter so the auto-return doesn't immediately override this mode
+    _idleCounter = 0;
     // this enables controller() immediately upon entering this mode
-    else if (mode == OperatingMode::OperatingModeDmx512Display)
+    if (mode == OperatingMode::OperatingModeDmx512Display)
     {
       _idleCounter = cMaximumIdleCount;
     }
+
+    // Notify serial remote of mode change
+    SerialRemote::notifyModeChange(
+      static_cast<uint8_t>(_applicationMode),
+      static_cast<uint8_t>(_viewMode));
   }
 }
 
@@ -330,6 +371,10 @@ void setViewMode(ViewMode mode)
   if (_viewMode != mode)
   {
     _viewMode = mode;
+
+    SerialRemote::notifyModeChange(
+      static_cast<uint8_t>(_applicationMode),
+      static_cast<uint8_t>(_viewMode));
   }
 }
 
@@ -572,6 +617,9 @@ void loop()
       DisplayManager::setMasterIntensity(_masterIntensity);
     }
 
+    // Process any pending serial remote commands
+    SerialRemote::process();
+
     // Check the buttons
     Keys::scanKeys();
     if (Keys::hasKeyPress())
@@ -580,6 +628,8 @@ void loop()
       auto key = Keys::getKeyPress();
       // Reset the counter since there has been button/key activity
       _idleCounter = 0;
+      _wasIdle = false;
+      Hardware::setHvState(true);
       // If an alarm is active and external control is not, send keypresses there
       if ((AlarmHandler::isAlarmActive())
        && (_externalControlMode == Application::ExternalControl::NoActiveExtControlEnum))
@@ -623,18 +673,29 @@ void loop()
     // If the idle counter has maxed out, kick back to the appropriate display mode
     if (_idleCounter >= cMaximumIdleCount)
     {
+      // On transition to idle, set HV state based on current context
+      if (!_wasIdle)
+      {
+        _wasIdle = true;
+        if (Dmx512Rx::signalIsActive() == true)
+        {
+          Hardware::setHvState(true);
+        }
+        else
+        {
+          Hardware::setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
+        }
+      }
+
       // If there is an active signal, update _externalControlMode
       if (Dmx512Rx::signalIsActive() == true)
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);
-        Hardware::setHvState(true);
       }
       // Kick back to the default display mode
       else if (_externalControlMode == ExternalControl::NoActiveExtControlEnum)
       {
-        Hardware::setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
-
         // Only change the display mode if it isn't already one of the time/date/temp modes
         if ((_applicationMode != OperatingMode::OperatingModeToggleDisplay) &&
             (_applicationMode != OperatingMode::OperatingModeFixedDisplay) &&
@@ -650,10 +711,6 @@ void loop()
           }
         }
       }
-    }
-    else
-    {
-      Hardware::setHvState(true);
     }
 
     if (_externalControlMode == ExternalControl::Dmx512ExtControlEnum)
@@ -671,12 +728,17 @@ void loop()
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);
+        Hardware::setHvState(true);
       }
       else
       {
         _externalControlMode = ExternalControl::NoActiveExtControlEnum;
         Dmx512Controller::setDmx512Active(false);
         AlarmHandler::clearAlarm();   // just in case...
+        if (_idleCounter >= cMaximumIdleCount)
+        {
+          Hardware::setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
+        }
       }
       // Setting this mode activates the view but also kicks us back to the menu if there is no signal
       setOperatingMode(OperatingMode::OperatingModeDmx512Display);

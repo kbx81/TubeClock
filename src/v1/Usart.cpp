@@ -64,10 +64,15 @@ void Usart::configure(const UsartTransferParams* usartTransferParams)
   {
     USART_CR3(_params.usart) |= USART_CR3_DEM;
   }
+
+  if (usartTransferParams->swapTxRx)
+  {
+    USART_CR2(_params.usart) |= USART_CR2_SWAP;
+  }
 }
 
 
-Usart::UsartReqAck Usart::receive(UsartTransferReq* request)
+Usart::UsartReqAck Usart::receiveDma(UsartTransferReq* request)
 {
   if ((DMA_ISR(_params.dmaController) & DMA_ISR_TCIF(_params.channelRx))
       || !(USART_CR3(_params.usart) & USART_CR3_DMAR))
@@ -75,7 +80,7 @@ Usart::UsartReqAck Usart::receive(UsartTransferReq* request)
     // Reset DMA channel
     dma_channel_reset(_params.dmaController, _params.channelRx);
     // Set up Rx DMA, note it has higher priority to avoid overrun
-    dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t)&USART2_RDR);
+    dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t)&USART_RDR(_params.usart));
     dma_set_memory_address(_params.dmaController, _params.channelRx, (uint32_t)request->buffer);
     dma_set_number_of_data(_params.dmaController, _params.channelRx, request->length);
     dma_set_read_from_peripheral(_params.dmaController, _params.channelRx);
@@ -96,14 +101,14 @@ Usart::UsartReqAck Usart::receive(UsartTransferReq* request)
 }
 
 
-Usart::UsartReqAck Usart::transmit(UsartTransferReq* request)
+Usart::UsartReqAck Usart::transmitDma(UsartTransferReq* request)
 {
   if (USART_ISR(_params.usart) & USART_ISR_TC)
   {
     // Reset DMA channel
     dma_channel_reset(_params.dmaController, _params.channelTx);
     // Set up tx DMA
-    dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t)&USART1_TDR);
+    dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t)&USART_TDR(_params.usart));
     dma_set_memory_address(_params.dmaController, _params.channelTx, (uint32_t)request->buffer);
     dma_set_number_of_data(_params.dmaController, _params.channelTx, request->length);
     dma_set_read_from_memory(_params.dmaController, _params.channelTx);
@@ -127,6 +132,18 @@ Usart::UsartReqAck Usart::transmit(UsartTransferReq* request)
 void Usart::dmaComplete()
 {
 
+}
+
+
+void Usart::enable() const
+{
+  usart_enable(_params.usart);
+}
+
+
+void Usart::disable() const
+{
+  usart_disable(_params.usart);
 }
 
 

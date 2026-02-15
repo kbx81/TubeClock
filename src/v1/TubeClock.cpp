@@ -22,6 +22,11 @@
 #include <libopencm3/stm32/gpio.h>
 #endif
 #include "Hardware.h"
+#if HARDWARE_VERSION == 1
+  #include "Hardware_v1.h"
+#else
+  #error HARDWARE_VERSION must be defined with a value of 1
+#endif
 #include "Animator.h"
 #include "Application.h"
 #include "DisplayManager.h"
@@ -30,9 +35,21 @@
 #include "GpsReceiver.h"
 #include "InfraredRemote.h"
 #include "Keys.h"
+#include "SerialRemote.h"
 
 
 using namespace kbxTubeClock;
+
+
+// Minimal terminate handler replacing libstdc++'s __verbose_terminate_handler.
+// The default pulls in __cxa_demangle (27 KB) and sprintf (23 KB) -- useless
+// on bare-metal where there's no console to print to anyway.
+namespace __gnu_cxx {
+  void __verbose_terminate_handler()
+  {
+    while (1) {}
+  }
+}
 
 
 /* ADC DMA */
@@ -79,12 +96,12 @@ void sys_tick_handler(void)
 void tim2_isr()
 {
 #ifdef ENABLE_PROFILING
-	gpio_set(GPIOA, GPIO0);
+	gpio_set(Hardware::cProfilingPort, Hardware::cProfilingPin);
 #endif
 	DisplayManager::tickPWM();
 	Hardware::tim2Isr();
 #ifdef ENABLE_PROFILING
-	gpio_clear(GPIOA, GPIO0);
+	gpio_clear(Hardware::cProfilingPort, Hardware::cProfilingPin);
 #endif
 }
 
@@ -120,19 +137,30 @@ void tsc_isr(void)
 }
 
 
-/* USART1 */
+/* USART1 -- GPS RX and serial remote TX/RX */
 void usart1_isr(void)
 {
 	GpsReceiver::rxIsr();
+	SerialRemote::rxIsr(USART1);
+	SerialRemote::txIsr(USART1);
 	Hardware::usart1Isr();
 }
 
 
-/* USART2 */
+/* USART2 -- DMX-512 */
 void usart2_isr(void)
 {
 	Dmx512Rx::rxIsr();
 	Hardware::usart2Isr();
+}
+
+
+/* USART3/4 -- serial remote control RX (USART3) and TX (USART4) */
+void usart3_4_isr(void)
+{
+	SerialRemote::rxIsr(USART3);
+	SerialRemote::txIsr(USART4);
+	Hardware::usart3_4Isr();
 }
 
 

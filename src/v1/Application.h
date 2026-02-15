@@ -124,19 +124,8 @@ namespace Application {
 
   /// @brief Common colors used throughout
   ///
-  static const RgbLed
-    red(RgbLed::cLedMaxIntensity, 0, 0),
-    orange(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity / 4, 0),
-    yellow(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, 0),
-    green(0, RgbLed::cLedMaxIntensity, 0),
-    cyan(0, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
-    blue(0, 0, RgbLed::cLedMaxIntensity),
-    violet(RgbLed::cLedMaxIntensity / 8, 0, RgbLed::cLedMaxIntensity),
-    magenta(RgbLed::cLedMaxIntensity, 0, RgbLed::cLedMaxIntensity),
-    white(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
-    gray(RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8),
-    darkGray(RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24),
-    nixieOrange(256, 32, 2);
+  extern const RgbLed red, orange, yellow, green, cyan, blue,
+    violet, magenta, white, gray, darkGray, nixieOrange;
 
   /// @brief Initialize the application
   ///
@@ -153,6 +142,18 @@ namespace Application {
   /// @brief Returns the temperature based on hardware
   ///  (in fahrenheit if fahrenheit == true; in BCD if bcd == true)
   int32_t  temperature(const bool fahrenheit, const bool bcd = false);
+
+  /// @brief Returns the active sensor's temperature in tenths of degrees Celsius
+  ///
+  int32_t  temperatureCx10();
+
+  /// @brief Returns the temperature for a specific sensor type in tenths of degrees Celsius
+  ///
+  int32_t  temperatureCx10(Hardware::TempSensorType type);
+
+  /// @brief Returns true if any temperature reading has been updated since last call
+  ///
+  bool     temperatureUpdated();
 
   /// @brief Get a mode's display number
   /// @param mode Desired mode to get the display number for

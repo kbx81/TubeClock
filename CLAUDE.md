@@ -118,6 +118,15 @@ The firmware is structured around several major subsystems:
 - Various visual effects and animations for tubes
 - Configurable duration and frequency
 
+**Serial Remote Control** ([SerialRemote.cpp](src/v1/SerialRemote.cpp), [SerialRemote.h](src/v1/SerialRemote.h))
+- NMEA-style ASCII protocol (`$TC{C|S}<category><action>[<data>]*XX\n`) with XOR checksum
+- USART1 (shared with GPS, full duplex), USART3 (RX on PB10 with TX/RX swap), USART4 (TX on PA0) at 115200 baud
+- Interrupt-driven I/O (no DMA - all 7 channels already allocated)
+- ISR-driven RX state machine with double-buffered parsing, independent from GPS parser
+- Command categories: P (page/mode), K (keys), H (hardware/ADC/HV), T (time), M (temperature), I (intensity), S (settings)
+- Unsolicited notifications for mode changes and key press/release events
+- Enables external MCU (WiFi, BLE, etc.) to monitor and control the clock
+
 **Alarms** ([AlarmHandler.cpp](src/v1/AlarmHandler.cpp))
 - Up to 8 configurable alarm slots
 - Per-slot beep/blink configuration
@@ -151,8 +160,10 @@ PWM refresh occurs via Timer 2 at 5 KHz, providing smooth intensity control and 
 - **Timer 7**: IR receiver signal timing
 - **Timer 15/16**: DMX-512 protocol supervision
 - **TSC**: Capacitive touch sensing
-- **USART1**: GPS module (115200 baud, auto-baud enabled)
+- **USART1**: GPS module RX and serial remote TX/RX (115200 baud, auto-baud enabled)
 - **USART2**: RS-485/DMX-512 (250000 baud, 2 stop bits, driver enable)
+- **USART3**: Serial remote RX on PB10 (115200 baud, interrupt-driven, TX/RX swap enabled)
+- **USART4**: Serial remote TX on PA0 (115200 baud, interrupt-driven)
 
 ## View System
 

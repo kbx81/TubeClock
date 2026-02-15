@@ -49,6 +49,7 @@ LDSCRIPT = stm32f07xzb-tubeclock.ld
 # LDFLAGS += -Wl,--Map=$(BINARY).map
 
 CXXSTD	 = -std=c++17
+CXXFLAGS += -fno-exceptions -fno-rtti
 
 include ../../../../libopencm3.target.mk
 

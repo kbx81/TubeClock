@@ -75,6 +75,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
     {
       _selectedView = static_cast<uint8_t>(DisplayItem::VoltageBattery);
     }
+    Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
   }
 
@@ -84,6 +85,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
     {
       _selectedView = 0;
     }
+    Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
   }
 
@@ -98,6 +100,8 @@ bool SystemStatusView::keyHandler(Keys::Key key)
 
 void SystemStatusView::loop()
 {
+  _selectedView = static_cast<int8_t>(Application::getViewMode());
+
   auto voltageBatt = Hardware::voltageBatt(),
        voltageVddA = Hardware::voltageVddA();
   uint32_t dotsBitmap = 0b0011;
@@ -124,7 +128,7 @@ void SystemStatusView::loop()
       {
         if (Hardware::getPpsInputState() == true)
         {
-          statusLed = Application::orange;
+          statusLed = Application::nixieOrange;
         }
       }
       break;

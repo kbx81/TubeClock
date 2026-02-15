@@ -32,6 +32,10 @@ namespace kbxTubeClock {
 
 namespace GpsReceiver
 {
+  /// @brief Initialize the GPS receiver (cache USART pointer)
+  ///
+  void initialize();
+
   /// @brief Check if the GPS module has sent anything meaningful at all
   /// @return True if connected
   ///

@@ -18,6 +18,7 @@
 //
 #include "InfraredRemote.h"
 #include "Keys.h"
+#include "SerialRemote.h"
 
 
 namespace kbxTubeClock {
@@ -115,12 +116,17 @@ namespace Keys {
     auto key = currentlyPressedKey();
     if (_currentPressedKey != key)
     {
+      if (_currentPressedKey != None)
+      {
+        SerialRemote::notifyKeyEvent(_currentPressedKey, false);
+      }
       _currentPressedKey = key;
       _keyPressedTimeCount = 0;
       _repeatMode = false;
       if (key != None)
       {
         addKeyPress(key);
+        SerialRemote::notifyKeyEvent(key, true);
       }
     }
     // key repeating could be handled here, but we'll do it seperately (below)

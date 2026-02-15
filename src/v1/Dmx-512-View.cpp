@@ -111,7 +111,7 @@ void Dmx512View::_dmxExtendedModeView(Dmx512Packet* packet, uint16_t address)
     uint32_t top = (packet->channel(address + t + Display::cTubeCount) * NixieGlyph::cGlyphMaximumIntensity);
     uint16_t level = static_cast<uint16_t>(top / 255);
 
-    currentTube.setGlyph(packet->channel(address + t) / 25.6);
+    currentTube.setGlyph(packet->channel(address + t) * 10 / 256);
     currentTube.setIntensity(level);
 
     dmxDisplay.setTubeFromRaw(t, currentTube);

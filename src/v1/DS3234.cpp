@@ -231,19 +231,19 @@ DateTime getDateTime()
 
 uint16_t getTemperatureRegister()
 {
-  return (_ds3234RegisterIn[cTemperatureMSBRegister] << 8) | _ds3234RegisterIn[cTemperatureLSBRegister];
+  return (_ds3234Registers[cTemperatureMSBRegister] << 8) | _ds3234Registers[cTemperatureLSBRegister];
 }
 
 
 int16_t getTemperatureWholePart()
 {
-  return ((int8_t)_ds3234RegisterIn[cTemperatureMSBRegister]);
+  return ((int8_t)_ds3234Registers[cTemperatureMSBRegister]);
 }
 
 
 uint16_t getTemperatureFractionalPart()
 {
-  return (_ds3234RegisterIn[cTemperatureLSBRegister] >> 4);
+  return (_ds3234Registers[cTemperatureLSBRegister] >> 4);
 }
 
 
