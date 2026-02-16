@@ -37,8 +37,8 @@ const uint8_t TimeDateTempView::cIntensityAdjustmentIncrement = 5;  // Increment
 TimeDateTempView::TimeDateTempView()
   : _currentTemperature(0),
     _currentTime(Application::dateTime()),
-    _lastAnimationTime(DateTime()),
-    _lastSwitchTime(DateTime()),
+    _animationCountdown(0),
+    _switchCountdown(0),
     _mode(Application::OperatingMode::OperatingModeFixedDisplay)
 {
 }
@@ -52,9 +52,9 @@ void TimeDateTempView::enter()
 
   _currentTime = Application::dateTime();
 
-  _lastAnimationTime = _currentTime;
+  _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
 
-  _lastSwitchTime = _currentTime;
+  _switchCountdown = _getItemDuration(static_cast<FixedDisplayItem>(Application::getViewMode()));
 
   DisplayManager::setStatusLedAutoRefreshing(pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm));
 }
@@ -127,8 +127,9 @@ bool TimeDateTempView::keyHandler(Keys::Key key)
 
   if (tick == true)
   {
-    _lastAnimationTime = _currentTime;
-    _lastSwitchTime = _currentTime;
+    Settings *pSettings = Application::getSettingsPtr();
+    _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
+    _switchCountdown = _getItemDuration(static_cast<FixedDisplayItem>(Application::getViewMode()));
   }
 
   return tick;
@@ -139,13 +140,10 @@ void TimeDateTempView::loop()
 {
   Application::ExternalControl externalControlState = Application::getExternalControlState();
   Settings *pSettings = Application::getSettingsPtr();
-  DateTime animationDisplayTime = _lastAnimationTime.addSeconds(pSettings->getRawSetting(Settings::Setting::EffectFrequency)),
-           changeDisplayTime;
   Display  tcDisp;
   FixedDisplayItem currentDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode()),
-                   nextDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode());
+                   nextDisplayItem = currentDisplayItem;
   RgbLed   statusLed;
-  uint32_t itemDisplayDuration = 0;
   bool displayFahrenheit = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DisplayFahrenheit);
 
   // update these only as needed -- keeps temperature from bouncing incessantly
@@ -153,6 +151,15 @@ void TimeDateTempView::loop()
   {
     _currentTime = Application::dateTime();
     _currentTemperature = Hardware::temperature(displayFahrenheit);
+    // decrement countdowns on each tick
+    if (_animationCountdown > 0)
+    {
+      _animationCountdown--;
+    }
+    if (_switchCountdown > 0)
+    {
+      _switchCountdown--;
+    }
   }
   // set status LED to appropriate color if enabled as AM/PM indicator
   if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm) == true)
@@ -173,48 +180,38 @@ void TimeDateTempView::loop()
 
   DisplayManager::writeDisplay(tcDisp, statusLed);
 
-  // determine the display duration of the current display item as well as the next item to display
-  if (_mode == Application::OperatingMode::OperatingModeToggleDisplay)
+  // rotate the display if it's time to do so
+  if ((_mode == Application::OperatingMode::OperatingModeToggleDisplay) && (_switchCountdown == 0))
   {
     switch (currentDisplayItem)
     {
       case FixedDisplayItem::Date:
-      itemDisplayDuration = pSettings->getRawSetting(Settings::Setting::DateDisplayDuration);
       nextDisplayItem = FixedDisplayItem::Temperature;
       break;
 
       case FixedDisplayItem::Temperature:
-      itemDisplayDuration = pSettings->getRawSetting(Settings::Setting::TemperatureDisplayDuration);
       nextDisplayItem = FixedDisplayItem::Time;
       break;
 
       default:
-      itemDisplayDuration = pSettings->getRawSetting(Settings::Setting::TimeDisplayDuration);
       nextDisplayItem = FixedDisplayItem::Date;
     }
-    // determine when we need to switch the display
-    changeDisplayTime = _lastSwitchTime.addSeconds(itemDisplayDuration);
 
-    // rotate the display if it's time to do so
-    if (_currentTime >= changeDisplayTime)
+    Application::setViewMode(static_cast<ViewMode>(nextDisplayItem));
+    _switchCountdown = _getItemDuration(nextDisplayItem);
+    // also trigger an animation if it is enabled
+    if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::TriggerEffectOnRotate) == true)
     {
-      Application::setViewMode(static_cast<ViewMode>(nextDisplayItem));
-
-      _lastSwitchTime = _currentTime;
-      // also trigger an animation if it is enabled
-      if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::TriggerEffectOnRotate) == true)
-      {
-        // this will trigger an animation based on the condition below
-        animationDisplayTime = _currentTime;
-      }
+      // this will trigger an animation based on the condition below
+      _animationCountdown = 0;
     }
   }
   // run an animation if it's time to do so
-  if ((_currentTime >= animationDisplayTime) && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
+  if ((_animationCountdown == 0) && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
   {
     Animator::run();
 
-    _lastAnimationTime = _currentTime;
+    _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
 
     Animator::setInitialDisplay(tcDisp);
     // only modify the final display if it's really necessary (due to rotation)
@@ -224,6 +221,24 @@ void TimeDateTempView::loop()
     }
 
     Animator::setFinalDisplay(tcDisp);
+  }
+}
+
+
+uint16_t TimeDateTempView::_getItemDuration(const FixedDisplayItem item)
+{
+  Settings *pSettings = Application::getSettingsPtr();
+
+  switch (item)
+  {
+    case FixedDisplayItem::Date:
+    return pSettings->getRawSetting(Settings::Setting::DateDisplayDuration);
+
+    case FixedDisplayItem::Temperature:
+    return pSettings->getRawSetting(Settings::Setting::TemperatureDisplayDuration);
+
+    default:
+    return pSettings->getRawSetting(Settings::Setting::TimeDisplayDuration);
   }
 }
 

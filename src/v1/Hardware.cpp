@@ -1073,27 +1073,26 @@ void _usartSetup()
 
 void _incrementOnTimeSecondsCounter()
 {
-  if ((_onTimeLastSecond != _currentDateTime.second()) && (_hvState == true))
+  if (_onTimeLastSecond == _currentDateTime.second() || !_hvState) return;
+
+  bool dbpState = (PWR_CR & PWR_CR_DBP);
+
+  _onTimeLastSecond = _currentDateTime.second();
+
+  pwr_disable_backup_domain_write_protect();
+
+  RTC_BKPXR(0) = ++_onTimeSecondsCounter;
+
+  if (dbpState == false)
   {
-    bool dbpState = (PWR_CR & PWR_CR_DBP);
-
-    _onTimeLastSecond = _currentDateTime.second();
-
-    pwr_disable_backup_domain_write_protect();
-
-    RTC_BKPXR(0) = ++_onTimeSecondsCounter;
-
-    if (dbpState == false)
-    {
-      pwr_enable_backup_domain_write_protect();
-    }
-    
-    // if connected, save to DS3234 RAM, also
-    // if (_externalRtcConnected == true)
-    // {
-    //   DS3234::writeSram(0x00, (uint8_t*)&_onTimeSecondsCounter, 4, false);
-    // }
+    pwr_enable_backup_domain_write_protect();
   }
+
+  // if connected, save to DS3234 RAM, also
+  // if (_externalRtcConnected == true)
+  // {
+  //   DS3234::writeSram(0x00, (uint8_t*)&_onTimeSecondsCounter, 4, false);
+  // }
 }
 
 
@@ -1193,10 +1192,10 @@ void _refreshTemp()
 
 void _refreshRTC()
 {
-  if (_externalRtcConnected == true)
+  if (_externalRtcConnected)
   {
     // Phase 1: queue the SPI refresh (non-blocking)
-    if (_refreshRTCNow == true)
+    if (_refreshRTCNow)
     {
       SpiMaster::SpiReqAck status = DS3234::refresh();  // non-blocking
       if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
@@ -1208,42 +1207,43 @@ void _refreshRTC()
     }
 
     // Phase 2: harvest the result once DMA completes
-    if ((_rtcReadPending == true) && (DS3234::transferComplete() == true))
+    if (_rtcReadPending && DS3234::transferComplete())
     {
       _currentDateTime = DS3234::getDateTime();
       _rtcReadPending = false;
     }
+    return;
   }
-  else if (_refreshRTCNow == true)
-  {
-    uint32_t dr = RTC_DR, tr = RTC_TR;
-    uint16_t year = 2000;
-    uint8_t month, day, hour, minute, second;
 
-    year += (10 * ((dr >> RTC_DR_YT_SHIFT) & RTC_DR_YT_MASK));
-    year += ((dr >> RTC_DR_YU_SHIFT) & RTC_DR_YU_MASK);
-    // 2019-10-05 - RTC_DR_MT_MASK is incorrect in rtc_common_l1f024.h
-    month = 10 * ((dr >> RTC_DR_MT_SHIFT) & RTC_DR_MT_MASK);
-    month += ((dr >> RTC_DR_MU_SHIFT) & RTC_DR_MU_MASK);
+  if (!_refreshRTCNow) return;
 
-    day = 10 * ((dr >> RTC_DR_DT_SHIFT) & RTC_DR_DT_MASK);
-    day += ((dr >> RTC_DR_DU_SHIFT) & RTC_DR_DU_MASK);
+  uint32_t dr = RTC_DR, tr = RTC_TR;
+  uint16_t year = 2000;
+  uint8_t month, day, hour, minute, second;
 
-    hour = 10 * ((tr >> RTC_TR_HT_SHIFT) & RTC_TR_HT_MASK);
-    hour += ((tr >> RTC_TR_HU_SHIFT) & RTC_TR_HU_MASK);
+  year += (10 * ((dr >> RTC_DR_YT_SHIFT) & RTC_DR_YT_MASK));
+  year += ((dr >> RTC_DR_YU_SHIFT) & RTC_DR_YU_MASK);
+  // 2019-10-05 - RTC_DR_MT_MASK is incorrect in rtc_common_l1f024.h
+  month = 10 * ((dr >> RTC_DR_MT_SHIFT) & RTC_DR_MT_MASK);
+  month += ((dr >> RTC_DR_MU_SHIFT) & RTC_DR_MU_MASK);
 
-    minute = 10 * ((tr >> RTC_TR_MNT_SHIFT) & RTC_TR_MNT_MASK);
-    minute += ((tr >> RTC_TR_MNU_SHIFT) & RTC_TR_MNU_MASK);
+  day = 10 * ((dr >> RTC_DR_DT_SHIFT) & RTC_DR_DT_MASK);
+  day += ((dr >> RTC_DR_DU_SHIFT) & RTC_DR_DU_MASK);
 
-    second = 10 * ((tr >> RTC_TR_ST_SHIFT) & RTC_TR_ST_MASK);
-    second += ((tr >> RTC_TR_SU_SHIFT) & RTC_TR_SU_MASK);
+  hour = 10 * ((tr >> RTC_TR_HT_SHIFT) & RTC_TR_HT_MASK);
+  hour += ((tr >> RTC_TR_HU_SHIFT) & RTC_TR_HU_MASK);
 
-    _currentDateTime.setDate(year, month, day);
-    _currentDateTime.setTime(hour, minute, second);
-    // _rtcIsSet = RTC_ISR & RTC_ISR_INITS;
+  minute = 10 * ((tr >> RTC_TR_MNT_SHIFT) & RTC_TR_MNT_MASK);
+  minute += ((tr >> RTC_TR_MNU_SHIFT) & RTC_TR_MNU_MASK);
 
-    _refreshRTCNow = false;
-  }
+  second = 10 * ((tr >> RTC_TR_ST_SHIFT) & RTC_TR_ST_MASK);
+  second += ((tr >> RTC_TR_SU_SHIFT) & RTC_TR_SU_MASK);
+
+  _currentDateTime.setDate(year, month, day);
+  _currentDateTime.setTime(hour, minute, second);
+  // _rtcIsSet = RTC_ISR & RTC_ISR_INITS;
+
+  _refreshRTCNow = false;
 }
 
 
@@ -1258,18 +1258,15 @@ void _syncRtcWithGps()
 {
   // Only read GPS time when we might actually sync (avoids reading GPS data every loop)
   // Only sync when not waiting for PPS refresh to avoid race with _currentDateTime update
-  if ((GpsReceiver::isConnected() == true)
-      && (GpsReceiver::isValid() == true)
-      && (_ppsDelayCounter == 0))
-  {
-    DateTime gpsTime = GpsReceiver::getLocalDateTime();
+  if (!GpsReceiver::isConnected() || !GpsReceiver::isValid() || _ppsDelayCounter != 0) return;
 
-    // Only sync RTCs once per hour when hour changes
-    if (gpsTime.hour() != _lastRtcGpsSyncHour)
-    {
-      setDateTime(gpsTime);
-      _lastRtcGpsSyncHour = gpsTime.hour();
-    }
+  DateTime gpsTime = GpsReceiver::getLocalDateTime();
+
+  // Only sync RTCs once per hour when hour changes
+  if (gpsTime.hour() != _lastRtcGpsSyncHour)
+  {
+    setDateTime(gpsTime);
+    _lastRtcGpsSyncHour = gpsTime.hour();
   }
 }
 
@@ -1434,24 +1431,16 @@ HwReqAck tone(const uint16_t frequency, const uint16_t duration)
 
 bool alarmInput(const uint8_t alarmInputNumber)
 {
-  if (alarmInputNumber < cAlarmInputPinCount)
-  {
-    // if the pin is low, return true (alarm is active if pin is pulled down)
-    return (gpio_get(cAlarmInputPort, cAlarmInputPins[alarmInputNumber]) == 0);
-  }
+  if (alarmInputNumber >= cAlarmInputPinCount) return false;
 
-  return false;
+  // if the pin is low, return true (alarm is active if pin is pulled down)
+  return (gpio_get(cAlarmInputPort, cAlarmInputPins[alarmInputNumber]) == 0);
 }
 
 
 bool button(const uint8_t button)
 {
-  if (_buttonStates & (1 << button))
-  {
-    return true;
-  }
-
-  return false;
+  return (_buttonStates & (1 << button)) != 0;
 }
 
 
@@ -1783,12 +1772,7 @@ PeripheralRefreshTrigger getPeripheralRefreshTrigger()
 
 bool getPpsInputState()
 {
-  if (gpio_get(Hardware::cPpsPort, Hardware::cPpsPin) != 0)
-  {
-    return true;
-  }
-
-  return false;
+  return gpio_get(Hardware::cPpsPort, Hardware::cPpsPin) != 0;
 }
 
 
@@ -1816,6 +1800,12 @@ bool setTempSensorType(TempSensorType type)
     return true;
   }
   return false;
+}
+
+
+bool isTempSensorDetected(TempSensorType type)
+{
+  return (_detectedTempSensorsMask & (1 << type)) != 0;
 }
 
 
@@ -1951,20 +1941,18 @@ HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberT
     // Let the caller know it was busy if so
     return HwReqAck::HwReqAckBusy;
   }
-  else
-  {
-    if (numberTx > 0)
-    {
-      _i2cAddr = addr;
-      _i2cBufferRx = bufferRx;
-      _i2cNumberRx = numberRx;
 
-      return i2cTransmit(addr, bufferTx, numberTx, (numberRx == 0));
-    }
-    else if (numberRx > 0)
-    {
-      return i2cReceive(addr, bufferRx, numberRx, true);
-    }
+  if (numberTx > 0)
+  {
+    _i2cAddr = addr;
+    _i2cBufferRx = bufferRx;
+    _i2cNumberRx = numberRx;
+
+    return i2cTransmit(addr, bufferTx, numberTx, (numberRx == 0));
+  }
+  if (numberRx > 0)
+  {
+    return i2cReceive(addr, bufferRx, numberRx, true);
   }
   return HwReqAck::HwReqAckError;   // catchall
 }

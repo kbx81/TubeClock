@@ -57,6 +57,10 @@ private:
   //
   void _setDisplay(Display *display, const FixedDisplayItem item);
 
+  // returns the display duration setting for a given display item
+  //
+  uint16_t _getItemDuration(const FixedDisplayItem item);
+
   // returns a bitmap of dot states for use during time display
   //
   uint16_t _getDotsBitmap();
@@ -74,13 +78,13 @@ private:
   //
   DateTime _currentTime;
 
-  // tracks the last time a display animation ran
+  // countdown (in seconds) until the next display animation
   //
-  DateTime _lastAnimationTime;
+  uint16_t _animationCountdown;
 
-  // tracks the last time the display was switched
+  // countdown (in seconds) until the next display switch
   //
-  DateTime _lastSwitchTime;
+  uint16_t _switchCountdown;
 
   // the main application's mode
   //

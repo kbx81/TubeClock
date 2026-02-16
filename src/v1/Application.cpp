@@ -317,46 +317,46 @@ OperatingMode getOperatingMode()
 
 void setOperatingMode(OperatingMode mode)
 {
-  if (_applicationMode != mode)
-  {
-    const uint16_t writeLedIntensity = 1024;
-    // first, write settings to FLASH, if needed
-    if ((mode != OperatingMode::OperatingModeMainMenu) &&
-        (mode < static_cast<uint8_t>(OperatingMode::OperatingModeSetSystemOptions)) &&
-        (_settingsModified == true))
-    {
-      if (_settings.saveToFlash() == 0)
-      {
-        _settingsModified = false;
-        Hardware::setGreenLed(writeLedIntensity);
-      }
-      else
-      {
-        Hardware::setRedLed(writeLedIntensity);
-      }
-      DisplayManager::doubleBlink();
-      Hardware::setStatusLed(RgbLed());
-    }
-    // ensure hardware is consistent with current settings
-    refreshSettings();
-    // set the new mode
-    _applicationMode = mode;
-    _viewMode = ViewMode::ViewMode0;
-    _currentView = cModeViews[static_cast<uint8_t>(cViewDescriptor[static_cast<uint8_t>(mode)].view)];
-    _currentView->enter();
-    // reset idle counter so the auto-return doesn't immediately override this mode
-    _idleCounter = 0;
-    // this enables controller() immediately upon entering this mode
-    if (mode == OperatingMode::OperatingModeDmx512Display)
-    {
-      _idleCounter = cMaximumIdleCount;
-    }
+  // nothing to do if we're already in this mode
+  if (_applicationMode == mode) return;
 
-    // Notify serial remote of mode change
-    SerialRemote::notifyModeChange(
-      static_cast<uint8_t>(_applicationMode),
-      static_cast<uint8_t>(_viewMode));
+  const uint16_t writeLedIntensity = 1024;
+  // first, write settings to FLASH, if needed
+  if ((mode != OperatingMode::OperatingModeMainMenu) &&
+      (mode < static_cast<uint8_t>(OperatingMode::OperatingModeSetSystemOptions)) &&
+      (_settingsModified == true))
+  {
+    if (_settings.saveToFlash() == 0)
+    {
+      _settingsModified = false;
+      Hardware::setGreenLed(writeLedIntensity);
+    }
+    else
+    {
+      Hardware::setRedLed(writeLedIntensity);
+    }
+    DisplayManager::doubleBlink();
+    Hardware::setStatusLed(RgbLed());
   }
+  // ensure hardware is consistent with current settings
+  refreshSettings();
+  // set the new mode
+  _applicationMode = mode;
+  _viewMode = ViewMode::ViewMode0;
+  _currentView = cModeViews[static_cast<uint8_t>(cViewDescriptor[static_cast<uint8_t>(mode)].view)];
+  _currentView->enter();
+  // reset idle counter so the auto-return doesn't immediately override this mode
+  _idleCounter = 0;
+  // this enables controller() immediately upon entering this mode
+  if (mode == OperatingMode::OperatingModeDmx512Display)
+  {
+    _idleCounter = cMaximumIdleCount;
+  }
+
+  // Notify serial remote of mode change
+  SerialRemote::notifyModeChange(
+    static_cast<uint8_t>(_applicationMode),
+    static_cast<uint8_t>(_viewMode));
 }
 
 

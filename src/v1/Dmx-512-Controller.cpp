@@ -169,25 +169,24 @@ uint16_t fadeDuration()
 void strobeTimer()
 {
   // Use cached state instead of function call to minimize ISR overhead
-  if (_dmx512Active)
-  {
-    if (_strobeDelay > 0)
-    {
-      _strobeCounter++;
-    }
+  if (!_dmx512Active) return;
 
-    if ((_masterIntensityLevel > 0) && ((_strobeDelay == 0) || (_strobeCounter > _strobeDelay)))
+  if (_strobeDelay > 0)
+  {
+    _strobeCounter++;
+  }
+
+  if ((_masterIntensityLevel > 0) && ((_strobeDelay == 0) || (_strobeCounter > _strobeDelay)))
+  {
+    DisplayManager::setDisplayBlanking(false);
+    if (_strobeCounter > _strobeDelay + cStrobeDuration)
     {
-      DisplayManager::setDisplayBlanking(false);
-      if (_strobeCounter > _strobeDelay + cStrobeDuration)
-      {
-        _strobeCounter = 0;
-      }
+      _strobeCounter = 0;
     }
-    else
-    {
-      DisplayManager::setDisplayBlanking(true);
-    }
+  }
+  else
+  {
+    DisplayManager::setDisplayBlanking(true);
   }
 }
 

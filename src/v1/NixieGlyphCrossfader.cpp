@@ -69,17 +69,42 @@ NixieGlyph NixieGlyphCrossfader::getTargetWithDuration() const
 
 void NixieGlyphCrossfader::resetFade()
 {
-  // reset the crossfade timer/counter
-  _active.setDuration(0);
-  // where we are is where the fade starts now
-  _start = _active;
+  if (_target.getDuration() == 0)
+  {
+    // Duration 0 means instant transition — snap immediately to avoid
+    // stale _active values being read by refresh() before the next tick()
+    _active = _target;
+    _start = _target;
+  }
+  else
+  {
+    // reset the crossfade timer/counter
+    _active.setDuration(0);
+    // where we are is where the fade starts now
+    _start = _active;
+  }
 }
 
 
 void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget)
 {
+  // Save current position and reset tick counter BEFORE updating _target.
+  // This prevents a race with tick() (ISR): if tick() fires after _target is
+  // set but before the counter is reset, it sees currentTick >= totalTicks
+  // with the new target and snaps _active immediately (skipping the fade).
+  // By resetting the counter first, tick() sees currentTick=0 < totalTicks
+  // and interpolates from _start (staying at the current position).
+  _start = _active;
+  _active.setDuration(0);
   _target = newTarget;
-  resetFade();
+
+  // Duration 0 means instant transition — snap immediately to avoid
+  // stale _active values being read by refresh() before the next tick()
+  if (_target.getDuration() == 0)
+  {
+    _active = _target;
+    _start = _target;
+  }
 }
 
 
@@ -87,8 +112,7 @@ void NixieGlyphCrossfader::startNewFadeIfDifferent(const NixieGlyph &newTarget)
 {
   if (newTarget != _target)
   {
-    _target = newTarget;
-    resetFade();
+    startNewFade(newTarget);
   }
 }
 
@@ -131,23 +155,39 @@ void NixieGlyphCrossfader::updateFadeTarget(const NixieGlyph &newTarget, const b
 {
   auto duration = _target.getDuration();
 
+  if (startNewFade == true)
+  {
+    // Reset counter before updating target to prevent ISR race (see startNewFade)
+    _start = _active;
+    _active.setDuration(0);
+  }
+
   _target = newTarget;
   _target.setDuration(duration);
 
-  if (startNewFade == true)
+  if (startNewFade == true && _target.getDuration() == 0)
   {
-    resetFade();
+    _active = _target;
+    _start = _target;
   }
 }
 
 
 void NixieGlyphCrossfader::updateFadeTargetAndDuration(const NixieGlyph &newTarget, const bool startNewFade)
 {
-  _target = newTarget;
-
   if (startNewFade == true)
   {
-    resetFade();
+    // Reset counter before updating target to prevent ISR race (see startNewFade)
+    _start = _active;
+    _active.setDuration(0);
+  }
+
+  _target = newTarget;
+
+  if (startNewFade == true && _target.getDuration() == 0)
+  {
+    _active = _target;
+    _start = _target;
   }
 }
 

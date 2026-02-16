@@ -81,9 +81,10 @@ static const uint8_t cSramData = 0x02;
 //
 static const uint8_t cSramMaxRWSize = 20;
 
-// A byte we use to test if the DS3234 is connected
+// Bytes we use to test if the DS3234 is connected (bitwise complements)
 //
 static const uint8_t cTestByte = 0x5a;
+static const uint8_t cTestByteComplement = 0xa5;
 
 // Setting this bit in the address byte makes the operation a write
 //
@@ -189,13 +190,26 @@ bool isConnected()
     // We must wait for the transfer to complete before we touch any buffers again
     while (_spiMaster->transferComplete(_slaveId) == false);
 
-    // If we read back the byte we wrote, the RTC is very likely connected
+    // If we read back the byte we wrote, try the complementary byte to confirm
     if (_ds3234RegisterIn[0] == cTestByte)
     {
-      // Kick off a full register refresh
-      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
+      // Write the complement (0xa5) and read back to eliminate false positives
+      _spiWorkingBufferOut[cAddressByte] = cSramAddressRegister | cWriteBit;
+      _spiWorkingBufferOut[cSramAddressByte] = cTestByteComplement;
+      request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+      while (_spiMaster->transferComplete(_slaveId) == false);
 
-      return true;
+      _spiWorkingBufferOut[cAddressByte] = cSramAddressRegister;
+      request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+      while (_spiMaster->transferComplete(_slaveId) == false);
+
+      if (_ds3234RegisterIn[0] == cTestByteComplement)
+      {
+        // Kick off a full register refresh
+        while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
+
+        return true;
+      }
     }
   }
   return false;

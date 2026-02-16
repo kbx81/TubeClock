@@ -94,17 +94,43 @@ bool isConnected()
 
   if (request != nullptr)
   {
+    // First read
     request->bufferIn = _lm74Register;
     request->bufferOut = _spareBuffer;
     request->length = cNumberOfRegisters;
-    // Try to read the temperature registers
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
-    // We must wait for the transfer to complete before we touch any buffers again
     while (_spiMaster->transferComplete(_slaveId) == false);
 
-    // If we read back some possible expected values, we'll go with it
-    if (((_lm74Register[0] == 0xff) && ((_lm74Register[1] & 0xfc) == 0))
-        || ((_lm74Register[1] & 0x04) == 0x04))
+    uint8_t read1_msb = _lm74Register[0];
+    uint8_t read1_lsb = _lm74Register[1];
+
+    // Second read
+    request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
+    while (_spiMaster->transferComplete(_slaveId) == false);
+
+    uint8_t read2_msb = _lm74Register[0];
+    uint8_t read2_lsb = _lm74Register[1];
+
+    // POR case: both reads must show MSB=0xFF, LSB bits[7:2]=0x00
+    bool porMatch = (read1_msb == 0xff) && ((read1_lsb & 0xfc) == 0)
+                 && (read2_msb == 0xff) && ((read2_lsb & 0xfc) == 0);
+
+    // Post-conversion case: D2 (conversion complete) set in both reads,
+    //  MSB != 0xFF (reject floating-high / ambiguous POR overlap),
+    //  and temperature values match within +/-2 LSBs
+    bool postConv = false;
+    if (((read1_lsb & 0x04) == 0x04) && ((read2_lsb & 0x04) == 0x04)
+        && (read1_msb != 0xff) && (read2_msb != 0xff))
+    {
+      // Compare temperature using D15:D3 (mask off D2:D0)
+      uint16_t raw1 = (read1_msb << 8) | (read1_lsb & 0xf8);
+      uint16_t raw2 = (read2_msb << 8) | (read2_lsb & 0xf8);
+      uint16_t diff = (raw1 > raw2) ? (raw1 - raw2) : (raw2 - raw1);
+      // Allow +/-2 temperature LSBs (each LSB is at bit 3, so 2 LSBs = 16)
+      postConv = (diff <= 16);
+    }
+
+    if (porMatch || postConv)
     {
       // Kick off a full register refresh
       while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);

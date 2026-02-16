@@ -19,11 +19,8 @@
 #include "Application.h"
 #include "DateTime.h"
 #include "DisplayManager.h"
-#include "DS1722.h"
-#include "DS3234.h"
 #include "GpsReceiver.h"
 #include "Hardware.h"
-#include "LM74.h"
 #include "Settings.h"
 #include "SystemStatusView.h"
 
@@ -159,7 +156,7 @@ void SystemStatusView::loop()
       tcDisp.setTubeToValue(1, 3);
       tcDisp.setTubeToValue(2, 2);
       tcDisp.setTubeToValue(3, 3);
-      if (DS3234::isConnected() == true)
+      if (Hardware::getRTCType() == Hardware::RtcType::DS323x)
       {
         statusLed = Application::green;
       }
@@ -175,7 +172,7 @@ void SystemStatusView::loop()
       tcDisp.setTubeToValue(1, 2);
       tcDisp.setTubeToValue(2, 7);
       tcDisp.setTubeToValue(3, 1);
-      if (DS1722::isConnected() == true)
+      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::DS1722))
       {
         statusLed = Application::green;
       }
@@ -189,7 +186,7 @@ void SystemStatusView::loop()
       tubeIntensityBitmap = 0b110011;
       tcDisp.setTubeToValue(0, 4);
       tcDisp.setTubeToValue(1, 7);
-      if (LM74::isConnected() == true)
+      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::LM74))
       {
         statusLed = Application::green;
       }

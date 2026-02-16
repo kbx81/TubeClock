@@ -289,6 +289,10 @@ namespace Hardware {
   /// @return true if successful, false if the sensor is not available
   bool setTempSensorType(TempSensorType type);
 
+  /// @brief Returns true if the specified temperature sensor was detected at initialization
+  ///
+  bool isTempSensorDetected(TempSensorType type);
+
   /// @brief Erases the FLASH area used for app data
   /// @return 0xff if startAddress is out of range, flash_get_status_flags() if
   ///  erase request failed, 0x40 if erase verification failed

@@ -214,41 +214,37 @@ void initialize()
 
 void refresh()
 {
-  NixieGlyph activeGlyph;
-
   // Update PWM buffer when tick() requests it
   // The crossfader tick() calls happen in ISR for precise timing,
   // but we read the results and update PWM here to minimize ISR time
-  if (_refreshIntensitiesNow == true)
+  if (!_refreshIntensitiesNow) return;
+  _refreshIntensitiesNow = false;
+
+  // Read crossfader states and update PWM buffer with master intensity applied
+  NixieGlyph activeGlyph;
+  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
   {
-    _refreshIntensitiesNow = false;
+    activeGlyph = _crossfader[glyphCrossfader].getActive();
+    _setDisplayPwmValue(glyphCrossfader, activeGlyph.getIntensity());
+  }
 
-    // Read crossfader states and update PWM buffer with master intensity applied
-    for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
-    {
-      activeGlyph = _crossfader[glyphCrossfader].getActive();
-      _setDisplayPwmValue(glyphCrossfader, activeGlyph.getIntensity());
-    }
+  // Refresh the status LED to play nicely with strobing via DMX-512
+  if (!_autoRefreshStatusLed) return;
 
-    // Refresh the status LED to play nicely with strobing via DMX-512
-    if (_autoRefreshStatusLed == true)
-    {
-      if (_displayBlank == true)
-      {
-        Hardware::setStatusLed(RgbLed());
-      }
-      else
-      {
-        RgbLed status = _statusLed;
-        // Apply master intensity to status LED using LUT
-        // Scale 12-bit RGB values (0-4095) to 8-bit (0-255) for LUT indexing
-        // Then scale 8-bit LUT output (0-254) back to 12-bit (0-4095) for hardware
-        status.setRed(((uint32_t)_intensityLUT[status.getRed() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
-        status.setGreen(((uint32_t)_intensityLUT[status.getGreen() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
-        status.setBlue(((uint32_t)_intensityLUT[status.getBlue() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
-        Hardware::setStatusLed(status);
-      }
-    }
+  if (_displayBlank)
+  {
+    Hardware::setStatusLed(RgbLed());
+  }
+  else
+  {
+    RgbLed status = _statusLed;
+    // Apply master intensity to status LED using LUT
+    // Scale 12-bit RGB values (0-4095) to 8-bit (0-255) for LUT indexing
+    // Then scale 8-bit LUT output (0-254) back to 12-bit (0-4095) for hardware
+    status.setRed(((uint32_t)_intensityLUT[status.getRed() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+    status.setGreen(((uint32_t)_intensityLUT[status.getGreen() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+    status.setBlue(((uint32_t)_intensityLUT[status.getBlue() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+    Hardware::setStatusLed(status);
   }
 }
 
@@ -383,28 +379,19 @@ bool getDisplayBlanking()
 
 void setDisplayBlanking(const bool blank)
 {
-  if (_displayBlank != blank)
-  {
-    _displayBlank = blank;
+  if (_displayBlank == blank) return;
 
-    if (blank == true)
-    {
-      if (_autoRefreshStatusLed == true)
-      {
-        Hardware::setStatusLed(RgbLed());
-      }
-      // blank the display
-      Hardware::setDisplayHardwareBlanking(true);
-    }
-    else
-    {
-      if (_autoRefreshStatusLed == true)
-      {
-        Hardware::setStatusLed(_statusLed);
-      }
-      // unblank the display
-      Hardware::setDisplayHardwareBlanking(false);
-    }
+  _displayBlank = blank;
+
+  if (blank)
+  {
+    if (_autoRefreshStatusLed) Hardware::setStatusLed(RgbLed());
+    Hardware::setDisplayHardwareBlanking(true);
+  }
+  else
+  {
+    if (_autoRefreshStatusLed) Hardware::setStatusLed(_statusLed);
+    Hardware::setDisplayHardwareBlanking(false);
   }
 }
 

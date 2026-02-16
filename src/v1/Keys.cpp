@@ -162,16 +162,11 @@ namespace Keys {
 
   Key getKeyPress()
   {
-    if (_queueHead != _queueTail)
-    {
-      auto key = _keyQueue[_queueHead];
-      _queueHead = (_queueHead + 1) & (cKeyQueueSize - 1);
-      return (Key)key;
-    }
-    else
-    {
-      return None;
-    }
+    if (_queueHead == _queueTail) return None;
+
+    auto key = _keyQueue[_queueHead];
+    _queueHead = (_queueHead + 1) & (cKeyQueueSize - 1);
+    return (Key)key;
   }
 
 

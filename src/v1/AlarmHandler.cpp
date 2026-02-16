@@ -343,26 +343,26 @@ bool isAlarmActive()
 
 void clearAlarm()
 {
-  if (_activeAlarms != 0)
-  {
-    DateTime current = Application::dateTime();
-
-    for (uint8_t i = 0; (i < cAlarmCount) && (_activeAlarms != 0); i++)
-    {
-      if (_activeAlarms & (1 << i))
-      {
-        if (i < cTimeSlotAlarmCount)
-        {
-          _ackTime[i] = current;
-        }
-        _activeAlarms &= (~(1 << i));
-      }
-    }
-    _beepCounter = 0;
-    // restore the display, etc. in case the alarm(s) changed anything
-    Application::refreshSettings();
-  }
   _hourlyAlarmActive = false;
+
+  if (_activeAlarms == 0) return;
+
+  DateTime current = Application::dateTime();
+
+  for (uint8_t i = 0; (i < cAlarmCount) && (_activeAlarms != 0); i++)
+  {
+    if (_activeAlarms & (1 << i))
+    {
+      if (i < cTimeSlotAlarmCount)
+      {
+        _ackTime[i] = current;
+      }
+      _activeAlarms &= (~(1 << i));
+    }
+  }
+  _beepCounter = 0;
+  // restore the display, etc. in case the alarm(s) changed anything
+  Application::refreshSettings();
 }
 
 

@@ -797,12 +797,20 @@ static void _handleCommand(const char* payload, uint8_t length)
       }
       else if (length > 2)
       {
-        // "$TCCI<nnn>" -- set intensity
+        // "$TCCI<nnn>[,<0|1>]" -- set intensity, optionally set auto-adjust
         uint8_t idx = 2;
         int32_t intensity = _parseDecimal(payload, idx, length);
         if (intensity >= 0 && intensity <= 255)
         {
           Application::setIntensity(static_cast<uint8_t>(intensity));
+        }
+        if (idx < length && payload[idx] == ',')
+        {
+          idx++;
+          if (idx < length)
+          {
+            Application::setIntensityAutoAdjust(payload[idx] == '1', false);
+          }
         }
       }
 
