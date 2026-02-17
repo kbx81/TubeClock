@@ -4,16 +4,13 @@
 
 ### Known issues
 
-1. None
-
+1. None, everything is perfect
 
 ## General TODO
 
-- [x] Fix intermittent weirdness on startup...some SPI issue?? **Probably fixed**
-- [x] Fix clock instability (seconds jumping)
-- [ ] Method to manually switch/override HV off/on schedule
+- [ ] Colon blinking
 - [ ] More effects/animations
-- [ ] HV always on upon DMX-512 input
+- [ ] Allow runtime user-defined IR remote control codes
 - [ ] DMX-512 Standard mode testing (...and fixes?)
 - [ ] Documentation!
 

@@ -32,8 +32,11 @@ PROFILE ?= 0
 
 DEFS	+= -DHARDWARE_VERSION=1
 DEFS	+= -DSETTINGS_PROFILE=$(PROFILE)
-# Uncomment to enable GPIO profiling pins (e.g. for logic analyzer measurement of ISR timing)
-# DEFS	+= -DENABLE_PROFILING
+# Enable GPIO profiling pins (e.g. for logic analyzer measurement of ISR timing)
+# Override at build time with: make ENABLE_PROFILING=1
+ifdef ENABLE_PROFILING
+DEFS	+= -DENABLE_PROFILING
+endif
 BINARY = $(BUILD_DIR)/TubeClock
 SRCS   = $(filter-out TubeClock.cpp, $(wildcard *.cpp))
 # CFLAGS += -I./

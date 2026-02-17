@@ -34,7 +34,8 @@ namespace kbxTubeClock {
 
 
 SpiMaster::SpiMaster()
-: _selectedSlave(cNoSlave),
+: _transferInProgress(false),
+  _selectedSlave(cNoSlave),
   _nextSlave(0),
   _params{0, 0, 0, 0}
 {
@@ -241,7 +242,7 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
   uint32_t dmaEnable = 0;
   volatile uint8_t temp_data __attribute__ ((unused));
 
-  if (_selectedSlave != cNoSlave)
+  if (_transferInProgress)
   {
     // Let the caller know it was busy if so
     return SpiReqAck::SpiReqAckBusy;
@@ -315,6 +316,8 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
 	// spi_enable_tx_dma(spiParams.spi);
   SPI_CR2(_params.spi) |= dmaEnable;
 
+  _transferInProgress = true;
+
   return SpiReqAck::SpiReqAckOk;
 }
 
@@ -359,8 +362,17 @@ void SpiMaster::dmaComplete()
     // indicate completion
     _transferRequest[_selectedSlave].state = SpiReqAck::SpiReqAckOk;
 
-    // release the appropriate CS line (also deasserts the CS/CE line if strobed)
-    _selectPeripheral(cNoSlave);
+    // Deactivate CS without full SPI deselection — keeps _selectedSlave cached
+    // so the next transfer for the same slave skips SPI reconfiguration entirely.
+    // For strobeCs devices (HV5622 display): CS was just pulsed HIGH by
+    // _activateCsCe (latch strobe); pull it LOW so we exit transparent mode
+    // before the next SPI transfer. For persistent-CS devices: CS stays active.
+    if (_slave[_selectedSlave].strobeCs)
+    {
+      _deactivateCsCe(_selectedSlave);
+    }
+    _transferInProgress = false;
+
     // fire off the next queued item (maintains more consistent timing for PWMing)
     processQueue();
   }
@@ -369,7 +381,7 @@ void SpiMaster::dmaComplete()
 
 bool SpiMaster::busy()
 {
-  return (_selectedSlave != cNoSlave);
+  return _transferInProgress;
 }
 
 

@@ -32,7 +32,7 @@
 //   reads crossfader states, adjusts intensity ->
 //   _setDisplayPwmValue() writes to INACTIVE _pwmValues buffer
 //
-// tickPWM() (called from tim2_isr at 12,800 Hz) ->
+// tickPWM() (called from tim2_isr at 15,360 Hz) ->
 //   reads from ACTIVE _pwmValues buffer and generates software PWM ->
 //     _displayBufferOut (HV562x shift register data) ->
 //       SPI DMA to HV562x shift registers & latches
@@ -324,13 +324,12 @@ void tickPWM()
       _displayBufferOut[device] = pwmBits;
     }
 
-    // Write the data to the drivers
-    // request->bufferIn = (uint8_t*)_displayBufferIn;
-    // request->bufferOut = (uint8_t*)_displayBufferOut;
-    // request->length = cSpiBytesToSend;
+    // Queue the data for transfer to the drivers.
+    // During normal operation, dmaComplete() chains each transfer to the next
+    // via processQueue(). We only call processQueue() here as a bootstrap when
+    // the SPI is completely idle (startup or after a period of no display activity).
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    // trigger the transfer if nothing is in progress
     if (_spiMaster->busy() == false)
     {
       _spiMaster->processQueue();

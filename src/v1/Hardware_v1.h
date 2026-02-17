@@ -32,6 +32,13 @@ namespace kbxTubeClock {
 
 namespace Hardware {
 
+#ifdef ENABLE_PROFILING
+  // ISR profiling I/O port & pin (active when ENABLE_PROFILING is defined)
+  //
+  static const auto cProfilingPort = GPIOA;
+  static const auto cProfilingPin  = GPIO15;
+#endif
+
   // USART assignments
   //
   static const auto cGpsUsart = USART1;
@@ -155,11 +162,6 @@ namespace Hardware {
   //
   static const auto cHvShutdownPort = GPIOA;
   static const auto cHvShutdownPin  = GPIO4;
-
-  // ISR profiling I/O port & pin (active when ENABLE_PROFILING is defined)
-  //
-  static const auto cProfilingPort = GPIOB;
-  static const auto cProfilingPin  = GPIO5;
 
   // DMA channel assignments and remapping via SYSCFG_CFGR1
   //

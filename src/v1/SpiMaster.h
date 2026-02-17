@@ -165,7 +165,11 @@ private:
   ///
   static const uint8_t cNoSelectedSlave;
 
-  /// @brief the active/currently selected slave
+  /// @brief true while a DMA transfer is in flight
+  ///
+  volatile bool _transferInProgress;
+
+  /// @brief the active/currently selected slave (cached to skip SPI reconfig)
   ///
   uint8_t _selectedSlave;
 

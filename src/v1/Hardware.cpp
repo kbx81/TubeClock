@@ -824,12 +824,12 @@ void _systickSetup(const uint16_t xms)
 {
 	// div8 per ST, stays compatible with M3/M4 parts, well done ST
 	systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
-  // Lower SysTick priority to 64 to allow TIM2 PWM ISR (priority 0) to preempt it
-  // On Cortex-M0, SHPR3[31:30] controls SysTick priority (2 bits = 4 priority levels: 0, 64, 128, 192)
-  // This allows TIM2 to interrupt SysTick, minimizing PWM jitter
-  // At 60Hz refresh (period 3125), scope shows stable 65-80-50µs pattern averaging 65.09µs
-  // Occasional SysTick preemption causes 80µs periods, but timing auto-compensates with 50µs periods
-  SCB_SHPR3 |= (64 << 24);
+  // Lower SysTick priority to 128 so both TIM2 PWM ISR (priority 0) and the
+  // SPI DMA complete ISR (priority 64) can preempt it. This ensures the HV5622
+  // latch strobe happens promptly after each DMA transfer completes, giving
+  // consistent output timing critical for flicker-free low-intensity PWM.
+  // On Cortex-M0, SHPR3[31:30] controls SysTick priority (2 bits = 4 levels: 0, 64, 128, 192)
+  SCB_SHPR3 |= (128 << 24);
 	// clear counter so it starts right away
 	STK_CVR = 0;
 
@@ -947,11 +947,8 @@ void _timerSetupPWM()
   timer_set_prescaler(cTubePwmTimer, 0);
   timer_set_repetition_counter(cTubePwmTimer, 0);
   timer_continuous_mode(cTubePwmTimer);
-  // Timer frequency: 48MHz / 3125 = 15360 Hz
-  // With 256 PWM steps (0-255), complete cycle = 256/15360 = 16.67ms (60Hz refresh)
-  // Timer period = 65.10µs provides excellent timing margin (25.3%) for ISR execution (~49µs max)
-  // Scope testing shows stable operation with 65-80-50µs period pattern (avg 65.09µs)
-  // Pattern caused by occasional SysTick preemption, but timing compensates perfectly
+  // Timer frequency: 48MHz / (3125+1) = 15,360 Hz (period = 65.10µs)
+  // With 256 PWM steps (uint8_t rollover), full PWM cycle = 256/15360 = 16.67ms (60Hz)
   timer_set_period(cTubePwmTimer, 3125);
 
   timer_enable_preload(cTubePwmTimer);

@@ -142,7 +142,7 @@ The display system uses a layered approach:
 4. **Display** - Collection of tubes representing the complete display
 5. **DisplayManager** - Hardware interface, manages SPI communication and PWM refresh
 
-PWM refresh occurs via Timer 2 at 5 KHz, providing smooth intensity control and digit fading effects.
+PWM refresh occurs via Timer 2 at ~15.4 KHz (256-step cycle = 60 Hz visible refresh), providing smooth intensity control and digit fading effects.
 
 ### Peripheral Usage Summary
 
@@ -155,7 +155,7 @@ PWM refresh occurs via Timer 2 at 5 KHz, providing smooth intensity control and 
 - **RTC**: Timekeeping (internal or DS323x external)
 - **SPI**: Tube drivers (HV5622), external RTC/temp sensors
 - **Timer 1**: Buzzer PWM for tones
-- **Timer 2**: Display PWM refresh at 5 KHz
+- **Timer 2**: Display PWM refresh at ~15.4 KHz
 - **Timer 3**: Status LED RGB PWM
 - **Timer 7**: IR receiver signal timing
 - **Timer 15/16**: DMX-512 protocol supervision
@@ -195,7 +195,7 @@ This is an embedded system with limited storage (flash memory) and RAM. Implemen
 ### Real-Time Constraints
 
 Several interrupt handlers have real-time requirements:
-- Timer 2 ISR (display PWM): Must complete quickly, runs at 5 KHz, **timing consistency is CRITICAL to avoid visible flickering on the nixie tubes.**
+- Timer 2 ISR (display PWM): Must complete quickly, runs at ~15.4 KHz, **timing consistency is CRITICAL to avoid visible flickering on the nixie tubes.** SysTick is set to lower priority (128) than the DMA-complete ISR (64) to ensure HV5622 latch strobes are not delayed.
 - DMX-512 timing (Timer 15/16): Protocol-critical timing
 - TSC (touch sensing): Must not miss touch events
 
@@ -216,7 +216,7 @@ As this is ultimately a clock, time accuracy is critical. As such, hardware RTC 
 
 ### Display Refresh Strategy
 
-The display uses software PWM at 5 KHz (Timer 2) to emulate intensity control for the Nixie tubes. This enables smooth crossfading effects between digits. The DisplayManager handles tube intensity calculations and SPI transfers to the HV5622 driver ICs.
+The display uses software PWM at ~15.4 KHz (Timer 2) to emulate intensity control for the Nixie tubes. This enables smooth crossfading effects between digits. The DisplayManager handles tube intensity calculations and SPI transfers to the HV5622 driver ICs. The SPI bus caches the active slave selection to avoid costly reconfiguration between consecutive same-slave transfers, which is critical for consistent ISR timing.
 
 ### Flash Settings Storage
 

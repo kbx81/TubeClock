@@ -95,11 +95,11 @@ void sys_tick_handler(void)
 /* Timer 2 interrupt -- used for generating PWM for tubes */
 void tim2_isr()
 {
+	Hardware::tim2Isr();	// clear UIF flag first to prevent RMW race
 #ifdef ENABLE_PROFILING
 	gpio_set(Hardware::cProfilingPort, Hardware::cProfilingPin);
 #endif
 	DisplayManager::tickPWM();
-	Hardware::tim2Isr();
 #ifdef ENABLE_PROFILING
 	gpio_clear(Hardware::cProfilingPort, Hardware::cProfilingPin);
 #endif
