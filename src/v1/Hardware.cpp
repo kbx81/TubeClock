@@ -1040,9 +1040,9 @@ void _usartSetup()
   // Setup USART2 TX, RX, and DE pins as alternate function
   gpio_set_af(cUsart2Port, cUsart2AF, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
   gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
-  // Setup USART3 RX pin as alternate function
+  // Setup USART3 RX pin as alternate function (pull-up: USART idle = HIGH)
   gpio_set_af(cUsart3RxPort, cUsart3RxAF, cUsart3RxPin);
-  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart3RxPin);
+  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_AF, GPIO_PUPD_PULLUP, cUsart3RxPin);
   // Setup USART4 TX pin as alternate function
   gpio_set_af(cUsart4TxPort, cUsart4TxAF, cUsart4TxPin);
   gpio_mode_setup(cUsart4TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart4TxPin);
@@ -1058,7 +1058,8 @@ void _usartSetup()
   _usart[0].enableRxInterrupt();          // USART1 GPS RX
   usart_enable_error_interrupt(cGpsUsart);
   usart_enable_error_interrupt(cDmxUsart);
-  _usart[2].enableRxInterrupt();          // USART3 serial remote RX
+  // NOTE: USART3 RX interrupt is enabled later by SerialRemote::initialize()
+  // to avoid unhandled RXNE interrupts before the ISR handler is ready.
 
   // Enable all USARTs
   for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
@@ -2243,32 +2244,37 @@ void dmaCh1Isr()
 
 void dmaCh2to3Isr()
 {
-  // we use DMA channels 2 and 3 for the SPI
-  if ((DMA1_ISR & DMA_ISR_TCIF2) || (DMA1_ISR & DMA_ISR_TCIF3))
+  // Handle each SPI DMA channel individually as its transfer completes
+  if (DMA1_ISR & DMA_ISR_TCIF2)
   {
-    // channel 2 is SPI recieve
-    if (DMA1_ISR & DMA_ISR_TCIF2)
-  	{
-  		DMA1_IFCR |= DMA_IFCR_CTCIF2;
+    DMA1_IFCR |= DMA_IFCR_CTCIF2;
 
-  		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
+    dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
 
-  		spi_disable_rx_dma(SPI1);
+    spi_disable_rx_dma(SPI1);
 
-  		dma_disable_channel(DMA1, DMA_CHANNEL2);
-  	}
-    // channel 3 is SPI transmit
-  	if (DMA1_ISR & DMA_ISR_TCIF3)
-  	{
-  		DMA1_IFCR |= DMA_IFCR_CTCIF3;
+    dma_disable_channel(DMA1, DMA_CHANNEL2);
+  }
 
-  		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL3);
+  if (DMA1_ISR & DMA_ISR_TCIF3)
+  {
+    DMA1_IFCR |= DMA_IFCR_CTCIF3;
 
-  		spi_disable_tx_dma(SPI1);
+    dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL3);
 
-  		dma_disable_channel(DMA1, DMA_CHANNEL3);
-  	}
+    spi_disable_tx_dma(SPI1);
 
+    dma_disable_channel(DMA1, DMA_CHANNEL3);
+  }
+
+  // Only process SPI completion when BOTH DMA channels are idle.
+  // TX DMA (ch3) typically completes before RX DMA (ch2), causing split
+  // ISR invocations. Without this guard, dmaComplete() would run when
+  // only one channel has finished, potentially processing the transfer
+  // prematurely and corrupting a subsequent chained transfer.
+  if (!(DMA_CCR(DMA1, DMA_CHANNEL2) & DMA_CCR_EN) &&
+      !(DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN))
+  {
     _spi1Master.dmaComplete();
   }
 }
@@ -2614,9 +2620,13 @@ void usart2Isr()
 void usart3_4Isr()
 {
   // Clear error flags on USART3 (serial remote RX)
-  if (_usart[2].hasErrors())
+  // Also flush RXNE if still set (safety net: SerialRemote::rxIsr normally
+  // reads the byte, but if it hasn't been initialized yet, RXNE would remain
+  // asserted and the ISR would loop indefinitely via Cortex-M0 tail-chaining)
+  if (_usart[2].hasErrors() || _usart[2].rxReady())
   {
     _usart[2].clearErrors();
+    USART_RQR(_usart[2].peripheral()) = USART_RQR_RXFRQ;
   }
   // Clear error flags on USART4 (serial remote TX)
   if (_usart[3].hasErrors())

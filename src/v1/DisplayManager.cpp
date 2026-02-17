@@ -266,6 +266,19 @@ void tick()
 
 void tickPWM()
 {
+  // During early init (display blanked), skip display SPI transfers but still
+  // service the SPI queue so sensor/RTC blocking reads can complete.
+  // Without this gate, the 15.4 kHz display transfers starve lower-priority
+  // SPI slaves because processQueue() always finds slave 0 (display) first.
+  if (_displayBlank)
+  {
+    if (_spiMaster->busy() == false)
+    {
+      _spiMaster->processQueue();
+    }
+    return;
+  }
+
   SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   if (request != nullptr)

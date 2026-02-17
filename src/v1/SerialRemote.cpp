@@ -339,6 +339,12 @@ void initialize()
   _txUsartPtrs[0] = Hardware::getUsart(0);  // USART1
   _txUsartPtrs[1] = Hardware::getUsart(3);  // USART4
   _rxUsart3Ptr    = Hardware::getUsart(2);  // USART3
+
+  // Enable USART3 RX interrupt now that the ISR handler is ready.
+  // (Must not be enabled earlier -- before _rxUsart3Ptr is set, rxIsr()
+  //  would return without reading the byte, leaving RXNE asserted and
+  //  locking the CPU in an infinite ISR tail-chain on Cortex-M0.)
+  _rxUsart3Ptr->enableRxInterrupt();
 }
 
 

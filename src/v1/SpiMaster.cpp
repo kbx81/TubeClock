@@ -248,6 +248,11 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
     return SpiReqAck::SpiReqAckBusy;
   }
 
+  // Claim the bus immediately so higher-priority ISRs (TIM2) see busy() == true
+  // before any SPI/DMA work begins. This prevents a race where TIM2 preempts
+  // the DMA ISR's processQueue() -> transfer() chain and starts a second transfer.
+  _transferInProgress = true;
+
 	// Reset SPI data and status registers
 	// First, ensure the SPI is not busy...
   while (SPI_SR(_params.spi) & (SPI_SR_BSY)) {}
@@ -260,6 +265,7 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
   // Configure SPI1 for use with the appropriate peripheral
   if (_selectPeripheral(slave) != SpiReqAck::SpiReqAckOk)
   {
+    _transferInProgress = false;
     return SpiReqAck::SpiReqAckError;
   }
   // indicate busy
@@ -315,8 +321,6 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
 	// spi_enable_rx_dma(spiParams.spi);
 	// spi_enable_tx_dma(spiParams.spi);
   SPI_CR2(_params.spi) |= dmaEnable;
-
-  _transferInProgress = true;
 
   return SpiReqAck::SpiReqAckOk;
 }
