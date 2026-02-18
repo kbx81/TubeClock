@@ -197,6 +197,12 @@ SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave)
     }
     _selectedSlave = slave;    // save for later!
   }
+  else if (slave != cNoSlave && _slave[slave].strobeCs == false)
+  {
+    // Same slave, cached — SPI is already configured, just re-assert CS
+    // to start the new transaction (dmaComplete deactivated it)
+    _activateCsCe(slave);
+  }
 
   return result;
 }
@@ -368,13 +374,10 @@ void SpiMaster::dmaComplete()
 
     // Deactivate CS without full SPI deselection — keeps _selectedSlave cached
     // so the next transfer for the same slave skips SPI reconfiguration entirely.
-    // For strobeCs devices (HV5622 display): CS was just pulsed HIGH by
-    // _activateCsCe (latch strobe); pull it LOW so we exit transparent mode
-    // before the next SPI transfer. For persistent-CS devices: CS stays active.
-    if (_slave[_selectedSlave].strobeCs)
-    {
-      _deactivateCsCe(_selectedSlave);
-    }
+    // CS must be deactivated for ALL slave types to properly delimit SPI
+    // transactions (persistent-CS devices like DS3234/DS1722 require CS toggling
+    // between register operations; strobeCs devices need LOW between transfers).
+    _deactivateCsCe(_selectedSlave);
     _transferInProgress = false;
 
     // fire off the next queued item (maintains more consistent timing for PWMing)

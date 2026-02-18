@@ -65,7 +65,7 @@ namespace Hardware {
   /// @brief Type of temperature sensor connected, if any
   ///
   enum TempSensorType : uint8_t {
-    NoTempSensor,
+    STM32ADC,
     DS3234,
     DS1722,
     LM74,
@@ -253,9 +253,9 @@ namespace Hardware {
   ///
   void     setFlickerReduction(const uint16_t value);
 
-  /// @brief Sets the calibration value used for the temperature calculation
+  /// @brief Sets the calibration offset for the specified temperature sensor (Cx10)
   ///
-  void     setTemperatureCalibration(const int8_t value);
+  void     setTemperatureCalibration(TempSensorType type, int16_t offsetCx10);
 
   /// @brief Sets the temperature from an external source (Celsius x10)
   ///

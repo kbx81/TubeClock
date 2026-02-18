@@ -209,10 +209,6 @@ static const uint16_t cI2cTimeout = 5000;
 //
 static const uint8_t cI2cMaxFailBusyCount = 20;
 
-// value by which we multiply the fractional part of temperature sensor readings
-//
-static const int16_t cTempFracMultiplier = 125;
-
 // minimum frequency allowed for tones
 //
 static const uint8_t cToneFrequencyMinimum = 92;
@@ -332,9 +328,9 @@ static uint8_t _onTimeLastSecond = 0;
 //
 static uint32_t _onTimeSecondsCounter = 0;
 
-// provides a way to calibrate the temperature indication
+// provides a way to calibrate the STM32 ADC temperature indication (Cx10)
 //
-static int8_t _temperatureAdjustment = -9;
+static int16_t _temperatureAdjustmentADCCx10 = -90;
 
 // tracks when to silence a tone
 //
@@ -368,10 +364,6 @@ static uint8_t _tscTouchState = 0;
 // date & time stored by Refresh()
 //
 static DateTime _currentDateTime;
-
-// contains the temperature in degrees Celsius times cBaseMultiplier
-//
-static int32_t _temperatureXcBaseMultiplier = 0;
 
 // per-sensor temperature cache in tenths of degrees Celsius (Cx10)
 //  sentinel value (cTempSentinel) indicates sensor not detected/available
@@ -428,12 +420,7 @@ static bool _rtcIsSet = false;
 
 // true if temp sensor is detected
 //
-static TempSensorType _externalTemperatureSensor = TempSensorType::NoTempSensor;
-
-// Bitmask of temperature sensors detected at init (bit = 1 << TempSensorType)
-// NoTempSensor (internal ADC) and ExternalSerial are always available
-//
-static uint8_t _detectedTempSensorsMask = (1 << TempSensorType::NoTempSensor) | (1 << TempSensorType::ExternalSerial);
+static TempSensorType _externalTemperatureSensor = TempSensorType::STM32ADC;
 
 // a string and some bits used for printf debugging :)
 //
@@ -1110,20 +1097,15 @@ void _refreshTemp()
       int32_t t = (averageTemp * voltageVddA() / cVddCalibrationVoltage) - ST_TSENSE_CAL1_30C;
       t = t * (110 - 30) * cBaseMultiplier;
       t = t / (ST_TSENSE_CAL2_110C - ST_TSENSE_CAL1_30C);
-      t = t + 30000 + (_temperatureAdjustment * cBaseMultiplier);
-      _temperatureCx10Cached[TempSensorType::NoTempSensor] = t / (cBaseMultiplier / 10);
+      t = t + 30000;
+      _temperatureCx10Cached[TempSensorType::STM32ADC] = t / (cBaseMultiplier / 10) + _temperatureAdjustmentADCCx10;
     }
 
-    // DS3234 (reads cached values populated by _refreshRTC() DMA transfer)
-    if ((_detectedTempSensorsMask & (1 << TempSensorType::DS3234)) && (_rtcReadPending == false))
-    {
-      int32_t t =  DS3234::getTemperatureWholePart() * cBaseMultiplier;
-      t += ((DS3234::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-      _temperatureCx10Cached[TempSensorType::DS3234] = t / (cBaseMultiplier / 10);
-    }
+    // DS3234 temperature is updated in _refreshRTC() Phase 2, where the
+    // register snapshot is guaranteed fresh.
 
     // SPI temperature sensor -- LM74 and DS1722 are mutually exclusive
-    if (_detectedTempSensorsMask & (1 << TempSensorType::LM74))
+    if (LM74::isConnected())
     {
       SpiMaster::SpiReqAck status = LM74::refresh();
       if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
@@ -1132,7 +1114,7 @@ void _refreshTemp()
         _tempReadPending = true;
       }
     }
-    else if (_detectedTempSensorsMask & (1 << TempSensorType::DS1722))
+    else if (DS1722::isConnected())
     {
       SpiMaster::SpiReqAck status = DS1722::refresh();
       if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
@@ -1147,10 +1129,6 @@ void _refreshTemp()
     if (!_tempReadPending)
     {
       // No SPI read queued -- all readings are complete this cycle
-      if (_externalTemperatureSensor != TempSensorType::ExternalSerial)
-      {
-        _temperatureXcBaseMultiplier = _temperatureCx10Cached[_externalTemperatureSensor] * (cBaseMultiplier / 10);
-      }
       _temperatureUpdated = true;
     }
   }
@@ -1160,28 +1138,20 @@ void _refreshTemp()
   {
     bool harvested = false;
 
-    if ((_detectedTempSensorsMask & (1 << TempSensorType::LM74)) && (LM74::transferComplete() == true))
+    if (LM74::isConnected() && (LM74::transferComplete() == true))
     {
-      int32_t t =  LM74::getTemperatureWholePart() * cBaseMultiplier;
-      t += ((LM74::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-      _temperatureCx10Cached[TempSensorType::LM74] = t / (cBaseMultiplier / 10);
+      _temperatureCx10Cached[TempSensorType::LM74] = LM74::getTemperatureCx10();
       harvested = true;
     }
-    else if ((_detectedTempSensorsMask & (1 << TempSensorType::DS1722)) && (DS1722::transferComplete() == true))
+    else if (DS1722::isConnected() && (DS1722::transferComplete() == true))
     {
-      int32_t t =  DS1722::getTemperatureWholePart() * cBaseMultiplier;
-      t += ((DS1722::getTemperatureFractionalPart() >> 1) * cTempFracMultiplier);
-      _temperatureCx10Cached[TempSensorType::DS1722] = t / (cBaseMultiplier / 10);
+      _temperatureCx10Cached[TempSensorType::DS1722] = DS1722::getTemperatureCx10();
       harvested = true;
     }
 
     if (harvested)
     {
       _tempReadPending = false;
-      if (_externalTemperatureSensor != TempSensorType::ExternalSerial)
-      {
-        _temperatureXcBaseMultiplier = _temperatureCx10Cached[_externalTemperatureSensor] * (cBaseMultiplier / 10);
-      }
       _temperatureUpdated = true;
     }
   }
@@ -1208,6 +1178,14 @@ void _refreshRTC()
     if (_rtcReadPending && DS3234::transferComplete())
     {
       _currentDateTime = DS3234::getDateTime();
+      // Also update cached temperature -- the DS3234 register snapshot already
+      // contains the temperature bytes, and _refreshTemp() cannot read them
+      // while _rtcReadPending is true (which it always is when _refreshTempNow
+      // fires, because both flags are set simultaneously).
+      if (DS3234::isConnected())
+      {
+        _temperatureCx10Cached[TempSensorType::DS3234] = DS3234::getTemperatureCx10();
+      }
       _rtcReadPending = false;
     }
     return;
@@ -1313,34 +1291,31 @@ void initialize()
   _tscTouchState = 0;  // All buttons released initially
 
   // Here we check for other temperature sensors
-  if (LM74::isConnected() == true)
+  if (LM74::checkConnection() == true)
   {
     _externalTemperatureSensor = TempSensorType::LM74;
-    _detectedTempSensorsMask |= (1 << TempSensorType::LM74);
   }
   else
   {
     gpio_clear(cNssPort, cNssTemperaturePin);
 
-    if (DS1722::isConnected() == true)
+    if (DS1722::checkConnection() == true)
     {
       _externalTemperatureSensor = TempSensorType::DS1722;
-      _detectedTempSensorsMask |= (1 << TempSensorType::DS1722);
     }
   }
 
-  _externalRtcConnected = DS3234::isConnected();
+  _externalRtcConnected = DS3234::checkConnection();
 
   if (_externalRtcConnected == true)
   {
     uint8_t buffer[] = { 0, 0x08 };
 
-    // isConnected() refreshes the status register so this will work without a refresh()
+    // checkConnection() refreshes the status register so this will work without a refresh()
     _rtcIsSet = DS3234::isValid();
     // enable PPS and 32 kHz outputs
     while (DS3234::setRegister(0x0e, buffer, 2, true) != SpiMaster::SpiReqAck::SpiReqAckOk);
-    _detectedTempSensorsMask |= (1 << TempSensorType::DS3234);
-    if (_externalTemperatureSensor == TempSensorType::NoTempSensor)
+    if (_externalTemperatureSensor == TempSensorType::STM32ADC)
     {
       _externalTemperatureSensor = TempSensorType::DS3234;
     }
@@ -1573,21 +1548,25 @@ bool rtcIsSet()
 
 int32_t temperature(const bool fahrenheit, const bool bcd)
 {
+  int32_t tempCx10 = _temperatureCx10Cached[_externalTemperatureSensor];
+
   if (fahrenheit == true)
   {
+    int32_t tempF = (tempCx10 * 18) / 100 + 32;
     if (bcd == true)
     {
-      return uint32ToBcd((uint16_t)((_temperatureXcBaseMultiplier * 18) / 10000) + 32);
+      return uint32ToBcd((uint16_t)tempF);
     }
-    return ((_temperatureXcBaseMultiplier * 18) / 10000) + 32;
+    return tempF;
   }
   else
   {
+    int32_t tempC = tempCx10 / 10;
     if (bcd == true)
     {
-      return uint32ToBcd((uint16_t)_temperatureXcBaseMultiplier / cBaseMultiplier);
+      return uint32ToBcd((uint16_t)tempC);
     }
-    return _temperatureXcBaseMultiplier / cBaseMultiplier;
+    return tempC;
   }
 }
 
@@ -1726,16 +1705,30 @@ void setFlickerReduction(const uint16_t value)
 }
 
 
-void setTemperatureCalibration(const int8_t value)
+void setTemperatureCalibration(TempSensorType type, int16_t offsetCx10)
 {
-  _temperatureAdjustment = value;
+  switch (type) {
+    case TempSensorType::STM32ADC:
+      _temperatureAdjustmentADCCx10 = offsetCx10;
+      break;
+    case TempSensorType::DS3234:
+      DS3234::setTemperatureOffset(offsetCx10);
+      break;
+    case TempSensorType::DS1722:
+      DS1722::setTemperatureOffset(offsetCx10);
+      break;
+    case TempSensorType::LM74:
+      LM74::setTemperatureOffset(offsetCx10);
+      break;
+    default:
+      break;
+  }
 }
 
 
 void setTemperature(const int32_t temperatureCx10)
 {
   _temperatureCx10Cached[TempSensorType::ExternalSerial] = temperatureCx10;
-  _temperatureXcBaseMultiplier = temperatureCx10 * (cBaseMultiplier / 10);
   _externalTemperatureSensor = TempSensorType::ExternalSerial;
   _temperatureUpdated = true;
 }
@@ -1792,18 +1785,49 @@ TempSensorType getTempSensorType()
 
 bool setTempSensorType(TempSensorType type)
 {
-  if (_detectedTempSensorsMask & (1 << type))
-  {
-    _externalTemperatureSensor = type;
-    return true;
+  switch (type) {
+    case TempSensorType::STM32ADC:
+      break;
+    case TempSensorType::ExternalSerial:
+      if (_temperatureCx10Cached[TempSensorType::ExternalSerial] == cTempSentinel)
+        return false;
+      break;
+    case TempSensorType::DS3234:
+      if (!DS3234::isConnected())
+        return false;
+      break;
+    case TempSensorType::DS1722:
+      if (!DS1722::isConnected())
+        return false;
+      break;
+    case TempSensorType::LM74:
+      if (!LM74::isConnected())
+        return false;
+      break;
+    default:
+      return false;
   }
-  return false;
+  _externalTemperatureSensor = type;
+  return true;
 }
 
 
 bool isTempSensorDetected(TempSensorType type)
 {
-  return (_detectedTempSensorsMask & (1 << type)) != 0;
+  switch (type) {
+    case TempSensorType::STM32ADC:
+      return true;
+    case TempSensorType::ExternalSerial:
+      return _temperatureCx10Cached[TempSensorType::ExternalSerial] != cTempSentinel;
+    case TempSensorType::DS3234:
+      return DS3234::isConnected();
+    case TempSensorType::DS1722:
+      return DS1722::isConnected();
+    case TempSensorType::LM74:
+      return LM74::isConnected();
+    default:
+      return false;
+  }
 }
 
 

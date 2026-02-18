@@ -90,8 +90,9 @@ namespace Application {
       SetTimeDateViewEnum = 4,
       SetBitsViewEnum = 5,
       SetValueViewEnum = 6,
-      SystemStatusViewEnum = 7,
-      TestDisplayEnum = 8
+      SetTempCalibrationViewEnum = 7,
+      SystemStatusViewEnum = 8,
+      TestDisplayEnum = 9
   };
 
   /// @brief Enums for views

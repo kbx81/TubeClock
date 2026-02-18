@@ -36,31 +36,34 @@ public:
   ///
   enum Setting : uint8_t
   {
-    SystemOptions               =  0,
-    BeepStates                  =  1,
-    BlinkStates                 =  2,
-    OnOffStates                 =  3,
-    TimeDisplayDuration         =  4,
-    DateDisplayDuration         =  5,
-    TemperatureDisplayDuration  =  6,
-    FadeDuration                =  7,
-    DstBeginMonth               =  8,
-    DstBeginDowOrdinal          =  9,
-    DstEndMonth                 = 10,
-    DstEndDowOrdinal            = 11,
-    DstSwitchDayOfWeek          = 12,
-    DstSwitchHour               = 13,
-    EffectDuration              = 14,
-    EffectFrequency             = 15,
-    MinimumIntensity            = 16,
-    BeeperVolume                = 17,
-    TemperatureCalibration      = 18,
-    DisplayRefreshInterval      = 19,
-    DateFormat                  = 20,
-    TimeZone                    = 21,
-    ColonBehavior               = 22,
-    TimerResetValue             = 23,
-    DmxAddress                  = 24
+    SystemOptions                =  0,
+    BeepStates                   =  1,
+    BlinkStates                  =  2,
+    OnOffStates                  =  3,
+    TimeDisplayDuration          =  4,
+    DateDisplayDuration          =  5,
+    TemperatureDisplayDuration   =  6,
+    FadeDuration                 =  7,
+    DstBeginMonth                =  8,
+    DstBeginDowOrdinal           =  9,
+    DstEndMonth                  = 10,
+    DstEndDowOrdinal             = 11,
+    DstSwitchDayOfWeek           = 12,
+    DstSwitchHour                = 13,
+    EffectDuration               = 14,
+    EffectFrequency              = 15,
+    MinimumIntensity             = 16,
+    BeeperVolume                 = 17,
+    TemperatureCalibrationSTM32  = 18,
+    TemperatureCalibrationDS3234 = 19,
+    TemperatureCalibrationDS1722 = 20,
+    TemperatureCalibrationLM74   = 21,
+    DisplayRefreshInterval       = 22,
+    DateFormat                   = 23,
+    TimeZone                     = 24,
+    ColonBehavior                = 25,
+    TimerResetValue              = 26,
+    DmxAddress                   = 27
   };
 
   /// @brief Settings we keep
@@ -112,6 +115,10 @@ public:
   /// @brief Bits used in each settings class
   ///
   static const uint16_t cSettingData[];
+
+  /// @brief Midpoint value for signed temperature calibration encoding
+  ///  stored = cCalibrationMidpoint + offsetCx10; offsetCx10 = stored - cCalibrationMidpoint
+  static const int16_t cCalibrationMidpoint = 99;
 
   /// @brief Default constructor
   ///

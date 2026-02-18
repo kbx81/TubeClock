@@ -41,8 +41,13 @@ namespace DS3234 {
 ///
 void initialize();
 
-/// @brief Check if the RTC is connected; returns true if so
+/// @brief Probe the RTC via SPI; returns true if connected (caches result for isConnected())
 /// @return true if DS3234 is connected
+///
+bool checkConnection();
+
+/// @brief Returns cached connection state set by checkConnection()
+/// @return true if DS3234 was detected
 ///
 bool isConnected();
 
@@ -65,15 +70,13 @@ DateTime getDateTime();
 ///
 uint16_t getTemperatureRegister();
 
-/// @brief Get the whole-number part of the temperature register (in degrees celsius)
-/// @return the temperature register's whole-number part as a int16_t
+/// @brief Get the temperature in tenths of degrees Celsius (Cx10), with offset applied
 ///
-int16_t getTemperatureWholePart();
+int32_t getTemperatureCx10();
 
-/// @brief Get the fractional part of the temperature register (in degrees celsius)
-/// @return the temperature register's fractional part as a uint16_t
+/// @brief Set the desired temperature offset in tenths of degrees Celsius (e.g. 25 = +2.5C, -30 = -3.0C)
 ///
-uint16_t getTemperatureFractionalPart();
+void setTemperatureOffset(int16_t offset);
 
 /// Configure the real time clock driver with a new base year
 ///

@@ -36,6 +36,7 @@
 #include "TimeDateTempView.h"
 #include "TimerCounterView.h"
 #include "SetTimeDateView.h"
+#include "SetTempCalibrationView.h"
 #include "SetValueView.h"
 #include "SetBitsView.h"
 #include "SystemStatusView.h"
@@ -75,6 +76,7 @@ static View* const cModeViews[] = {
     new SetTimeDateView(),
     new SetBitsView(),
     new SetValueView(),
+    new SetTempCalibrationView(),
     new SystemStatusView(),
     new TestDisplayView()
 };
@@ -118,7 +120,7 @@ static viewDescriptor const cViewDescriptor[] = {
     { 31, ViewEnum::SetValueViewEnum,     Settings::Setting::EffectFrequency },
     { 32, ViewEnum::SetValueViewEnum,     Settings::Setting::MinimumIntensity },
     { 33, ViewEnum::SetValueViewEnum,     Settings::Setting::BeeperVolume },
-    { 34, ViewEnum::SetValueViewEnum,     Settings::Setting::TemperatureCalibration },
+    { 34, ViewEnum::SetTempCalibrationViewEnum, Settings::Setting::TemperatureCalibrationSTM32 },
     { 35, ViewEnum::SetValueViewEnum,     Settings::Setting::DisplayRefreshInterval },
     { 36, ViewEnum::SetValueViewEnum,     Settings::Setting::DateFormat },
     { 37, ViewEnum::SetValueViewEnum,     Settings::Setting::TimeZone },
@@ -415,7 +417,14 @@ void refreshSettings()
 
   // Update hardware things
   Hardware::setVolume(_settings.getRawSetting(Settings::Setting::BeeperVolume));
-  Hardware::setTemperatureCalibration((int8_t)(-(_settings.getRawSetting(Settings::Setting::TemperatureCalibration))));
+  Hardware::setTemperatureCalibration(Hardware::TempSensorType::STM32ADC,
+    (int16_t)_settings.getRawSetting(Settings::Setting::TemperatureCalibrationSTM32) - Settings::cCalibrationMidpoint);
+  Hardware::setTemperatureCalibration(Hardware::TempSensorType::DS3234,
+    (int16_t)_settings.getRawSetting(Settings::Setting::TemperatureCalibrationDS3234) - Settings::cCalibrationMidpoint);
+  Hardware::setTemperatureCalibration(Hardware::TempSensorType::DS1722,
+    (int16_t)_settings.getRawSetting(Settings::Setting::TemperatureCalibrationDS1722) - Settings::cCalibrationMidpoint);
+  Hardware::setTemperatureCalibration(Hardware::TempSensorType::LM74,
+    (int16_t)_settings.getRawSetting(Settings::Setting::TemperatureCalibrationLM74) - Settings::cCalibrationMidpoint);
 
   DisplayManager::setDisplayRefreshInterval(_settings.getRawSetting(Settings::Setting::DisplayRefreshInterval));
   DisplayManager::setDisplayBlanking(false);

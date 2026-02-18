@@ -290,7 +290,7 @@ Returns temperatures from all sensor types as comma-separated signed decimal int
 
 | Index | Sensor            | Notes                                           |
 |-------|-------------------|-------------------------------------------------|
-| 0     | NoTempSensor      | STM32 internal ADC temperature (always present) |
+| 0     | STM32ADC      | STM32 internal ADC temperature (always present) |
 | 1     | DS3234            | DS3234 RTC integrated temperature sensor        |
 | 2     | DS1722            | External DS1722 SPI temperature sensor          |
 | 3     | LM74              | External LM74 SPI temperature sensor            |
@@ -443,13 +443,16 @@ Example: `$TCCS17,128*XX\n` sets BeeperVolume (17) to 128.
 | 15 | EffectFrequency | Display effect frequency |
 | 16 | MinimumIntensity | Minimum display intensity |
 | 17 | BeeperVolume | Beeper volume |
-| 18 | TemperatureCalibration | Temperature calibration offset |
-| 19 | DisplayRefreshInterval | Display refresh interval |
-| 20 | DateFormat | Date format |
-| 21 | TimeZone | Time zone offset |
-| 22 | ColonBehavior | Colon/separator behavior during time display |
-| 23 | TimerResetValue | Timer/counter reset value |
-| 24 | DmxAddress | DMX-512 base address |
+| 18 | TemperatureCalibrationSTM32 | Temperature calibration offset (STM32 internal ADC) |
+| 19 | TemperatureCalibrationDS3234 | Temperature calibration offset (DS3234) |
+| 20 | TemperatureCalibrationDS1722 | Temperature calibration offset (DS1722) |
+| 21 | TemperatureCalibrationLM74 | Temperature calibration offset (LM74) |
+| 22 | DisplayRefreshInterval | Display refresh interval |
+| 23 | DateFormat | Date format |
+| 24 | TimeZone | Time zone offset |
+| 25 | ColonBehavior | Colon/separator behavior during time display |
+| 26 | TimerResetValue | Timer/counter reset value |
+| 27 | DmxAddress | DMX-512 base address |
 
 #### SystemOptions Bit Flags (Setting 0)
 

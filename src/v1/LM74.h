@@ -32,7 +32,11 @@ namespace LM74 {
 ///
 void initialize();
 
-/// @brief Check if the chip is connected
+/// @brief Probe the chip via SPI; returns true if connected (caches result for isConnected())
+///
+bool checkConnection();
+
+/// @brief Returns cached connection state set by checkConnection()
 ///
 bool isConnected();
 
@@ -40,15 +44,15 @@ bool isConnected();
 ///
 uint16_t getTemperatureRegister();
 
-/// @brief Get the whole-number part of the temperature register (in degrees celsius)
+/// @brief Get the temperature in tenths of degrees Celsius (Cx10), with offset applied
 ///
-int16_t getTemperatureWholePart();
+int32_t getTemperatureCx10();
 
-/// @brief Get the fractional part of the temperature register (in degrees celsius)
+/// @brief Set the desired temperature offset in tenths of degrees Celsius (e.g. 25 = +2.5C, -30 = -3.0C)
 ///
-uint16_t getTemperatureFractionalPart();
+void setTemperatureOffset(int16_t offset);
 
-/// @brief Read all registers from the DS1722
+/// @brief Read all registers from the LM74
 ///
 SpiMaster::SpiReqAck refresh(const bool block = false);
 

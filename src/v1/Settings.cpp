@@ -44,7 +44,7 @@ extern "C" uint32_t __settings_flash_start;
 namespace kbxTubeClock {
 
   // Default settings profiles
-  // Each profile contains default values for all 25 settings
+  // Each profile contains default values for all 28 settings
   // Profile selection is controlled by SETTINGS_PROFILE macro (set in Makefile)
 
   struct SettingsProfile {
@@ -74,7 +74,10 @@ namespace kbxTubeClock {
       300,           // EffectFrequency
       20,            // MinimumIntensity
       3,             // BeeperVolume
-      10,            // TemperatureCalibration
+      4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+      79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
+      79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
+      79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
       0,             // DateFormat
       32,            // TimeZone
@@ -106,7 +109,10 @@ namespace kbxTubeClock {
       300,           // EffectFrequency
       20,            // MinimumIntensity
       3,             // BeeperVolume
-      10,            // TemperatureCalibration
+      4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+      79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
+      79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
+      79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
       1,             // DateFormat (DD.MM.YYYY)
       56,            // TimeZone
@@ -138,7 +144,10 @@ namespace kbxTubeClock {
       0,             // EffectFrequency (effects disabled)
       20,            // MinimumIntensity
       0,             // BeeperVolume (silent)
-      10,            // TemperatureCalibration
+      4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+      79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
+      79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
+      79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
       0,             // DateFormat
       56,            // TimeZone
@@ -170,7 +179,10 @@ namespace kbxTubeClock {
       300,           // EffectFrequency
       20,            // MinimumIntensity
       2,             // BeeperVolume
-      10,            // TemperatureCalibration
+      4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+      79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
+      79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
+      79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
       0,             // DateFormat
       32,            // TimeZone
@@ -223,7 +235,10 @@ namespace kbxTubeClock {
                                               43200,    // EffectFrequency
                                               1000,     // MinimumIntensity
                                               7,        // BeeperVolume
-                                              31,       // TemperatureCalibration
+                                              198,      // TemperatureCalibrationSTM32 (midpoint 99: 0=-99Cx10, 198=+99Cx10)
+                                              198,      // TemperatureCalibrationDS3234
+                                              198,      // TemperatureCalibrationDS1722
+                                              198,      // TemperatureCalibrationLM74
                                               100,      // DisplayRefreshInterval
                                               2,        // DateFormat
                                               112,      // TimeZone

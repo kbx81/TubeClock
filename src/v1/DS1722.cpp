@@ -74,6 +74,14 @@ static SpiMaster *_spiMaster = nullptr;
 //
 static uint8_t _slaveId = SpiMaster::cNoSlave;
 
+// Temperature offset in tenths of degrees Celsius
+//
+static int16_t _temperatureOffset = 0;
+
+// Cached connection state, set by checkConnection()
+//
+static bool _connected = false;
+
 
 void initialize()
 {
@@ -99,7 +107,7 @@ void initialize()
 }
 
 
-bool isConnected()
+bool checkConnection()
 {
   SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
@@ -131,10 +139,17 @@ bool isConnected()
       // Kick off a full register refresh
       while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
 
+      _connected = true;
       return true;
     }
   }
   return false;
+}
+
+
+bool isConnected()
+{
+  return _connected;
 }
 
 
@@ -144,15 +159,20 @@ uint16_t getTemperatureRegister()
 }
 
 
-int16_t getTemperatureWholePart()
+int32_t getTemperatureCx10()
 {
-  return ((int8_t)_ds1722RegisterIn[cTemperatureMSBRegister]);
+  int16_t temp_whole = (int8_t)_ds1722RegisterIn[cTemperatureMSBRegister];
+  uint16_t temp_frac = _ds1722RegisterIn[cTemperatureLSBRegister] >> 4;
+  // (whole * 1000 + (frac >> 1) * 125) / 100 = (whole * 8 + (frac >> 1)) * 5 / 4
+  // Replaces expensive / 100 (software divide) with / 4 (shift)
+  int32_t v = (temp_whole * 8 + (temp_frac >> 1)) * 5;
+  return v / 4 + _temperatureOffset;
 }
 
 
-uint16_t getTemperatureFractionalPart()
+void setTemperatureOffset(int16_t offset)
 {
-  return (_ds1722RegisterIn[cTemperatureLSBRegister] >> 4);
+  _temperatureOffset = offset;
 }
 
 
