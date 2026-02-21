@@ -63,7 +63,7 @@ namespace Application {
     white(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
     gray(RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8),
     darkGray(RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24),
-    nixieOrange(256, 32, 2);
+    nixieOrange(1280, 496, 112);
 
 
 // An array with all views for the application; must correspond with ViewEnum!

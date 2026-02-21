@@ -238,12 +238,13 @@ void refresh()
   else
   {
     RgbLed status = _statusLed;
-    // Apply master intensity to status LED using LUT
-    // Scale 12-bit RGB values (0-4095) to 8-bit (0-255) for LUT indexing
-    // Then scale 8-bit LUT output (0-254) back to 12-bit (0-4095) for hardware
-    status.setRed(((uint32_t)_intensityLUT[status.getRed() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
-    status.setGreen(((uint32_t)_intensityLUT[status.getGreen() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
-    status.setBlue(((uint32_t)_intensityLUT[status.getBlue() >> 4] * RgbLed::cLedMaxIntensity + 127) / 254);
+    // Apply master intensity in full 12-bit precision, then gamma-correct for
+    // perceptually linear brightness. This gives: perceived ∝ master/255 linearly,
+    // and preserves color ratios across the full dimming range without quantization.
+    status.setRed(  ((uint32_t)status.getRed()   * _masterIntensity + 127) / 255);
+    status.setGreen(((uint32_t)status.getGreen() * _masterIntensity + 127) / 255);
+    status.setBlue( ((uint32_t)status.getBlue()  * _masterIntensity + 127) / 255);
+    status.gammaCorrect12bit();
     Hardware::setStatusLed(status);
   }
 }

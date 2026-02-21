@@ -685,6 +685,15 @@ static void _handleCommand(const char* payload, uint8_t length)
     // --- Hardware ---
     case 'H':
     {
+      // "$TCCHV" -- query HV state (length == 3, 'V' only after "CH")
+      if (length == 3 && payload[2] == 'V')
+      {
+        _txBeginResponse("HV");
+        _txAppendChar(Hardware::getHvState() ? '1' : '0');
+        _txSendResponse();
+        break;
+      }
+
       if (length < 5) break;
 
       char s0 = payload[2], s1 = payload[3], s2 = payload[4];
@@ -703,7 +712,7 @@ static void _handleCommand(const char* payload, uint8_t length)
       else if (s0 == 'C' && s1 == 'O' && s2 == 'N')
       {
         // "$TCCHCON" -- connected components bitmask
-        _txBeginResponse("H");
+        _txBeginResponse("HCON");
         uint8_t connected = 0;
         if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS3234)  connected |= (1 << 0);
         if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS1722)  connected |= (1 << 1);

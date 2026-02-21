@@ -185,6 +185,10 @@ namespace Hardware {
   ///
   void     setHvState(const bool hvEnabled);
 
+  /// @brief Returns the current state of the HV boost converter (true = on, false = off)
+  ///
+  bool     getHvState();
+
   /// @brief Enable or disable the display blanking output pin
   ///
   void     setDisplayHardwareBlanking(const bool blankingState);

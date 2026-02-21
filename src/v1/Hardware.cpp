@@ -1460,6 +1460,12 @@ void setHvState(const bool hvEnabled)
 }
 
 
+bool getHvState()
+{
+  return _hvState;
+}
+
+
 void setDisplayHardwareBlanking(const bool blankingState)
 {
   _displayBlankingState = blankingState;

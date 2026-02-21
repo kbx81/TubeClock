@@ -219,6 +219,15 @@ Returns a decimal bitmask of detected hardware:
 
 Example: `$TCSHCON24*XX\n` means GPS connected (8) + GPS valid (16).
 
+#### Get HV State
+
+```
+-> $TCCHV*XX\n
+<- $TCSHV<0|1>*XX\n
+```
+
+Returns the current state of the high-voltage supply: `1` = enabled, `0` = disabled.
+
 #### HV Power On
 
 ```
