@@ -104,16 +104,6 @@ namespace Application {
       Dmx512ExtControlEnum
   };
 
-  /// @brief Enums for DST computation
-  ///
-  enum DstState : uint8_t
-  {
-    Reset,
-    Spring,
-    Fall
-  };
-
-
   /// @brief Number of seconds in a day
   ///
   const uint16_t cSecondsInAnHour = 60 * 60;
@@ -203,6 +193,11 @@ namespace Application {
   ///
   void setSettings(const Settings &settings);
 
+  /// @brief Saves current settings to flash, skipping write if unchanged
+  /// @return true on success (saved or already up to date), false on write error
+  ///
+  bool saveSettingsToFlash();
+
   /// @brief Handles DST date/time computation; maintains clock's DST state machine.
   ///  Intended for tracking DST clock adjustments, not for arbitrary use!
   ///  To reset state machine, call with year != year provided when last called.
@@ -223,6 +218,10 @@ namespace Application {
   /// @brief Returns the application's current display intensity
   /// @return current display intensity (0-255)
   uint8_t getIntensity();
+
+  /// @brief Returns the application's startup settings load result
+  /// @return true if settings were loaded successfully, false if failure & defaults were set
+  bool getStartupSettingsLoadResult();
 
   /// @brief Set the application's display intensity and disables automagic adjusting of the display intensity
   /// @param intensity New display intensity (0-255)

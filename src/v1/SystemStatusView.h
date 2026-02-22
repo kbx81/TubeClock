@@ -39,7 +39,8 @@ class SystemStatusView : public View {
     StatusDS1722      = ViewMode::ViewMode3,
     StatusLM74        = ViewMode::ViewMode4,
     VoltageVddA       = ViewMode::ViewMode5,
-    VoltageBattery    = ViewMode::ViewMode6
+    VoltageBattery    = ViewMode::ViewMode6,
+    StartupResult     = ViewMode::ViewMode7
   };
 
 

@@ -155,42 +155,19 @@ bool DateTime::operator<(const DateTime &other) const
 
 bool DateTime::operator<=(const DateTime &other) const
 {
-  return operator<(other) || operator==(other);
+  return !(other < *this);
 }
 
 
 bool DateTime::operator>(const DateTime &other) const
 {
-  if (_year != other._year)
-  {
-    return _year > other._year;
-  }
-  else if (_month != other._month)
-  {
-    return _month > other._month;
-  }
-  else if (_day != other._day)
-  {
-    return _day > other._day;
-  }
-  else if (_hour != other._hour)
-  {
-    return _hour > other._hour;
-  }
-  else if (_minute != other._minute)
-  {
-    return _minute > other._minute;
-  }
-  else
-  {
-    return _second > other._second;
-  }
+  return other < *this;
 }
 
 
 bool DateTime::operator>=(const DateTime &other) const
 {
-  return operator>(other) || operator==(other);
+  return !(*this < other);
 }
 
 
@@ -400,7 +377,7 @@ uint8_t DateTime::daysThisMonth() const
 }
 
 
-uint32_t DateTime::secondsSinceMidnight(const bool bcd)
+uint32_t DateTime::secondsSinceMidnight(const bool bcd) const
 {
   if (bcd)
   {

@@ -68,6 +68,10 @@ namespace DisplayManager
   ///
   bool getDisplayBlanking();
 
+  /// @brief Returns true if a blink() animation is currently in progress
+  ///
+  bool isBlinkActive();
+
   /// @brief Blank the display
   /// @param blank Display is blank (off) if true
   ///
@@ -83,9 +87,11 @@ namespace DisplayManager
   ///
   void setDisplayRefreshInterval(const uint8_t interval);
 
-  /// @brief Causes the display to blink twice (acknowledgement of some action)
+  /// @brief Blinks the display count times as a non-blocking animation.
+  ///  The animation is driven by tick() and completes asynchronously (~100ms per blink).
+  /// @param count Number of blinks (default 2)
   ///
-  void doubleBlink();
+  void blink(uint8_t count = 2);
 
   /// @brief Writes the passed display into the display buffer. Tubes will fade
   ///  to the intensities in the new display at the specified rates.
@@ -99,6 +105,11 @@ namespace DisplayManager
   /// @param statusLed New status LED state
   ///
   void writeStatusLed(const RgbLed &statusLed);
+
+  /// @brief Returns the current status LED state as stored in the DisplayManager
+  /// @return Current RgbLed value
+  ///
+  RgbLed getStatusLed();
 
 
 }

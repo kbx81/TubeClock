@@ -55,6 +55,15 @@ namespace Hardware {
     SysTick
   };
 
+  /// @brief Result of RTC startup
+  ///
+  enum RtcStartResult : uint8_t {
+    UnknownError,
+    Ok,           // Normal startup
+    OscStopped,   // Oscillator was stopped, reinitialization occurred (clock will require updating)
+    OscTimeout    // Oscillator did not start within the expected time (clock may not function)
+  };
+
   /// @brief Type of temperature sensor connected, if any
   ///
   enum RtcType : uint8_t {
@@ -281,6 +290,10 @@ namespace Hardware {
   ///
   bool getPpsInputState();
 
+  /// @brief Returns the result of RTC start-up
+  ///
+  RtcStartResult getRTCStartupResult();
+
   /// @brief Returns the active RTC type/source
   ///
   RtcType getRTCType();
@@ -343,7 +356,6 @@ namespace Hardware {
   void     setGreenLed(const uint32_t intensity);
   void     setRedLed(const uint32_t intensity);
   void     setStatusLed(const RgbLed &led);
-  void     blinkStatusLed(const RgbLed &led1, const RgbLed &led2, uint32_t numberOfBlinks, const uint32_t delayLength);
 
   /// @brief Creates a delay of length based on systick (configured for milliseconds)
   ///

@@ -51,9 +51,9 @@ void MainMenuView::enter()
     _selectedMode = Application::OperatingMode::OperatingModeSetDate;
   }
 
-  DisplayManager::setStatusLedAutoRefreshing(false);
+  DisplayManager::setStatusLedAutoRefreshing(true);
   // Make sure the status LEDs are off
-  Hardware::setStatusLed(RgbLed());
+  DisplayManager::writeStatusLed(RgbLed());
 }
 
 
@@ -64,14 +64,13 @@ bool MainMenuView::keyHandler(Keys::Key key)
   if ((key == Keys::Key::A) &&
       (_selectedMode == static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1))
   {
-    Hardware::setStatusLed(Application::red);
+    DisplayManager::writeStatusLed(Application::red);
 
     Hardware::eraseFlash(Settings::cSettingsFlashAddress);
     _selectedMode = 1;
 
-    DisplayManager::doubleBlink();
-    DisplayManager::doubleBlink();
-    Hardware::setStatusLed(RgbLed());
+    DisplayManager::blink(4);
+    DisplayManager::writeStatusLed(RgbLed());
   }
 
   if (key == Keys::Key::B)

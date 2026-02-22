@@ -294,7 +294,6 @@ static uint8_t _buttonStatesPrevious = 0;
 // counter used by delay()
 //
 volatile static uint32_t _delayCounter = 0;
-volatile static uint32_t _delayCounterNB = 0;
 
 // tracks how many times tx/rx requests were blocked because the I2C is busy
 //
@@ -376,7 +375,7 @@ static volatile bool _temperatureUpdated = false;
 
 // state of the BLANK pin
 //
-static bool _displayBlankingState = false;
+static bool _displayBlankingState = true;
 
 // indicates to setDisplayBlankPin() that it should NOT clear the BLANK pin as
 //  a display write is in progress with flicker reduction active
@@ -413,6 +412,10 @@ volatile static bool _tempReadPending = false;
 // indicates if the app can rely on a periodic interrupt (PPS) to trigger
 //  external RTC and temperature sensor refreshes
 static PeripheralRefreshTrigger _peripheralRefreshTrigger = PeripheralRefreshTrigger::SysTick;
+
+// result of RTC start-up (oscillator status, etc.)
+//
+static RtcStartResult _rtcStartupResult = RtcStartResult::UnknownError;
 
 // true if RTC is set/valid
 //
@@ -717,10 +720,6 @@ void _nvicSetup()
 
 
 // Configure RTC and ensure it's running
-// Status LED behavior:
-//  Cyan: Normal startup
-//  Red/Cyan blink: Oscillator was stopped, reinitialization occured (clock will need to be updated by user)
-//  Red/Yellow blink: Oscillator did not start within the expected time (clock may not function)
 //
 void _rtcSetup()
 {
@@ -732,7 +731,7 @@ void _rtcSetup()
 
   if (rcc_is_osc_ready(RCC_LSE) == false)
   {
-    blinkStatusLed(Application::red, Application::cyan, 4, 100);
+    _rtcStartupResult = RtcStartResult::OscStopped;
 
     pwr_disable_backup_domain_write_protect();
 
@@ -765,7 +764,7 @@ void _rtcSetup()
       RCC_BDCR |= RCC_BDCR_BDRST;
       RCC_BDCR &= ~RCC_BDCR_BDRST;
 
-      blinkStatusLed(Application::red, Application::yellow, 20, 500);
+      _rtcStartupResult = RtcStartResult::OscTimeout;
     }
 
   	// set synch prescaler, using defaults for 1Hz out
@@ -782,7 +781,7 @@ void _rtcSetup()
   }
   else
   {
-    setStatusLed(Application::cyan);
+    _rtcStartupResult = RtcStartResult::Ok;
   }
 }
 
@@ -888,8 +887,6 @@ void _timerSetupStatusLED()
   timer_enable_preload(cLedPwmTimer);
 
   timer_enable_counter(cLedPwmTimer);
-
-  setRedLed(RgbLed::cLedMaxIntensity); // show signs of life...
 
   // Configure status LED GPIO pins
   gpio_mode_setup(cLedPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cLed0Pin | cLed1Pin | cLed2Pin);
@@ -1328,20 +1325,6 @@ void initialize()
   _rtcSetup();
 
   _onTimeSecondsCounter = RTC_BKPXR(0);
-
-  Hardware::setHvState(true);
-
-  Display startupDisplay(cTargetHardwareVersion);
-
-  DisplayManager::setStatusLedAutoRefreshing(true);
-  DisplayManager::writeDisplay(startupDisplay, Application::darkGray);
-  DisplayManager::setDisplayBlanking(false);
-
-  delay(500);
-
-  startupDisplay.setTubesOff(0b111111);
-  DisplayManager::writeDisplay(startupDisplay, RgbLed());
-  delay(250);
 }
 
 
@@ -1447,6 +1430,7 @@ void buttonsRefresh()
 void setHvState(const bool hvEnabled)
 {
   if (_hvState == hvEnabled) return;
+
   _hvState = hvEnabled;
 
   if (hvEnabled == false)
@@ -1468,6 +1452,8 @@ bool getHvState()
 
 void setDisplayHardwareBlanking(const bool blankingState)
 {
+  if (_displayBlankingState == blankingState) return;
+
   _displayBlankingState = blankingState;
 
   if (blankingState == false)
@@ -1770,6 +1756,12 @@ PeripheralRefreshTrigger getPeripheralRefreshTrigger()
 bool getPpsInputState()
 {
   return gpio_get(Hardware::cPpsPort, Hardware::cPpsPin) != 0;
+}
+
+
+RtcStartResult getRTCStartupResult()
+{
+  return _rtcStartupResult;
 }
 
 
@@ -2192,43 +2184,10 @@ void setStatusLed(const RgbLed &led)
 }
 
 
-void blinkStatusLed(const RgbLed &led1, const RgbLed &led2, uint32_t numberOfBlinks, const uint32_t delayLength)
-{
-  // be sure this is off so blinking is visible
-  DisplayManager::setStatusLedAutoRefreshing(false);
-
-  while (numberOfBlinks-- > 0)
-  {
-    setStatusLed(led1);
-    delay(delayLength);
-    setStatusLed(led2);
-    delay(delayLength);
-  }
-}
-
-
 void delay(const uint32_t length)
 {
   _delayCounter = 0;
-
-  while (_delayCounter < length)
-  {
-    DisplayManager::refresh();
-  }
-}
-
-
-void delayNBStart()
-{
-  _delayCounterNB = 0;
-}
-
-
-bool delayNBComplete(const uint32_t length)
-{
-  DisplayManager::refresh();
-
-  return (_delayCounterNB >= length);
+  while (_delayCounter < length) {}
 }
 
 
@@ -2419,9 +2378,7 @@ void exti415Isr()
 
 void systickIsr()
 {
-  // used by delay()
-  _delayCounter++;
-  _delayCounterNB++;
+  _delayCounter++;  // used by delay()
 
   // Handle PPS delay countdown - when it reaches 1, trigger the RTC refresh
   if (_ppsDelayCounter > 0)

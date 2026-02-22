@@ -135,7 +135,6 @@ The response includes the current operating mode number. If the view mode (sub-p
 | 31 | SetColonBehavior | Colon/separator behavior |
 | 32 | SetDMX512Address | DMX-512 address |
 | 33-40 | Slot1Time-Slot8Time | Set slot 1-8 time |
-| 41 | TestDisplay | Test display mode |
 
 #### View Mode (Sub-Page) Values
 
@@ -363,6 +362,99 @@ Example: `$TCCMS0*XX\n` switches to the internal STM32 ADC.
 
 ---
 
+### L -- Status LED
+
+Get or set the RGB status LED color. Values are 0–255 per channel; internally the LED uses 12-bit resolution (0–4095), so the serial interface scales by a factor of 16 in each direction.
+
+#### Get LED Color
+
+```
+-> $TCCL*XX\n
+<- $TCSL<r>,<g>,<b>*XX\n
+```
+
+Returns the current red, green, and blue channel values (0–255 each).
+
+Example: `$TCSL0,0,0*XX\n` (LED off).
+
+#### Set LED Color
+
+```
+-> $TCCL<r>,<g>,<b>*XX\n
+<- $TCSL<r>,<g>,<b>*XX\n
+```
+
+Sets the LED to the specified color. The response confirms the new state.
+
+Example: `$TCCL255,128,0*XX\n` sets the LED to orange.
+
+**Note:** The LED color set via this command persists until a view that manages the LED internally changes it (e.g. a PM indicator transition in `TimeDateTempView`, or entering `MainMenuView`). The clock minimizes unnecessary LED writes, so the externally set color is preserved as long as the active view's own desired LED color does not change.
+
+This response is also sent as an **unsolicited status notification** whenever the LED color changes from any source (internal views or external commands).
+
+---
+
+### B -- Buzzer (RTTTL Playback)
+
+Play, stop, or query RTTTL (Ring Tone Text Transfer Language) melodies through the clock's buzzer.
+
+[RTTTL format](https://en.wikipedia.org/wiki/Ring_Tone_Transfer_Language): `Name:d=<dur>,o=<oct>,b=<bpm>:<notes>`
+
+| Field | Description |
+|-------|-------------|
+| `Name` | Song name (up to ~15 characters, ignored during playback) |
+| `d=` | Default note duration: 1=whole, 2=half, 4=quarter, 8=eighth, 16=sixteenth, 32=thirty-second |
+| `o=` | Default octave (4–7) |
+| `b=` | BPM (beats per minute, in quarter notes) |
+| notes | Comma-separated sequence of `[dur][note][#][oct][.]` |
+
+Note characters: `c`, `d`, `e`, `f`, `g`, `a`, `b` (or `h`), `p` (pause). Append `#` for sharp, a digit for octave override, `.` for dotted (50% longer).
+
+#### Play RTTTL
+
+```
+-> $TCCBPName:d=4,o=5,b=120:4e,4d,4c*XX\n
+<- $TCSBP*XX\n
+```
+
+The RTTTL string begins immediately after the `P` action character. The response reports current playback status: `P` (playing) or `S` (stopped). If playback is already in progress, it is interrupted and the new song starts immediately.
+
+Maximum RTTTL string length: 251 bytes (within the 255-byte payload limit, minus the 3-byte `CBP` prefix).
+
+Example: play two notes (E and C in octave 5 at 120 BPM):
+```
+-> $TCCBPTwo:d=4,o=5,b=120:e,c*XX\n
+<- $TCSBP*XX\n
+```
+
+#### Stop Playback
+
+```
+-> $TCCBS*XX\n
+<- $TCSBS*XX\n
+```
+
+Stops RTTTL playback immediately. The current note (already in the hardware tone queue) may finish playing. The response reports `S` (stopped).
+
+#### Query Status
+
+```
+-> $TCCBQ*XX\n
+<- $TCSB<status>*XX\n
+```
+
+Returns the current playback status: `P` (playing) or `S` (stopped).
+
+#### RTTTL Playback Complete Notification
+
+```
+<- $TCSBOK*XX\n
+```
+
+Sent as an unsolicited notification when RTTTL playback completes. This fires when the last note has been accepted into the hardware tone queue; the final note(s) may still be audible for a short time after the notification is received.
+
+---
+
 ### I -- Intensity
 
 Get or set the display brightness.
@@ -430,6 +522,21 @@ Sets setting `nn` to `value` (unsigned 16-bit integer). The response confirms th
 
 Example: `$TCCS17,128*XX\n` sets BeeperVolume (17) to 128.
 
+**Note:** Set Setting updates the in-memory settings only. Use Save Settings to persist changes across power cycles.
+
+#### Save Settings
+
+```
+-> $TCCSW*XX\n
+<- $TCSSW<result>*XX\n
+```
+
+Saves the current in-memory settings to flash. To prevent unnecessary flash wear, the write is skipped if the in-memory settings are identical to the copy already stored in flash (compared by CRC).
+
+- **result**: `1` = saved successfully (or already up to date), `0` = flash write error
+
+Example: `$TCSSW1*XX\n` — settings saved (or unchanged).
+
 #### Setting Index Reference
 
 | Index | Setting | Description |
@@ -476,13 +583,13 @@ Example: `$TCCS17,128*XX\n` sets BeeperVolume (17) to 128.
 | 6 | StartupToToggle | Boot into toggle display mode |
 | 7 | DmxExtended | DMX-512 extended mode |
 | 8 | MSDsOff | Turn off most-significant digits when zero |
-| 9 | TriggerEffectOnRotate | Trigger display effect on digit change |
+| 9 | TriggerEffectOnRotate | Trigger display effect on time/date/temperature toggling |
 
 ---
 
 ## Unsolicited Notifications
 
-The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are only sent when the TX path is idle; if a transmission is in progress, the notification is silently dropped. The external MCU can always poll for current state if a notification is missed.
+The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are only sent when the TX path is idle; if a transmission is in progress, the notification is silently dropped (this is an uncommon occurrence). The external MCU can always poll for current state if a notification is missed.
 
 ### Mode Change
 
@@ -509,6 +616,22 @@ Example sequence for pressing and releasing the Enter key:
 <- $TCSK4,0*XX\n      (Enter released)
 ```
 
+### LED Color Change
+
+```
+<- $TCSL<r>,<g>,<b>*XX\n
+```
+
+Sent whenever the LED color changes, whether from an external `$TCCL` command or from an internal view (e.g. AM/PM indicator). Values are 0–255 per channel.
+
+### RTTTL Playback Complete
+
+```
+<- $TCSBOK*XX\n
+```
+
+Sent when RTTTL playback finishes. Fires when the last note has been accepted into the hardware tone queue; the final note(s) may still be audible briefly. This notification is suppressed if playback is stopped via the `$TCCBS` command.
+
 ---
 
 ## Implementation Notes
@@ -519,5 +642,5 @@ Example sequence for pressing and releasing the Enter key:
 - **GPS coexistence**: On USART1, both the GPS parser and the serial remote parser see every received byte independently. The GPS parser ignores `$TC` sentences and the serial remote parser ignores `$GP` sentences. No special multiplexing is needed.
 - **Command processing**: Commands are processed in the main application loop (not in ISR context). One command is processed per loop iteration.
 - **TX busy handling**: If a response is still being transmitted when a new command is processed or a notification is triggered, the new response is silently dropped. The external MCU should wait for a response before sending the next command.
-- **Payload size limit**: Maximum payload length between `$TC` header and `*` checksum marker is 32 bytes.
+- **Payload size limit**: Maximum payload length between `$TC` header and `*` checksum marker is 255 bytes.
 - **Response size limit**: Maximum total response size (including header, checksum, and newline) is 48 bytes.

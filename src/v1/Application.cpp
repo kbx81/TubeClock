@@ -29,6 +29,7 @@
 #include "Dmx-512-View.h"
 #include "GpsReceiver.h"
 #include "Keys.h"
+#include "RtttlPlayer.h"
 #include "SerialRemote.h"
 #include "Settings.h"
 #include "MainMenuView.h"
@@ -157,10 +158,6 @@ static uint8_t _masterIntensity = _minimumIntensity;
 //
 static DateTime _currentTime, _dstStart, _dstEnd;
 
-// daylight savings state
-//
-static DstState _dstState;
-
 // The current mode of the application
 //
 static OperatingMode _applicationMode;
@@ -194,18 +191,16 @@ static bool _previousDmxState = false;
 //
 static bool _settingsModified = false;
 
+// Set in initialize() when settings are loaded from flash
+//
+static bool _settingsLoadFromFlashResult = false;
+
 static bool _wasIdle = false;
 
 
 void initialize()
 {
-  if (_settings.loadFromFlash() == false)
-  {
-    // blink to alert that settings could not be loaded
-    Hardware::blinkStatusLed(Application::green, Application::orange, 12, 80);
-    Hardware::delay(500);
-    Hardware::setStatusLed(RgbLed());
-  }
+  _settingsLoadFromFlashResult = _settings.loadFromFlash();
 
   GpsReceiver::initialize();
   SerialRemote::initialize();
@@ -217,12 +212,12 @@ void initialize()
 
   Dmx512Controller::initialize();
   // make sure the display lights up at start-up time if auto-adjust is disabled
-  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity) == false)
+  if (!_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity))
   {
     setIntensity(255);  // Full brightness
   }
   // setOperatingMode() will refreshSettings()
-  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle) == true)
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle))
   {
     setOperatingMode(OperatingMode::OperatingModeToggleDisplay);
   }
@@ -230,6 +225,8 @@ void initialize()
   {
     setOperatingMode(OperatingMode::OperatingModeFixedDisplay);
   }
+
+  Hardware::setHvState(true);
 }
 
 
@@ -245,8 +242,8 @@ DateTime dateTime()
   {
     _currentTime = hardwareTime;
 
-    if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
-        && (isDst(_currentTime) == true))
+    if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable)
+        && isDst(_currentTime))
     {
       _currentTime = _currentTime.addSeconds(cDstOffsetSeconds);
     }
@@ -259,8 +256,8 @@ void setDateTime(const DateTime &now)
 {
   _currentTime = now;
 
-  if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
-      && (isDst(now) == true))
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable)
+      && isDst(now))
   {
     Hardware::setDateTime(_currentTime.addSeconds(-cDstOffsetSeconds));
   }
@@ -297,7 +294,11 @@ bool temperatureUpdated()
 
 uint8_t getModeDisplayNumber(OperatingMode mode)
 {
-  return cViewDescriptor[static_cast<uint8_t>(mode)].menuItemDisplayNumber;
+  if (mode <= OperatingMode::OperatingModeTestDisplay)
+  {
+    return cViewDescriptor[static_cast<uint8_t>(mode)].menuItemDisplayNumber;
+  }
+  return 0;
 }
 
 
@@ -323,12 +324,13 @@ void setOperatingMode(OperatingMode mode)
   if (_applicationMode == mode) return;
 
   const uint16_t writeLedIntensity = 1024;
+  bool blinkOnExit = false;
   // first, write settings to FLASH, if needed
   if ((mode != OperatingMode::OperatingModeMainMenu) &&
       (mode < static_cast<uint8_t>(OperatingMode::OperatingModeSetSystemOptions)) &&
-      (_settingsModified == true))
+      _settingsModified)
   {
-    if (_settings.saveToFlash() == 0)
+    if (_settings.saveToFlashIfChanged())
     {
       _settingsModified = false;
       Hardware::setGreenLed(writeLedIntensity);
@@ -337,10 +339,10 @@ void setOperatingMode(OperatingMode mode)
     {
       Hardware::setRedLed(writeLedIntensity);
     }
-    DisplayManager::doubleBlink();
-    Hardware::setStatusLed(RgbLed());
+    blinkOnExit = true;
   }
   // ensure hardware is consistent with current settings
+  // (this calls setDisplayBlanking(false), so blink() must come after)
   refreshSettings();
   // set the new mode
   _applicationMode = mode;
@@ -359,6 +361,13 @@ void setOperatingMode(OperatingMode mode)
   SerialRemote::notifyModeChange(
     static_cast<uint8_t>(_applicationMode),
     static_cast<uint8_t>(_viewMode));
+
+  // Initiate non-blocking blink after all state changes so that
+  // setDisplayBlanking(false) from refreshSettings() doesn't cancel it
+  if (blinkOnExit)
+  {
+    DisplayManager::blink();
+  }
 }
 
 
@@ -449,6 +458,12 @@ void setSettings(const Settings &settings)
 }
 
 
+bool saveSettingsToFlash()
+{
+  return _settings.saveToFlashIfChanged();
+}
+
+
 // Handles DST date/time computation and setup
 //
 bool isDst(const DateTime &currentTime)
@@ -457,7 +472,6 @@ bool isDst(const DateTime &currentTime)
 
   if (_dstStart.year(false) != currentTime.year(false))
   {
-    _dstState = DstState::Reset;
     firstDay = ((_settings.getRawSetting(Settings::Setting::DstBeginDowOrdinal) - 1) * 7) + 1;
 
     do
@@ -467,11 +481,6 @@ bool isDst(const DateTime &currentTime)
     while((_dstStart.dayOfWeek() != _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek)) && (firstDay <= 31));
 
     _dstStart.setTime(_settings.getRawSetting(Settings::Setting::DstSwitchHour), 0, 0);
-
-    if (currentTime >= _dstStart)
-    {
-      _dstState = DstState::Spring;
-    }
   }
 
   if (_dstEnd.year(false) != currentTime.year(false))
@@ -484,36 +493,15 @@ bool isDst(const DateTime &currentTime)
     }
     while((_dstEnd.dayOfWeek() != _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek)) && (firstDay <= 31));
 
+    // Fall-back hour is specified as local DST (wall clock) time, but isDst() receives
+    // standard time from the hardware RTC. Subtract the DST offset so the comparison
+    // fires at the correct standard-time moment (e.g. 2:00 AM DST == 1:00 AM standard).
     _dstEnd.setTime(_settings.getRawSetting(Settings::Setting::DstSwitchHour), 0, 0);
-
-    if (currentTime >= _dstEnd)
-    {
-      _dstState = DstState::Fall;
-    }
+    _dstEnd = _dstEnd.addSeconds(-cDstOffsetSeconds);
   }
 
   // once everything is calculated above, it becomes this simple...
   return (currentTime >= _dstStart && currentTime < _dstEnd);
-}
-
-
-// Handles updating of the clock hardware for DST
-//
-void _refreshDst()
-{
-  // _currentTime = Hardware::getDateTime();
-  //
-  // if ((_currentTime >= _dstEnd) && (_dstState == DstState::Spring))
-  // {
-  //   _dstState = DstState::Fall;
-  //   Hardware::setDstState(isDst(_currentTime), true);
-  // }
-  //
-  // if ((_currentTime >= _dstStart) && (_dstState == DstState::Reset))
-  // {
-  //   _dstState = DstState::Spring;
-  //   Hardware::setDstState(isDst(_currentTime), true);
-  // }
 }
 
 
@@ -531,7 +519,7 @@ void _updateIntensityPercentage(const bool quick = false)
     currentIntensity = _minimumIntensity;
   }
 
-  if (quick == true)
+  if (quick)
   {
     // Quick mode: snap immediately to target
     _masterIntensity = currentIntensity;
@@ -571,7 +559,7 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust)
   {
     _autoAdjustIntensities = enable;
 
-    if ((enable == true) && (quickAdjust == true))
+    if (enable && quickAdjust)
     {
       _updateIntensityPercentage(quickAdjust);
     }
@@ -582,6 +570,12 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust)
 uint8_t getIntensity()
 {
   return _masterIntensity;
+}
+
+
+bool getStartupSettingsLoadResult()
+{
+  return _settingsLoadFromFlashResult;
 }
 
 
@@ -599,7 +593,7 @@ void tick()
     _idleCounter++;
   }
 
-  if (_autoAdjustIntensities == true)
+  if (_autoAdjustIntensities)
   {
     _updateIntensityPercentage();
   }
@@ -615,11 +609,6 @@ void loop()
     // Refresh hardware data (date, time, temperature, etc.)
     Hardware::refresh();
 
-    // Check up on DST and adjust the time if enabled based on settings
-    // if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
-    // {
-    //   _refreshDst();
-    // }
     // We control the master display intensity only if DMX-512 is NOT active
     if (_externalControlMode != ExternalControl::Dmx512ExtControlEnum)
     {
@@ -647,23 +636,26 @@ void loop()
       }
       else
       {
-        if (Animator::isRunning() == true)
+        if (Animator::isRunning())
         {
           Animator::keyHandler(key);
         }
-        if (_currentView->keyHandler(key) == true)
+        if (_currentView->keyHandler(key))
         {
           // The key did something, so make the tick sound
           Hardware::tick();
           // Take control back
           _externalControlMode = ExternalControl::NoActiveExtControlEnum;
           Dmx512Controller::setDmx512Active(false);
-          // Make sure the display is visible
-          DisplayManager::setDisplayBlanking(false);
+          // Make sure the display is visible (skip if blink() is in progress)
+          if (!DisplayManager::isBlinkActive())
+          {
+            DisplayManager::setDisplayBlanking(false);
+          }
         }
       }
     }
-    if (Animator::isRunning() == true)
+    if (Animator::isRunning())
     {
       Animator::loop();
     }
@@ -672,6 +664,9 @@ void loop()
       // Execute the loop block of the current view
       _currentView->loop();
     }
+    // Process RTTTL playback
+    RtttlPlayer::loop();
+
     // We do not signal alarms if some external control is active
     if (_externalControlMode == Application::ExternalControl::NoActiveExtControlEnum)
     {
@@ -686,7 +681,7 @@ void loop()
       if (!_wasIdle)
       {
         _wasIdle = true;
-        if (Dmx512Rx::signalIsActive() == true)
+        if (Dmx512Rx::signalIsActive())
         {
           Hardware::setHvState(true);
         }
@@ -697,7 +692,7 @@ void loop()
       }
 
       // If there is an active signal, update _externalControlMode
-      if (Dmx512Rx::signalIsActive() == true)
+      if (Dmx512Rx::signalIsActive())
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);
@@ -710,7 +705,7 @@ void loop()
             (_applicationMode != OperatingMode::OperatingModeFixedDisplay) &&
             (_applicationMode != OperatingMode::OperatingModeTimerCounter))
         {
-          if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle) == true)
+          if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle))
           {
             setOperatingMode(OperatingMode::OperatingModeToggleDisplay);
           }
@@ -733,7 +728,7 @@ void loop()
     {
       _previousDmxState = Dmx512Rx::signalIsActive();
 
-      if (_previousDmxState == true)
+      if (_previousDmxState)
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);

@@ -20,8 +20,11 @@
 
 #include "Application.h"
 #include "DateTime.h"
+#include "DisplayManager.h"
 #include "GpsReceiver.h"
 #include "Hardware.h"
+#include "RgbLed.h"
+#include "RtttlPlayer.h"
 #include "SerialRemote.h"
 #include "Settings.h"
 
@@ -49,9 +52,10 @@ enum RxState : uint8_t {
 };
 
 
-// Maximum payload length (between "$TC" header and "*" checksum marker)
+// Maximum payload length (between "$TC" header and "*" checksum marker).
+// 255 bytes accommodates more RTTTL strings (see 'B' command handler).
 //
-static const uint8_t cMaxPayloadLength = 32;
+static const uint8_t cMaxPayloadLength = 255;
 
 // Protocol header: "$TC"
 //
@@ -132,11 +136,18 @@ static int32_t _prevTempValues[Hardware::cTempSensorCount] = {
 };
 static bool _pendingTempNotification = false;
 
+// LED color change notification state
+static RgbLed _prevLed;
+static bool _pendingLedNotification = false;
+
 // ADC change notification state -- tracks previous values to detect changes
 static uint16_t _prevAdcLight = 0;
 static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
 static bool _pendingAdcNotification = false;
+
+// RTTTL playback completion notification
+static bool _pendingRtttlDoneNotification = false;
 
 
 // --- Helper: convert nibble to hex char ---
@@ -292,6 +303,20 @@ static void _txSendTempStatus()
     if (i > 0) _txAppendChar(',');
     _txAppendDecimal(Hardware::temperatureCx10(static_cast<Hardware::TempSensorType>(i)), 1);
   }
+  _txSendResponse();
+}
+
+
+// --- Helper: send current status LED values as response ---
+static void _txSendLedStatus()
+{
+  RgbLed led = DisplayManager::getStatusLed();
+  _txBeginResponse("L");
+  _txAppendDecimal(led.getRed() / 16, 1);
+  _txAppendChar(',');
+  _txAppendDecimal(led.getGreen() / 16, 1);
+  _txAppendChar(',');
+  _txAppendDecimal(led.getBlue() / 16, 1);
   _txSendResponse();
 }
 
@@ -526,6 +551,16 @@ void process()
     }
   }
 
+  // Check for LED color changes
+  {
+    RgbLed currentLed = DisplayManager::getStatusLed();
+    if (currentLed != _prevLed)
+    {
+      _prevLed = currentLed;
+      _pendingLedNotification = true;
+    }
+  }
+
   // Check for ADC value changes
   if (Hardware::adcValuesUpdated())
   {
@@ -542,7 +577,13 @@ void process()
     }
   }
 
-  // Send deferred notifications when TX is idle (mode > key > intensity > temp > ADC)
+  // Check for RTTTL playback completion
+  if (RtttlPlayer::playingFinished())
+  {
+    _pendingRtttlDoneNotification = true;
+  }
+
+  // Send deferred notifications when TX is idle (mode > key > intensity > LED > temp > ADC > RTTTL done)
   if (!_txBusy())
   {
     if (_pendingModeNotification)
@@ -568,6 +609,11 @@ void process()
       _txAppendChar(Application::getIntensityAutoAdjust() ? '1' : '0');
       _txSendResponse();
     }
+    else if (_pendingLedNotification)
+    {
+      _pendingLedNotification = false;
+      _txSendLedStatus();
+    }
     else if (_pendingTempNotification)
     {
       _pendingTempNotification = false;
@@ -577,6 +623,12 @@ void process()
     {
       _pendingAdcNotification = false;
       _txSendAdcStatus();
+    }
+    else if (_pendingRtttlDoneNotification)
+    {
+      _pendingRtttlDoneNotification = false;
+      _txBeginResponse("BOK");
+      _txSendResponse();
     }
   }
 
@@ -843,6 +895,16 @@ static void _handleCommand(const char* payload, uint8_t length)
     {
       if (length < 3) break;
 
+      // "$TCCSW" -- save current settings to flash (skips write if unchanged)
+      if (payload[2] == 'W')
+      {
+        bool ok = Application::saveSettingsToFlash();
+        _txBeginResponse("SW");
+        _txAppendChar(ok ? '1' : '0');
+        _txSendResponse();
+        break;
+      }
+
       uint8_t idx = 2;
       int32_t settingNum = _parseDecimal(payload, idx, length);
 
@@ -864,6 +926,65 @@ static void _handleCommand(const char* payload, uint8_t length)
       _txAppendChar(',');
       _txAppendDecimal(
         Application::getSettingsPtr()->getRawSetting(static_cast<uint8_t>(settingNum)), 1);
+      _txSendResponse();
+      break;
+    }
+
+    // --- Status LED ---
+    case 'L':
+    {
+      if (length > 2)
+      {
+        // "$TCCL<r>,<g>,<b>" -- set LED color
+        uint8_t idx = 2;
+        int32_t r = _parseDecimal(payload, idx, length);
+        if (idx < length && payload[idx] == ',') idx++;
+        int32_t g = _parseDecimal(payload, idx, length);
+        if (idx < length && payload[idx] == ',') idx++;
+        int32_t b = _parseDecimal(payload, idx, length);
+
+        if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255)
+        {
+          DisplayManager::writeStatusLed(
+            RgbLed(static_cast<uint16_t>(r) * 16,
+                   static_cast<uint16_t>(g) * 16,
+                   static_cast<uint16_t>(b) * 16));
+        }
+      }
+
+      // Sync _prevLed so process() doesn't fire a redundant notification
+      _prevLed = DisplayManager::getStatusLed();
+
+      // Always respond with current LED state
+      _txSendLedStatus();
+      break;
+    }
+
+    // --- Buzzer / RTTTL ---
+    case 'B':
+    {
+      if (length >= 3)
+      {
+        char action = payload[2];
+
+        if (action == 'P' && length > 3)
+        {
+          // "$TCCBP<rtttl>" -- play RTTTL string starting at payload[3]
+          RtttlPlayer::play(payload + 3, length - 3);
+          _pendingRtttlDoneNotification = false;  // cancel any stale done notification
+        }
+        else if (action == 'S')
+        {
+          // "$TCCBS" -- stop playback
+          RtttlPlayer::stop();
+          _pendingRtttlDoneNotification = false;
+        }
+        // else: 'Q' or any other sub-command falls through to send status
+      }
+
+      // Always respond with current playback status
+      _txBeginResponse("B");
+      _txAppendChar(RtttlPlayer::isPlaying() ? 'P' : 'S');
       _txSendResponse();
       break;
     }

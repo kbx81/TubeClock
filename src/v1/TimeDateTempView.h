@@ -57,6 +57,10 @@ private:
   //
   void _setDisplay(Display *display, const FixedDisplayItem item);
 
+  // sets the desired status LED color based on AM/PM and user settings
+  //
+  void _setStatusLed(const RgbLed &statusLed);
+
   // returns the display duration setting for a given display item
   //
   uint16_t _getItemDuration(const FixedDisplayItem item);
@@ -78,6 +82,10 @@ private:
   //
   DateTime _currentTime;
 
+  // current status LED color (used for AM/PM indication, when enabled)
+  //
+  RgbLed   _statusLed;
+
   // countdown (in seconds) until the next display animation
   //
   uint16_t _animationCountdown;
@@ -89,6 +97,10 @@ private:
   // the main application's mode
   //
   Application::OperatingMode _mode;
+
+  // true if status LED should be refreshed by the next loop iteration
+  //
+  bool _refreshStatusLed = false;
 };
 
 }

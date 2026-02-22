@@ -37,6 +37,7 @@ const uint8_t TimeDateTempView::cIntensityAdjustmentIncrement = 5;  // Increment
 TimeDateTempView::TimeDateTempView()
   : _currentTemperature(0),
     _currentTime(Application::dateTime()),
+    _statusLed(RgbLed()),
     _animationCountdown(0),
     _switchCountdown(0),
     _mode(Application::OperatingMode::OperatingModeFixedDisplay)
@@ -143,7 +144,6 @@ void TimeDateTempView::loop()
   Display  tcDisp;
   FixedDisplayItem currentDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode()),
                    nextDisplayItem = currentDisplayItem;
-  RgbLed   statusLed;
   bool displayFahrenheit = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DisplayFahrenheit);
 
   // update these only as needed -- keeps temperature from bouncing incessantly
@@ -167,18 +167,24 @@ void TimeDateTempView::loop()
     // this will set the color and (more importantly) fade duration correctly
     if (_currentTime.isPM() == true)
     {
-      statusLed = Application::nixieOrange;
+      _setStatusLed(Application::nixieOrange);
     }
     // turn it off if we're not displaying the time (a bit silly but it works)
     if ((currentDisplayItem != FixedDisplayItem::Time) && (currentDisplayItem != FixedDisplayItem::TimeSeconds))
     {
-      statusLed.setOff();
+      _setStatusLed(RgbLed());
     }
   }
 
   _setDisplay(&tcDisp, currentDisplayItem);
 
-  DisplayManager::writeDisplay(tcDisp, statusLed);
+  DisplayManager::writeDisplay(tcDisp);
+
+  if (_refreshStatusLed == true)
+  {
+    DisplayManager::writeStatusLed(_statusLed);
+    _refreshStatusLed = false;
+  }
 
   // rotate the display if it's time to do so
   if ((_mode == Application::OperatingMode::OperatingModeToggleDisplay) && (_switchCountdown == 0))
@@ -272,6 +278,7 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
   uint32_t dotsBitmap = _getDotsBitmap(),
            secondsSinceMidnight = _currentTime.secondsSinceMidnight(false);
   uint16_t duration = pSettings->getRawSetting(Settings::Setting::FadeDuration);
+  bool     msdsOff = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff);
   uint8_t tubeIntensityBitmap = 0b111111;
 
   if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum)
@@ -296,6 +303,17 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
       case FixedDisplayItem::TimeSeconds:
         dotsBitmap = 0;       // no dots for seconds display
         display->setDisplayFromWord(secondsSinceMidnight);
+        for (uint8_t i = display->cTubeCount - 1; msdsOff && i > 0; i--)
+        {
+          if (display->getTubeValue(i) == 0)
+          {
+            tubeIntensityBitmap &= ~(1 << i);  // blank tube if digit is 0
+          }
+          else
+          {
+            break;  // stop blanking tubes once we hit a non-zero digit
+          }
+        }
         break;
 
       case FixedDisplayItem::Date:
@@ -304,6 +322,10 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
 
       default:
         display->setDisplayFromDateTime(_currentTime, _getDisplaySelection(item));
+        if (msdsOff == true && display->getTubeValue(display->cTubeCount - 1) == 0)
+        {
+          tubeIntensityBitmap = 0b11111;
+        }
     }
   }
   else
@@ -324,6 +346,12 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
   display->setTubeDurations(duration);
 }
 
+
+void TimeDateTempView::_setStatusLed(const RgbLed &statusLed) {
+  if (_statusLed == statusLed) return;
+  _statusLed = statusLed;
+  _refreshStatusLed = true;
+}
 
 uint16_t TimeDateTempView::_getDotsBitmap()
 {

@@ -48,13 +48,11 @@ namespace kbxTubeClock {
   // Profile selection is controlled by SETTINGS_PROFILE macro (set in Makefile)
 
   struct SettingsProfile {
-    const char* name;
     const uint16_t settings[Settings::Setting::DmxAddress + 1];
   };
 
   // Profile 0: Standard US/North America defaults (DST enabled, 12-hour, Fahrenheit)
   static const SettingsProfile cProfileStandard = {
-    "Standard",
     {
       0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
       0b11100000000, // BeepStates
@@ -89,7 +87,6 @@ namespace kbxTubeClock {
 
   // Profile 1: European defaults (24-hour, Celsius, no DST handling)
   static const SettingsProfile cProfileEuropean = {
-    "European",
     {
       0b1011101100,  // SystemOptions: 24hr, Celsius, auto intensity
       0b11100000000, // BeepStates
@@ -124,7 +121,6 @@ namespace kbxTubeClock {
 
   // Profile 2: Minimal/Silent (no beeps, no effects, basic display)
   static const SettingsProfile cProfileMinimal = {
-    "Minimal",
     {
       0b0000100000,  // SystemOptions: 24hr, auto intensity only
       0b00000000000, // BeepStates: all disabled
@@ -159,7 +155,6 @@ namespace kbxTubeClock {
 
   // Profile 3: kbx's preferred defaults (DST enabled, 12-hour, Fahrenheit)
   static const SettingsProfile cProfileKbx = {
-    "Kbx",
     {
       0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
       0b11100000000, // BeepStates
@@ -206,10 +201,9 @@ namespace kbxTubeClock {
   #endif
 
   // Compile-time validation of SETTINGS_PROFILE range
-  #define NUM_PROFILES (sizeof(cSettingsProfiles) / sizeof(cSettingsProfiles[0]))
-  static_assert(SETTINGS_PROFILE >= 0 && SETTINGS_PROFILE < NUM_PROFILES,
-                "SETTINGS_PROFILE is out of range! Valid values are 0-"
-                "3" /* Update this when adding/removing profiles */);
+  constexpr uint32_t cNumProfiles = sizeof(cSettingsProfiles) / sizeof(cSettingsProfiles[0]);
+  static_assert(SETTINGS_PROFILE >= 0 && SETTINGS_PROFILE < cNumProfiles,
+                "SETTINGS_PROFILE is out of range - update cSettingsProfiles and SETTINGS_PROFILE");
 
   static const SettingsProfile* const cActiveProfile = cSettingsProfiles[SETTINGS_PROFILE];
 
@@ -296,6 +290,28 @@ namespace kbxTubeClock {
     _crc = Hardware::getCRC((uint32_t*)this, sizeof(Settings) / 4);
 
     return Hardware::writeFlash(cSettingsFlashAddress, (uint8_t*)this, sizeof(Settings));
+  }
+
+
+  bool Settings::saveToFlashIfChanged()
+  {
+    // Compute what the CRC would be (same way saveToFlash does: _crc=0, then compute)
+    uint32_t savedCrc = _crc;
+    _crc = 0;
+    uint32_t newCrc = Hardware::getCRC((uint32_t*)this, sizeof(Settings) / 4);
+    _crc = savedCrc;
+
+    // Read the stored CRC from flash (_crc is the last field in the Settings struct)
+    uint32_t flashCrc = 0;
+    Hardware::readFlash(cSettingsFlashAddress + (sizeof(Settings) - sizeof(uint32_t)),
+                        sizeof(uint32_t), (uint8_t*)&flashCrc);
+
+    if (newCrc == flashCrc)
+    {
+      return true;   // settings unchanged, skip the erase/write cycle
+    }
+
+    return saveToFlash() == 0;
   }
 
 

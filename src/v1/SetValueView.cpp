@@ -60,7 +60,7 @@ bool SetValueView::keyHandler(Keys::Key key)
     _settings.setRawSetting(Application::getOperatingModeRelatedSetting(_mode), _setValue);
     Application::setSettings(_settings);
 
-    DisplayManager::doubleBlink();
+    DisplayManager::blink();
   }
 
   if (key == Keys::Key::B)

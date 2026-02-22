@@ -139,6 +139,11 @@ public:
   ///
   uint32_t saveToFlash();
 
+  /// @brief Saves settings to FLASH only if they differ from the stored copy
+  /// @return true on success (written or already up to date), false on write error
+  ///
+  bool saveToFlashIfChanged();
+
 
   /// @brief Returns a setting
   /// @return true if setting is enabled, false otherwise

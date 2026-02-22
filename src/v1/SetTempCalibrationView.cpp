@@ -71,7 +71,7 @@ bool SetTempCalibrationView::keyHandler(Keys::Key key)
 
     Application::setSettings(settings);
 
-    DisplayManager::doubleBlink();
+    DisplayManager::blink();
   }
 
   if (key == Keys::Key::B)

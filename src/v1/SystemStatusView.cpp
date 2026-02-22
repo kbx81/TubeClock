@@ -70,7 +70,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
   {
     if (--_selectedView < 0)
     {
-      _selectedView = static_cast<uint8_t>(DisplayItem::VoltageBattery);
+      _selectedView = static_cast<uint8_t>(DisplayItem::StartupResult);
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
@@ -78,7 +78,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::U)
   {
-    if (++_selectedView > static_cast<uint8_t>(DisplayItem::VoltageBattery))
+    if (++_selectedView > static_cast<uint8_t>(DisplayItem::StartupResult))
     {
       _selectedView = 0;
     }
@@ -101,6 +101,8 @@ void SystemStatusView::loop()
 
   auto voltageBatt = Hardware::voltageBatt(),
        voltageVddA = Hardware::voltageVddA();
+  auto rtcStartupResult = Hardware::getRTCStartupResult();
+  bool settingsLoadResult = Application::getStartupSettingsLoadResult();
   uint32_t dotsBitmap = 0b0011;
   uint8_t tubeIntensityBitmap = 0b111111;
   RgbLed statusLed;
@@ -202,9 +204,18 @@ void SystemStatusView::loop()
       break;
 
     case DisplayItem::VoltageBattery:
-    default:
       dotsBitmap = 0b1000011;
       tcDisp.setDisplayFromWord(voltageBatt);
+      break;
+
+    case DisplayItem::StartupResult:
+      tubeIntensityBitmap = 0b110101;
+      tcDisp.setTubeToValue(0, settingsLoadResult ? 1 : 0);
+      tcDisp.setTubeToValue(2, static_cast<uint8_t>(rtcStartupResult));
+      break;
+
+    default:
+      break;
   }
 
   if (_selectedView != DisplayItem::TubeLifetime)

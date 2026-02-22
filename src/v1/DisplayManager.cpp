@@ -64,7 +64,7 @@ namespace kbxTubeClock {
 namespace DisplayManager
 {
 
-// length of delays used for doubleBlink confirmation; passed to Hardware::delay()
+// Duration (ms) of each blank/visible phase in the blink() animation
 //
 static const uint8_t cDoubleBlinkDuration = 50;
 
@@ -118,6 +118,10 @@ static NixieGlyphCrossfader _crossfader[cGlyphCount];
 //
 static bool _autoRefreshStatusLed = false;
 
+// true if status LED should be refreshed by the next iteration of refresh()
+//
+static bool _refreshStatusLed = false;
+
 // if true, BLANK pin will be held high to turn off all LEDs
 //
 static bool _displayBlank = true;
@@ -132,6 +136,16 @@ volatile static bool _refreshIntensitiesNow = false;
 // Hardware refresh interval
 //
 static uint8_t _driverRefreshInterval = 0;
+
+// Non-blocking blink() state machine
+// _blinkPhasesRemaining counts the number of timed phase transitions remaining.
+// The initial blank is set immediately by blink(); each subsequent phase
+// (toggling blank/visible) fires directly in tick() when _blinkPhaseTimer counts down.
+// Phases remaining: odd → blank, even (or 0 = done) → visible.
+// For blink(n): _blinkPhasesRemaining = 2n - 1.
+//
+static volatile uint8_t _blinkPhasesRemaining = 0;
+static volatile uint8_t _blinkPhaseTimer = 0;
 
 // Pointer to SpiMaster, initialized by initialize()
 //
@@ -235,7 +249,7 @@ void refresh()
   {
     Hardware::setStatusLed(RgbLed());
   }
-  else
+  else if (_refreshStatusLed)
   {
     RgbLed status = _statusLed;
     // Apply master intensity in full 12-bit precision, then gamma-correct for
@@ -262,6 +276,21 @@ void tick()
 
   // Set flag to request PWM buffer update in main loop
   _refreshIntensitiesNow = true;
+
+  // Advance the blink() state machine (phases remaining > 0 means animation active)
+  if (_blinkPhasesRemaining > 0)
+  {
+    if (--_blinkPhaseTimer == 0)
+    {
+      _blinkPhasesRemaining--;
+      if (_blinkPhasesRemaining > 0)
+      {
+        _blinkPhaseTimer = cDoubleBlinkDuration;
+      }
+      // Odd phases remaining → blank; even (or 0 = done) → visible
+      setDisplayBlanking((_blinkPhasesRemaining & 1u) != 0u);
+    }
+  }
 }
 
 
@@ -390,6 +419,12 @@ bool getDisplayBlanking()
 }
 
 
+bool isBlinkActive()
+{
+  return _blinkPhasesRemaining > 0;
+}
+
+
 void setDisplayBlanking(const bool blank)
 {
   if (_displayBlank == blank) return;
@@ -421,15 +456,15 @@ void setDisplayRefreshInterval(const uint8_t interval)
 }
 
 
-void doubleBlink()
+void blink(uint8_t count)
 {
+  // Start the animation: blank immediately, then schedule 2n-1 timed phase transitions.
+  // Each blink = one blank phase + one visible phase (two transitions).
+  // tick() toggles blanking directly on each transition (no deferred flag), so phases
+  // are never missed even if the main loop is slow.
   setDisplayBlanking(true);
-  Hardware::delay(cDoubleBlinkDuration);
-  setDisplayBlanking(false);
-  Hardware::delay(cDoubleBlinkDuration);
-  setDisplayBlanking(true);
-  Hardware::delay(cDoubleBlinkDuration);
-  setDisplayBlanking(false);
+  _blinkPhasesRemaining = (count * 2u) - 1u;
+  _blinkPhaseTimer = cDoubleBlinkDuration;
 }
 
 
@@ -463,14 +498,22 @@ void writeDisplay(const Display &display, const RgbLed &statusLed)
   _loadCrossfaders(display);
 
   // _crossfader[Display::cPixelCount].startNewFadeIfDifferent(statusLed);
-  _statusLed = statusLed;
+  writeStatusLed(statusLed);
 }
 
 
 void writeStatusLed(const RgbLed &statusLed)
 {
   // _crossfader[Display::cPixelCount].startNewFadeIfDifferent(statusLed);
+  if (_statusLed == statusLed) return;
   _statusLed = statusLed;
+  _refreshStatusLed = true;
+}
+
+
+RgbLed getStatusLed()
+{
+  return _statusLed;
 }
 
 

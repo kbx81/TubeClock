@@ -137,11 +137,6 @@ public:
   ///
   uint8_t dayOfWeek() const;
 
-  /// Set the day of the week.
-  /// Value from 0=Sunday, 1=Monday...6=Saturday
-  ///
-  void setDayOfWeek(uint8_t dayOfWeek);
-
   /// Get the hour.
   /// If format == true, value from 1 to 12, else value 0 to 23
   ///
@@ -177,7 +172,7 @@ public:
 
   /// Returns the number of seconds since midnight.
   ///
-  uint32_t secondsSinceMidnight(const bool bcd = false);
+  uint32_t secondsSinceMidnight(const bool bcd = false) const;
 
   /// Get the number of seconds to the other date/time.
   /// This is a slow operation. It works only correctly with differences

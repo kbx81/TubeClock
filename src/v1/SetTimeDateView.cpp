@@ -101,7 +101,7 @@ bool SetTimeDateView::keyHandler(Keys::Key key)
       break;
     }
 
-    DisplayManager::doubleBlink();
+    DisplayManager::blink();
   }
 
   if (key == Keys::Key::B)
