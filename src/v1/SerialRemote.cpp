@@ -70,6 +70,10 @@ static const uint8_t cTxBufferSize = 48;
 //
 static const uint8_t cTxUsartCount = 2;
 
+// TX notification/response queue capacity
+//
+static const uint8_t cQueueSize = 8;
+
 // Maximum valid OperatingMode value (OperatingModeTestDisplay)
 //
 static const uint8_t cMaxOperatingMode = 41;
@@ -115,39 +119,72 @@ static Usart* _rxUsart3Ptr = nullptr;
 // command handler can send a single authoritative response with final state
 static bool _suppressNotifications = false;
 
-// Deferred mode change notification -- set when notifyModeChange() is called
-// but TX is busy (e.g. key press notification in progress). Cleared and sent
-// the next time process() runs and TX is idle.
-static bool _pendingModeNotification = false;
 
-// Deferred key event notification state
-static uint8_t _pendingKeyMask = 0;
-static bool _pendingKeyPressed = false;
-static bool _pendingKeyNotification = false;
+// --- TX notification/response queue ---
+//
+// Each entry stores a message type and any data needed to format the message at
+// dequeue time. _txBuffer is only written when a message is actually ready to
+// transmit, so the queue never races with an in-flight transfer.
+//
+// A queue entry is popped only when !_txBusy() -- i.e. after BOTH USARTs have
+// finished transmitting the previous message.
+//
+// Unsolicited notification types are coalesced (at most one per type in the
+// queue at a time). Command response types are always enqueued as-is.
+//
+enum class NotificationType : uint8_t {
+  None = 0,           // Placeholder / cancelled entry; skipped on dequeue
 
-// Intensity change notification state
+  // Unsolicited notifications (coalesced)
+  Mode,               // Current operating mode + view mode
+  Intensity,          // Current display intensity + auto-adjust flag
+  Led,                // Current status LED color
+  Temp,               // All temperature sensor values
+  Adc,                // ADC: light level, VddA, VBatt
+  RtttlDone,          // RTTTL playback completed
+
+  // Key events (not coalesced; each press/release is a distinct event)
+  KeyEvent,
+
+  // Command responses (formatted with live state at dequeue time)
+  CmdKeys,            // Current raw button bitmask (K command)
+  CmdHvState,         // HV power on/off state (H command)
+  CmdConnected,       // Connected-peripherals bitmask (H/CON command)
+  CmdTime,            // Current date/time (T command)
+  CmdTempSource,      // Active temperature sensor type (M/S command)
+  CmdTempSourceError, // Temperature sensor type change error (M/S command)
+  CmdSettingValue,    // Single setting number + value (S command)
+  CmdSettingSaved,    // Flash save result (S/W command)
+  CmdBuzzerStatus,    // RTTTL play/stop state (B command)
+};
+
+struct QueueEntry {
+  NotificationType type;
+  union {
+    struct { uint8_t mask; bool pressed; } key;  // KeyEvent
+    uint8_t settingNum;                           // CmdSettingValue
+    bool    saveOk;                               // CmdSettingSaved
+  } data;
+};
+
+static QueueEntry _txQueue[cQueueSize];
+static uint8_t _txQueueHead = 0;
+static uint8_t _txQueueTail = 0;
+
+
+// --- Change-detection state for unsolicited notifications ---
+
 static uint8_t _prevIntensity = 0;
-static bool _pendingIntensityNotification = false;
 
-// Temperature notification state -- tracks previous Cx10 values to detect changes
 static int32_t _prevTempValues[Hardware::cTempSensorCount] = {
   Hardware::cTempSentinel, Hardware::cTempSentinel, Hardware::cTempSentinel,
   Hardware::cTempSentinel, Hardware::cTempSentinel
 };
-static bool _pendingTempNotification = false;
 
-// LED color change notification state
 static RgbLed _prevLed;
-static bool _pendingLedNotification = false;
-
-// ADC change notification state -- tracks previous values to detect changes
 static uint16_t _prevAdcLight = 0;
 static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
-static bool _pendingAdcNotification = false;
-
-// RTTTL playback completion notification
-static bool _pendingRtttlDoneNotification = false;
 
 
 // --- Helper: convert nibble to hex char ---
@@ -266,7 +303,7 @@ static bool _txBusy()
 }
 
 
-// --- Helper: send current page/mode status as response ---
+// --- Helper: send current page/mode status ---
 static void _txSendPageStatus()
 {
   _txBeginResponse("P");
@@ -281,20 +318,20 @@ static void _txSendPageStatus()
 }
 
 
-// --- Helper: send current ADC values as notification ---
+// --- Helper: send current ADC values ---
 static void _txSendAdcStatus()
 {
   _txBeginResponse("HADC");
-  _txAppendDecimal(_prevAdcLight, 1);
+  _txAppendDecimal(Hardware::lightLevel(), 1);
   _txAppendChar(',');
-  _txAppendDecimal(_prevAdcVddA, 1);
+  _txAppendDecimal(Hardware::voltageVddA(), 1);
   _txAppendChar(',');
-  _txAppendDecimal(_prevAdcVbatt, 1);
+  _txAppendDecimal(Hardware::voltageBatt(), 1);
   _txSendResponse();
 }
 
 
-// --- Helper: send all temperature sensor values as response/notification ---
+// --- Helper: send all temperature sensor values ---
 static void _txSendTempStatus()
 {
   _txBeginResponse("M");
@@ -307,7 +344,7 @@ static void _txSendTempStatus()
 }
 
 
-// --- Helper: send current status LED values as response ---
+// --- Helper: send current status LED values ---
 static void _txSendLedStatus()
 {
   RgbLed led = DisplayManager::getStatusLed();
@@ -352,6 +389,192 @@ static int32_t _parseDecimal(const char* str, uint8_t &index, uint8_t maxLen)
   }
 
   return negative ? -value : value;
+}
+
+
+// --- Queue helpers ---
+
+static bool _queueEmpty()
+{
+  return _txQueueHead == _txQueueTail;
+}
+
+static bool _queueFull()
+{
+  return ((_txQueueTail + 1) % cQueueSize) == _txQueueHead;
+}
+
+// Returns true if a non-None entry of the given type is already in the queue
+static bool _queueContains(NotificationType type)
+{
+  uint8_t i = _txQueueHead;
+  while (i != _txQueueTail)
+  {
+    if (_txQueue[i].type == type) return true;
+    i = (i + 1) % cQueueSize;
+  }
+  return false;
+}
+
+// Appends an entry; drops the new entry (no-op) if the queue is full
+static bool _queueEnqueue(const QueueEntry& entry)
+{
+  if (_queueFull()) return false;
+  _txQueue[_txQueueTail] = entry;
+  _txQueueTail = (_txQueueTail + 1) % cQueueSize;
+  return true;
+}
+
+// Enqueues a coalescing notification: skipped if type is already queued or
+// notifications are currently suppressed
+static void _enqueueNotification(NotificationType type)
+{
+  if (_suppressNotifications) return;
+  if (!_queueContains(type))
+  {
+    QueueEntry e;
+    e.type = type;
+    _queueEnqueue(e);
+  }
+}
+
+// Marks all queued entries of the given type as None (effectively cancels them)
+static void _queueCancelType(NotificationType type)
+{
+  uint8_t i = _txQueueHead;
+  while (i != _txQueueTail)
+  {
+    if (_txQueue[i].type == type)
+      _txQueue[i].type = NotificationType::None;
+    i = (i + 1) % cQueueSize;
+  }
+}
+
+// Sends the next queued message if TX is idle. None entries at the head are
+// skipped (advanced past) without transmitting. Called from process().
+static void _txProcessQueue()
+{
+  // Skip any None (cancelled) entries at the head
+  while (!_queueEmpty() && _txQueue[_txQueueHead].type == NotificationType::None)
+  {
+    _txQueueHead = (_txQueueHead + 1) % cQueueSize;
+  }
+
+  if (_queueEmpty() || _txBusy()) return;
+
+  // Pop the head entry
+  QueueEntry entry = _txQueue[_txQueueHead];
+  _txQueueHead = (_txQueueHead + 1) % cQueueSize;
+
+  switch (entry.type)
+  {
+    case NotificationType::Mode:
+      _txSendPageStatus();
+      break;
+
+    case NotificationType::KeyEvent:
+      _txBeginResponse("K");
+      _txAppendDecimal(entry.data.key.mask, 1);
+      _txAppendChar(',');
+      _txAppendChar(entry.data.key.pressed ? '1' : '0');
+      _txSendResponse();
+      break;
+
+    case NotificationType::Intensity:
+      _txBeginResponse("I");
+      _txAppendDecimal(Application::getIntensity(), 1);
+      _txAppendChar(',');
+      _txAppendChar(Application::getIntensityAutoAdjust() ? '1' : '0');
+      _txSendResponse();
+      break;
+
+    case NotificationType::Led:
+      _txSendLedStatus();
+      break;
+
+    case NotificationType::Temp:
+      _txSendTempStatus();
+      break;
+
+    case NotificationType::Adc:
+      _txSendAdcStatus();
+      break;
+
+    case NotificationType::RtttlDone:
+      _txBeginResponse("BOK");
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdKeys:
+      _txBeginResponse("K");
+      _txAppendDecimal(Hardware::buttons(), 1);
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdHvState:
+      _txBeginResponse("HV");
+      _txAppendChar(Hardware::getHvState() ? '1' : '0');
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdConnected:
+    {
+      _txBeginResponse("HCON");
+      uint8_t connected = 0;
+      if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS3234)  connected |= (1 << 0);
+      if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS1722)  connected |= (1 << 1);
+      if (Hardware::getTempSensorType() == Hardware::TempSensorType::LM74)    connected |= (1 << 2);
+      if (GpsReceiver::isConnected())                                         connected |= (1 << 3);
+      if (GpsReceiver::isValid())                                             connected |= (1 << 4);
+      _txAppendDecimal(connected, 1);
+      _txSendResponse();
+      break;
+    }
+
+    case NotificationType::CmdTime:
+    {
+      DateTime dt = Application::dateTime();
+      _txBeginResponse("T");
+      _txAppendDateTime(dt);
+      _txSendResponse();
+      break;
+    }
+
+    case NotificationType::CmdTempSource:
+      _txBeginResponse("MS");
+      _txAppendDecimal(Hardware::getTempSensorType(), 1);
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdTempSourceError:
+      _txBeginResponse("MSE");
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdSettingValue:
+      _txBeginResponse("S");
+      _txAppendDecimal(entry.data.settingNum, 1);
+      _txAppendChar(',');
+      _txAppendDecimal(
+        Application::getSettingsPtr()->getRawSetting(entry.data.settingNum), 1);
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdSettingSaved:
+      _txBeginResponse("SW");
+      _txAppendChar(entry.data.saveOk ? '1' : '0');
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdBuzzerStatus:
+      _txBeginResponse("B");
+      _txAppendChar(RtttlPlayer::isPlaying() ? 'P' : 'S');
+      _txSendResponse();
+      break;
+
+    default:
+      break;
+  }
 }
 
 
@@ -533,21 +756,26 @@ void process()
     if (intensity != _prevIntensity)
     {
       _prevIntensity = intensity;
-      _pendingIntensityNotification = true;
+      _enqueueNotification(NotificationType::Intensity);
     }
   }
 
   // Check for temperature sensor updates
   if (Hardware::temperatureUpdated())
   {
+    bool changed = false;
     for (uint8_t i = 0; i < Hardware::cTempSensorCount; i++)
     {
       int32_t current = Hardware::temperatureCx10(static_cast<Hardware::TempSensorType>(i));
       if (current != _prevTempValues[i])
       {
         _prevTempValues[i] = current;
-        _pendingTempNotification = true;
+        changed = true;
       }
+    }
+    if (changed)
+    {
+      _enqueueNotification(NotificationType::Temp);
     }
   }
 
@@ -557,7 +785,7 @@ void process()
     if (currentLed != _prevLed)
     {
       _prevLed = currentLed;
-      _pendingLedNotification = true;
+      _enqueueNotification(NotificationType::Led);
     }
   }
 
@@ -573,64 +801,18 @@ void process()
       _prevAdcLight = light;
       _prevAdcVddA = vdda;
       _prevAdcVbatt = vbatt;
-      _pendingAdcNotification = true;
+      _enqueueNotification(NotificationType::Adc);
     }
   }
 
   // Check for RTTTL playback completion
   if (RtttlPlayer::playingFinished())
   {
-    _pendingRtttlDoneNotification = true;
+    _enqueueNotification(NotificationType::RtttlDone);
   }
 
-  // Send deferred notifications when TX is idle (mode > key > intensity > LED > temp > ADC > RTTTL done)
-  if (!_txBusy())
-  {
-    if (_pendingModeNotification)
-    {
-      _pendingModeNotification = false;
-      _txSendPageStatus();
-    }
-    else if (_pendingKeyNotification)
-    {
-      _pendingKeyNotification = false;
-      _txBeginResponse("K");
-      _txAppendDecimal(_pendingKeyMask, 1);
-      _txAppendChar(',');
-      _txAppendChar(_pendingKeyPressed ? '1' : '0');
-      _txSendResponse();
-    }
-    else if (_pendingIntensityNotification)
-    {
-      _pendingIntensityNotification = false;
-      _txBeginResponse("I");
-      _txAppendDecimal(_prevIntensity, 1);
-      _txAppendChar(',');
-      _txAppendChar(Application::getIntensityAutoAdjust() ? '1' : '0');
-      _txSendResponse();
-    }
-    else if (_pendingLedNotification)
-    {
-      _pendingLedNotification = false;
-      _txSendLedStatus();
-    }
-    else if (_pendingTempNotification)
-    {
-      _pendingTempNotification = false;
-      _txSendTempStatus();
-    }
-    else if (_pendingAdcNotification)
-    {
-      _pendingAdcNotification = false;
-      _txSendAdcStatus();
-    }
-    else if (_pendingRtttlDoneNotification)
-    {
-      _pendingRtttlDoneNotification = false;
-      _txBeginResponse("BOK");
-      _txSendResponse();
-    }
-  }
+  // Send next queued notification/response when TX is idle (both USARTs done)
+  _txProcessQueue();
 
   if (!_rxCommandReady)
   {
@@ -649,32 +831,22 @@ void notifyModeChange(uint8_t mode, uint8_t viewMode)
 {
   (void)mode;
   (void)viewMode;
-  if (_suppressNotifications) return;
-  if (_txBusy())
-  {
-    _pendingModeNotification = true;
-    return;
-  }
-  _txSendPageStatus();
+  _enqueueNotification(NotificationType::Mode);
 }
 
 
 void notifyKeyEvent(uint8_t keyMask, bool pressed)
 {
   if (_suppressNotifications) return;
-  if (_txBusy())
+  // KeyEvents are not coalesced -- each press/release is a distinct event
+  if (!_queueFull())
   {
-    _pendingKeyMask = keyMask;
-    _pendingKeyPressed = pressed;
-    _pendingKeyNotification = true;
-    return;
+    QueueEntry e;
+    e.type = NotificationType::KeyEvent;
+    e.data.key.mask = keyMask;
+    e.data.key.pressed = pressed;
+    _queueEnqueue(e);
   }
-
-  _txBeginResponse("K");
-  _txAppendDecimal(keyMask, 1);
-  _txAppendChar(',');
-  _txAppendChar(pressed ? '1' : '0');
-  _txSendResponse();
 }
 
 
@@ -685,9 +857,6 @@ static void _handleCommand(const char* payload, uint8_t length)
 
   // First char after "$TC" is C (command) -- we only handle commands
   if (payload[0] != 'C') return;
-
-  // Don't respond if TX is busy
-  if (_txBusy()) return;
 
   switch (payload[1])
   {
@@ -720,17 +889,19 @@ static void _handleCommand(const char* payload, uint8_t length)
           _suppressNotifications = false;
         }
       }
-      // Always respond with current page status (handles both get and set)
-      _txSendPageStatus();
+      // Always respond with current page status (handles both get and set).
+      // Uses the coalescing path: if a Mode notification is already queued,
+      // it will carry the authoritative post-set state when dequeued.
+      _enqueueNotification(NotificationType::Mode);
       break;
     }
 
     // --- Keys ---
     case 'K':
     {
-      _txBeginResponse("K");
-      _txAppendDecimal(Hardware::buttons(), 1);
-      _txSendResponse();
+      QueueEntry e;
+      e.type = NotificationType::CmdKeys;
+      _queueEnqueue(e);
       break;
     }
 
@@ -740,9 +911,9 @@ static void _handleCommand(const char* payload, uint8_t length)
       // "$TCCHV" -- query HV state (length == 3, 'V' only after "CH")
       if (length == 3 && payload[2] == 'V')
       {
-        _txBeginResponse("HV");
-        _txAppendChar(Hardware::getHvState() ? '1' : '0');
-        _txSendResponse();
+        QueueEntry e;
+        e.type = NotificationType::CmdHvState;
+        _queueEnqueue(e);
         break;
       }
 
@@ -752,36 +923,23 @@ static void _handleCommand(const char* payload, uint8_t length)
 
       if (s0 == 'A' && s1 == 'D' && s2 == 'C')
       {
-        // "$TCCHADC" -- ADC data: light level, VddA, VBatt
-        _txBeginResponse("HADC");
-        _txAppendDecimal(Hardware::lightLevel(), 1);
-        _txAppendChar(',');
-        _txAppendDecimal(Hardware::voltageVddA(), 1);
-        _txAppendChar(',');
-        _txAppendDecimal(Hardware::voltageBatt(), 1);
-        _txSendResponse();
+        // "$TCCHADC" -- ADC data: same format as Adc notification
+        _enqueueNotification(NotificationType::Adc);
       }
       else if (s0 == 'C' && s1 == 'O' && s2 == 'N')
       {
         // "$TCCHCON" -- connected components bitmask
-        _txBeginResponse("HCON");
-        uint8_t connected = 0;
-        if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS3234)  connected |= (1 << 0);
-        if (Hardware::getTempSensorType() == Hardware::TempSensorType::DS1722)  connected |= (1 << 1);
-        if (Hardware::getTempSensorType() == Hardware::TempSensorType::LM74)    connected |= (1 << 2);
-        if (GpsReceiver::isConnected())                                         connected |= (1 << 3);
-        if (GpsReceiver::isValid())                                             connected |= (1 << 4);
-        _txAppendDecimal(connected, 1);
-        _txSendResponse();
+        QueueEntry e;
+        e.type = NotificationType::CmdConnected;
+        _queueEnqueue(e);
       }
       else if (s0 == 'V' && s1 == 'O')
       {
         // "$TCCHVON" / "$TCCHVOF" -- HV power on/off
-        bool hvOn = (s2 == 'N');
-        Hardware::setHvState(hvOn);
-        _txBeginResponse("HV");
-        _txAppendChar(hvOn ? '1' : '0');
-        _txSendResponse();
+        Hardware::setHvState(s2 == 'N');
+        QueueEntry e;
+        e.type = NotificationType::CmdHvState;
+        _queueEnqueue(e);
       }
       break;
     }
@@ -808,10 +966,9 @@ static void _handleCommand(const char* payload, uint8_t length)
 
       // Always respond with current time (handles both get and set)
       {
-        DateTime dt = Application::dateTime();
-        _txBeginResponse("T");
-        _txAppendDateTime(dt);
-        _txSendResponse();
+        QueueEntry e;
+        e.type = NotificationType::CmdTime;
+        _queueEnqueue(e);
       }
       break;
     }
@@ -828,14 +985,15 @@ static void _handleCommand(const char* payload, uint8_t length)
           int32_t source = _parseDecimal(payload, idx, length);
           if (!Hardware::setTempSensorType(static_cast<Hardware::TempSensorType>(source)))
           {
-            _txBeginResponse("MSE");
-            _txSendResponse();
+            QueueEntry e;
+            e.type = NotificationType::CmdTempSourceError;
+            _queueEnqueue(e);
             break;
           }
         }
-        _txBeginResponse("MS");
-        _txAppendDecimal(Hardware::getTempSensorType(), 1);
-        _txSendResponse();
+        QueueEntry e;
+        e.type = NotificationType::CmdTempSource;
+        _queueEnqueue(e);
       }
       else
       {
@@ -846,7 +1004,7 @@ static void _handleCommand(const char* payload, uint8_t length)
           int32_t temp = _parseDecimal(payload, idx, length);
           Hardware::setTemperature(temp);
         }
-        _txSendTempStatus();
+        _enqueueNotification(NotificationType::Temp);
       }
       break;
     }
@@ -881,12 +1039,10 @@ static void _handleCommand(const char* payload, uint8_t length)
         }
       }
 
+      // Sync _prevIntensity so process() doesn't fire a redundant notification
+      _prevIntensity = Application::getIntensity();
       // Always respond with current intensity state
-      _txBeginResponse("I");
-      _txAppendDecimal(Application::getIntensity(), 1);
-      _txAppendChar(',');
-      _txAppendChar(Application::getIntensityAutoAdjust() ? '1' : '0');
-      _txSendResponse();
+      _enqueueNotification(NotificationType::Intensity);
       break;
     }
 
@@ -899,9 +1055,10 @@ static void _handleCommand(const char* payload, uint8_t length)
       if (payload[2] == 'W')
       {
         bool ok = Application::saveSettingsToFlash();
-        _txBeginResponse("SW");
-        _txAppendChar(ok ? '1' : '0');
-        _txSendResponse();
+        QueueEntry e;
+        e.type = NotificationType::CmdSettingSaved;
+        e.data.saveOk = ok;
+        _queueEnqueue(e);
         break;
       }
 
@@ -921,12 +1078,12 @@ static void _handleCommand(const char* payload, uint8_t length)
       }
 
       // Respond with current value (whether we just set it or not)
-      _txBeginResponse("S");
-      _txAppendDecimal(settingNum, 1);
-      _txAppendChar(',');
-      _txAppendDecimal(
-        Application::getSettingsPtr()->getRawSetting(static_cast<uint8_t>(settingNum)), 1);
-      _txSendResponse();
+      {
+        QueueEntry e;
+        e.type = NotificationType::CmdSettingValue;
+        e.data.settingNum = static_cast<uint8_t>(settingNum);
+        _queueEnqueue(e);
+      }
       break;
     }
 
@@ -956,7 +1113,7 @@ static void _handleCommand(const char* payload, uint8_t length)
       _prevLed = DisplayManager::getStatusLed();
 
       // Always respond with current LED state
-      _txSendLedStatus();
+      _enqueueNotification(NotificationType::Led);
       break;
     }
 
@@ -971,21 +1128,23 @@ static void _handleCommand(const char* payload, uint8_t length)
         {
           // "$TCCBP<rtttl>" -- play RTTTL string starting at payload[3]
           RtttlPlayer::play(payload + 3, length - 3);
-          _pendingRtttlDoneNotification = false;  // cancel any stale done notification
+          _queueCancelType(NotificationType::RtttlDone);  // cancel any stale done notification
         }
         else if (action == 'S')
         {
           // "$TCCBS" -- stop playback
           RtttlPlayer::stop();
-          _pendingRtttlDoneNotification = false;
+          _queueCancelType(NotificationType::RtttlDone);
         }
         // else: 'Q' or any other sub-command falls through to send status
       }
 
       // Always respond with current playback status
-      _txBeginResponse("B");
-      _txAppendChar(RtttlPlayer::isPlaying() ? 'P' : 'S');
-      _txSendResponse();
+      {
+        QueueEntry e;
+        e.type = NotificationType::CmdBuzzerStatus;
+        _queueEnqueue(e);
+      }
       break;
     }
 

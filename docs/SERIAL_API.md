@@ -199,6 +199,8 @@ Returns three comma-separated decimal values:
 
 Example: `$TCSHADC1782,3300,2791*XX\n`
 
+This response is also sent as an **unsolicited status notification** whenever a new ADC reading is obtained and at least one value has changed. See [ADC Update](#adc-update) in the Unsolicited Notifications section.
+
 #### Get Connected Components
 
 ```
@@ -494,6 +496,8 @@ Enables (`1`) or disables (`0`) automatic intensity adjustment based on ambient 
 
 Example: `$TCCIA1*XX\n` enables auto-adjust.
 
+**Note:** When auto-adjust is active and the intensity changes automatically, an unsolicited `$TCSI` notification is sent. See [Intensity Change](#intensity-change) in the Unsolicited Notifications section.
+
 ---
 
 ### S -- Settings
@@ -589,7 +593,7 @@ Example: `$TCSSW1*XX\n` — settings saved (or unchanged).
 
 ## Unsolicited Notifications
 
-The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are only sent when the TX path is idle; if a transmission is in progress, the notification is silently dropped (this is an uncommon occurrence). The external MCU can always poll for current state if a notification is missed.
+The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are buffered in a transmit queue and sent when the TX path becomes idle (after both USART output channels finish transmitting the previous message). Unsolicited notification types are coalesced — at most one pending entry per type is kept in the queue, so only the latest state is sent when the queue drains. Key events are an exception and are never coalesced; each press and release is individually queued. If the queue is full (capacity 8), new entries are silently dropped. The external MCU can always poll for current state if a notification is missed.
 
 ### Mode Change
 
@@ -624,6 +628,30 @@ Example sequence for pressing and releasing the Enter key:
 
 Sent whenever the LED color changes, whether from an external `$TCCL` command or from an internal view (e.g. AM/PM indicator). Values are 0–255 per channel.
 
+### Temperature Change
+
+```
+<- $TCSM<adc>,<ds3234>,<ds1722>,<lm74>,<external>*XX\n
+```
+
+Sent whenever a new temperature reading is obtained from hardware and at least one sensor value has changed. Format is identical to the `M` command response. See the M command for field descriptions.
+
+### Intensity Change
+
+```
+<- $TCSI<intensity>,<auto>*XX\n
+```
+
+Sent when the display intensity changes due to automatic brightness adjustment. Not sent in response to an explicit `$TCCI` or `$TCCIA` command (the command response provides that confirmation). Format is identical to the `I` command response. See the I command for field descriptions.
+
+### ADC Update
+
+```
+<- $TCSHADC<light>,<vdda>,<vbatt>*XX\n
+```
+
+Sent whenever new ADC readings are obtained and at least one value (light level, VddA, or VBatt) has changed. Format is identical to the `H/ADC` command response. See the H command for field descriptions.
+
 ### RTTTL Playback Complete
 
 ```
@@ -641,6 +669,6 @@ Sent when RTTTL playback finishes. Fires when the last note has been accepted in
 - **Shared TX buffer**: Both USART1 and USART4 transmit from the same buffer with independent per-USART progress tracking. USART1 and USART4 may complete transmission at different times.
 - **GPS coexistence**: On USART1, both the GPS parser and the serial remote parser see every received byte independently. The GPS parser ignores `$TC` sentences and the serial remote parser ignores `$GP` sentences. No special multiplexing is needed.
 - **Command processing**: Commands are processed in the main application loop (not in ISR context). One command is processed per loop iteration.
-- **TX busy handling**: If a response is still being transmitted when a new command is processed or a notification is triggered, the new response is silently dropped. The external MCU should wait for a response before sending the next command.
+- **TX notification queue**: Command responses and unsolicited notifications share a transmit queue (capacity 8). Messages are held in the queue and sent when both USART output channels are idle. Unsolicited notification types are coalesced in the queue (at most one pending entry per type, so only the latest state is sent). Key events are not coalesced. New entries are silently dropped when the queue is full — an uncommon condition in normal use.
 - **Payload size limit**: Maximum payload length between `$TC` header and `*` checksum marker is 255 bytes.
 - **Response size limit**: Maximum total response size (including header, checksum, and newline) is 48 bytes.
