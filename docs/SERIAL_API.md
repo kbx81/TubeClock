@@ -595,6 +595,18 @@ Example: `$TCSSW1*XX\n` — settings saved (or unchanged).
 
 The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are buffered in a transmit queue and sent when the TX path becomes idle (after both USART output channels finish transmitting the previous message). Unsolicited notification types are coalesced — at most one pending entry per type is kept in the queue, so only the latest state is sent when the queue drains. Key events are an exception and are never coalesced; each press and release is individually queued. If the queue is full (capacity 8), new entries are silently dropped. The external MCU can always poll for current state if a notification is missed.
 
+### Boot
+
+```
+<- $TCSBOOT<version>*XX\n
+```
+
+Sent once immediately after the clock finishes initialization, before any other unsolicited notifications. The `<version>` field is the firmware version string in `M.m.BB` format (major, minor, two-digit zero-padded build number).
+
+Example: `$TCSBOOT1.0.05*XX\n`
+
+---
+
 ### Mode Change
 
 ```

@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include "Application.h"
+#include "BuildInfo.h"
 #include "DateTime.h"
 #include "DisplayManager.h"
 #include "GpsReceiver.h"
@@ -142,6 +143,7 @@ enum class NotificationType : uint8_t {
   Temp,               // All temperature sensor values
   Adc,                // ADC: light level, VddA, VBatt
   RtttlDone,          // RTTTL playback completed
+  Boot,               // Sent once at startup before any other notifications
 
   // Key events (not coalesced; each press/release is a distinct event)
   KeyEvent,
@@ -505,6 +507,12 @@ static void _txProcessQueue()
       _txSendResponse();
       break;
 
+    case NotificationType::Boot:
+      _txBeginResponse("BOOT");
+      _txAppendString(kFirmwareVersion);
+      _txSendResponse();
+      break;
+
     case NotificationType::CmdKeys:
       _txBeginResponse("K");
       _txAppendDecimal(Hardware::buttons(), 1);
@@ -593,6 +601,12 @@ void initialize()
   //  would return without reading the byte, leaving RXNE asserted and
   //  locking the CPU in an infinite ISR tail-chain on Cortex-M0.)
   _rxUsart3Ptr->enableRxInterrupt();
+
+  // Enqueue the boot notification as the very first queue entry so it is
+  // transmitted before any other unsolicited notifications.
+  QueueEntry bootEntry;
+  bootEntry.type = NotificationType::Boot;
+  _queueEnqueue(bootEntry);
 }
 
 
