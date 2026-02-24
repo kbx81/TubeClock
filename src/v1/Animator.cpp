@@ -34,15 +34,15 @@ namespace Animator {
 
 // Number
 //
-const uint8_t cMaxAnimationId = 4;
+const uint8_t cMaxAnimationId = 10;
+
+// Per-tube stagger offsets (0-5) for the staggered-start animation
+//
+static const uint8_t cBaseStagger[Display::cTubeCount] = {3, 0, 5, 1, 4, 2};
 
 // The animation ID triggered by the last call to run()
 //
 uint16_t _animationId = 0;
-
-// The previous animation ID triggered by the last call to run()
-//
-uint16_t _lastAnimationId = 0;
 
 // The last frame written to the display. Ensures all frames are displayed.
 //
@@ -55,10 +55,6 @@ uint16_t _duration = 0;
 // Counter for animation in progress
 //
 uint16_t _runCounter = 0;
-
-// Number of ticks between frames
-//
-uint16_t _ticksBetweenFrames = 0;
 
 // Initial and final displays for animations
 //
@@ -86,14 +82,11 @@ uint16_t _currentFrame(const uint16_t totalNumberOfFrames)
 }
 
 
-// Rolls over values > 9
+// Rolls over values > 9 (input is at most 18 given tube values 0-9 plus offset 0-9)
 //
 uint8_t _rollOverer(uint8_t value)
 {
-  while (value > 9)
-  {
-    value = value - 10;
-  }
+  if (value >= 10) value -= 10;
   return value;
 }
 
@@ -103,7 +96,7 @@ uint8_t _rollOverer(uint8_t value)
 Display _frameGenerator0()
 {
   Display frame;
-  uint32_t valueOffset = 9 - _currentFrame(9);
+  uint8_t valueOffset = 9 - _currentFrame(9);
 
   for (uint8_t t = 0; t < Display::cTubeCount; t++)
   {
@@ -121,8 +114,8 @@ Display _frameGenerator0()
 Display _frameGenerator1()
 {
   Display frame;
-  uint32_t frameNumber = _currentFrame(Display::cTubeCount);  // six tubes
-  uint8_t  t = 0;
+  uint8_t frameNumber = _currentFrame(Display::cTubeCount);  // six tubes
+  uint8_t t = 0;
 
   // set from _initial -- does not run when frameNumber == 6
   for (t = 0; t < Display::cTubeCount - frameNumber; t++)
@@ -148,8 +141,8 @@ Display _frameGenerator1()
 Display _frameGenerator2()
 {
   Display frame;
-  uint32_t frameNumber = _currentFrame(10 * 6); // 10 digits by 6 tubes
-  uint8_t  workingTube = (frameNumber * 0xCCCDu) >> 19,  // gives us 0 to (Display::cGlyphCount - 1)
+  uint8_t frameNumber = _currentFrame(10 * 6); // 10 digits by 6 tubes
+  uint8_t workingTube = (frameNumber * 0xCCCDu) >> 19,   // gives us 0 to (Display::cGlyphCount - 1)
            workingValue = frameNumber - workingTube * 10, // gives us 0 - 9
            t = 0;
 
@@ -169,6 +162,7 @@ Display _frameGenerator2()
   }
 
   frame.setTubeToValue(workingTube, _rollOverer(_final.getTubeValue(workingTube) + workingValue));
+  frame.setTubeIntensity(workingTube, _final.getTubeIntensity(workingTube));
 
   return frame;
 }
@@ -179,8 +173,8 @@ Display _frameGenerator2()
 Display _frameGenerator3()
 {
   Display frame;
-  uint32_t frameNumber = _currentFrame(10 * 2); // 10 digits by 2 groups
-  uint8_t  workingTube = (frameNumber * 0xCCCDu) >> 19,  // gives us 0 or 1 (evens or odds)
+  uint8_t frameNumber = _currentFrame(10 * 2); // 10 digits by 2 groups
+  uint8_t workingTube = (frameNumber * 0xCCCDu) >> 19,   // gives us 0 or 1 (evens or odds)
            workingValue = frameNumber - workingTube * 10, // gives us 0 - 9
            t = 0;
 
@@ -217,69 +211,187 @@ Display _frameGenerator3()
 }
 
 
-// Pairs of digits roll inward  --><--
+// Shared helper for pair animations. outerFirst=true: pairs roll inward (outer first);
+//  outerFirst=false: pairs roll outward (inner first).
+//  Each pair's turn order is determined by comparing its index to the current phase (0-2).
 //
-Display _frameGenerator4()
+static Display _frameGeneratorPairs(const bool outerFirst)
 {
   Display frame;
-  uint32_t frameNumber = _currentFrame(10 * 3); // 10 digits by 3 groups
-  uint8_t  workingValue = frameNumber - ((frameNumber * 0xCCCDu) >> 19) * 10, // gives us 0 - 9
-           t = 0, f = 0;
+  uint8_t frameNumber  = _currentFrame(10 * 3); // 10 digits by 3 groups
+  uint8_t phase        = (frameNumber * 0xCCCDu) >> 19, // group 0, 1, or 2
+          workingValue = frameNumber - phase * 10,        // 0 - 9
+          t = 0, f = 0;
 
   for (t = 0; t < Display::cTubeCount / 2; t++)
   {
     f = Display::cTubeCount - 1 - t;
 
-    if (frameNumber >= 20)
+    // outerFirst: order is 0,1,2 for t=0,1,2  (outer pair rolls first)
+    // innerFirst: order is 2,1,0 for t=0,1,2  (inner pair rolls first)
+    const uint8_t order = outerFirst ? t : (Display::cTubeCount / 2 - 1 - t);
+
+    if (order < phase)       // this pair already rolled
     {
-      if (t == 2)
-      {
-        frame.setTubeToValue(t, _rollOverer(_final.getTubeValue(t) + workingValue));
-        frame.setTubeToValue(f, _rollOverer(_final.getTubeValue(f) + workingValue));
-      }
-      else
-      {
-        frame.setTubeToValue(t, _final.getTubeValue(t));
-        frame.setTubeToValue(f, _final.getTubeValue(f));
-        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
-        frame.setTubeIntensity(f, _final.getTubeIntensity(f));
-      }
+      frame.setTubeToValue(t, _final.getTubeValue(t));
+      frame.setTubeToValue(f, _final.getTubeValue(f));
+      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      frame.setTubeIntensity(f, _final.getTubeIntensity(f));
     }
-    else if (frameNumber >= 10)
+    else if (order == phase) // this pair is rolling now
     {
-      if (t == 1)
-      {
-        frame.setTubeToValue(t, _rollOverer(_final.getTubeValue(t) + workingValue));
-        frame.setTubeToValue(f, _rollOverer(_final.getTubeValue(f) + workingValue));
-      }
-      else if (t < 1)
-      {
-        frame.setTubeToValue(t, _final.getTubeValue(t));
-        frame.setTubeToValue(f, _final.getTubeValue(f));
-        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
-        frame.setTubeIntensity(f, _final.getTubeIntensity(f));
-      }
-      else if (t > 1)
-      {
-        frame.setTubeToValue(t, _initial.getTubeValue(t));
-        frame.setTubeToValue(f, _initial.getTubeValue(f));
-      }
+      frame.setTubeToValue(t, _rollOverer(_final.getTubeValue(t) + workingValue));
+      frame.setTubeToValue(f, _rollOverer(_final.getTubeValue(f) + workingValue));
+      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      frame.setTubeIntensity(f, _final.getTubeIntensity(f));
+    }
+    else                     // this pair hasn't started yet
+    {
+      frame.setTubeToValue(t, _initial.getTubeValue(t));
+      frame.setTubeToValue(f, _initial.getTubeValue(f));
+      frame.setTubeIntensity(t, _initial.getTubeIntensity(t));
+      frame.setTubeIntensity(f, _initial.getTubeIntensity(f));
+    }
+  }
+
+  return frame;
+}
+
+
+// Pairs of digits roll inward  --><--
+//
+Display _frameGenerator4() { return _frameGeneratorPairs(true);  }
+
+
+// Pairs of digits roll outward  <-->
+//
+Display _frameGenerator5() { return _frameGeneratorPairs(false); }
+
+
+// Intensity crossfade: fade out initial values, swap, fade in final values
+//
+Display _frameGenerator6()
+{
+  Display frame;
+  const uint16_t progress = _currentFrame(256); // 0 to 256
+
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    if (progress < 128)
+    {
+      frame.setTubeToValue(t, _initial.getTubeValue(t));
+      frame.setTubeIntensity(t, ((uint16_t)_initial.getTubeIntensity(t) * (128 - progress)) >> 7);
     }
     else
     {
-      if (t == 0)
-      {
-        frame.setTubeToValue(t, _rollOverer(_final.getTubeValue(t) + workingValue));
-        frame.setTubeToValue(f, _rollOverer(_final.getTubeValue(f) + workingValue));
-        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
-        frame.setTubeIntensity(f, _final.getTubeIntensity(f));
-      }
-      else
-      {
-        frame.setTubeToValue(t, _initial.getTubeValue(t));
-        frame.setTubeToValue(f, _initial.getTubeValue(f));
-      }
+      frame.setTubeToValue(t, _final.getTubeValue(t));
+      frame.setTubeIntensity(t, ((uint16_t)_final.getTubeIntensity(t) * (progress - 128)) >> 7);
     }
+  }
+
+  return frame;
+}
+
+
+// Variable-speed roll: each tube rolls at speed proportional to distance to its final digit;
+//  all tubes finish simultaneously
+//
+Display _frameGenerator7()
+{
+  Display frame;
+  const uint8_t f = _currentFrame(9); // 0 to 9
+
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    const uint8_t initialVal = _initial.getTubeValue(t);
+    const uint8_t finalVal   = _final.getTubeValue(t);
+    const uint8_t dist       = (initialVal - finalVal + 10) % 10;
+    const uint8_t offset     = dist - dist * f / 9;
+
+    frame.setTubeToValue(t, _rollOverer(finalVal + offset));
+    frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+  }
+
+  return frame;
+}
+
+
+// Staggered start: each tube begins its roll at a pseudo-random time
+//
+Display _frameGenerator8()
+{
+  Display frame;
+  const uint8_t currentPhase = _currentFrame(15); // 0 to 15 (6 stagger slots + 9 roll frames)
+
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    const uint8_t stagger = (cBaseStagger[t] + _initial.getTubeValue(t)) % 6;
+
+    if (currentPhase >= stagger + 10)
+    {
+      frame.setTubeToValue(t, _final.getTubeValue(t));
+      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+    }
+    else if (currentPhase >= stagger)
+    {
+      const uint8_t offset = stagger + 9 - currentPhase; // 9 down to 0
+      frame.setTubeToValue(t, _rollOverer(_final.getTubeValue(t) + offset));
+      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+    }
+    else
+    {
+      frame.setTubeToValue(t, _initial.getTubeValue(t));
+      frame.setTubeIntensity(t, _initial.getTubeIntensity(t));
+    }
+  }
+
+  return frame;
+}
+
+
+// Brightness sweep: final values appear as an intensity wave moves left to right
+//
+Display _frameGenerator9()
+{
+  Display frame;
+  const uint16_t progress = _currentFrame(256); // 0 to 256
+
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    frame.setTubeToValue(t, _final.getTubeValue(t));
+
+    const uint16_t tubeStart = (uint16_t)t * 32u; // staggered start: 0, 32, 64, 96, 128, 160
+
+    if (progress >= tubeStart + 64u)
+    {
+      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+    }
+    else if (progress >= tubeStart)
+    {
+      // Linear ramp over 64 steps
+      frame.setTubeIntensity(t, ((uint16_t)_final.getTubeIntensity(t) * (progress - tubeStart)) >> 6);
+    }
+    // else: intensity stays at 0 (default)
+  }
+
+  return frame;
+}
+
+
+// Slot machine deceleration: fast roll slowing to a stop on final digits (quadratic ease-out)
+//
+Display _frameGenerator10()
+{
+  Display frame;
+  // tn = normalized time 0..256; i = 19*tn*(512-tn)>>16 maps 0..256 -> 0..19 with ease-out
+  // tube shows (final + 19 - i) % 10: rolls 1.9 turns, decelerating to final digit
+  const uint16_t tn = _currentFrame(256);
+  const uint32_t i  = (19ul * tn * (512u - tn)) >> 16;
+
+  for (uint8_t t = 0; t < Display::cTubeCount; t++)
+  {
+    frame.setTubeToValue(t, (uint8_t)((_final.getTubeValue(t) + 19u - i) % 10u));
+    frame.setTubeIntensity(t, _final.getTubeIntensity(t));
   }
 
   return frame;
@@ -298,12 +410,6 @@ void keyHandler(Keys::Key key)
     _runCounter = _duration;
     _lastWrittenFrame = _duration;
   }
-}
-
-
-void setDelayBetweenFrames(const uint16_t ticksBetweenFrames)
-{
-  _ticksBetweenFrames = ticksBetweenFrames;
 }
 
 
@@ -335,7 +441,6 @@ void run(const uint8_t animationId)
 {
   if (animationId == 0)
   {
-    _lastAnimationId = _animationId;
     if (++_animationId > cMaxAnimationId)
     {
       _animationId = 0;
@@ -343,7 +448,6 @@ void run(const uint8_t animationId)
   }
   else
   {
-    _lastAnimationId = _animationId;
     _animationId = animationId - 1;
   }
 
@@ -355,35 +459,26 @@ void run(const uint8_t animationId)
 void loop()
 {
   Display  tcDisp;
-  RgbLed   statusLed;
   _lastWrittenFrame = _runCounter;
 
   switch (_animationId)
   {
-    case 1:
-      tcDisp = _frameGenerator1();
-      break;
-
-    case 2:
-      tcDisp = _frameGenerator2();
-      break;
-
-    case 3:
-      tcDisp = _frameGenerator3();
-      break;
-
-    case 4:
-      tcDisp = _frameGenerator4();
-      break;
-
-    default:
-      tcDisp = _frameGenerator0();
-      break;
+    case 1:  tcDisp = _frameGenerator1();  break;
+    case 2:  tcDisp = _frameGenerator2();  break;
+    case 3:  tcDisp = _frameGenerator3();  break;
+    case 4:  tcDisp = _frameGenerator4();  break;
+    case 5:  tcDisp = _frameGenerator5();  break;
+    case 6:  tcDisp = _frameGenerator6();  break;
+    case 7:  tcDisp = _frameGenerator7();  break;
+    case 8:  tcDisp = _frameGenerator8();  break;
+    case 9:  tcDisp = _frameGenerator9();  break;
+    case 10: tcDisp = _frameGenerator10(); break;
+    default: tcDisp = _frameGenerator0();  break;
   }
 
   _copyDots(_final, tcDisp);
 
-  DisplayManager::writeDisplay(tcDisp, statusLed);
+  DisplayManager::writeDisplay(tcDisp);
 }
 
 

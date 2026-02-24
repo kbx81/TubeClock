@@ -41,11 +41,6 @@ namespace Animator {
   void keyHandler(Keys::Key key);
 
   /// @brief Sets the delay between frames in ticks
-  /// @param ticksBetweenFrames Number of ticks between frames
-  ///
-  void setDelayBetweenFrames(const uint16_t ticksBetweenFrames);
-
-  /// @brief Sets the delay between frames in ticks
   /// @param duration Desired length of animation in ticks
   ///
   void setAnimationDuration(const uint16_t duration);
