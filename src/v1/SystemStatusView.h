@@ -40,7 +40,8 @@ class SystemStatusView : public View {
     StatusLM74        = ViewMode::ViewMode4,
     VoltageVddA       = ViewMode::ViewMode5,
     VoltageBattery    = ViewMode::ViewMode6,
-    StartupResult     = ViewMode::ViewMode7
+    StartupResult     = ViewMode::ViewMode7,
+    FirmwareVersion   = ViewMode::ViewMode8,
   };
 
 

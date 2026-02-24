@@ -59,6 +59,15 @@ include ../../../../libopencm3.target.mk
 # Make .bin the default target
 all: $(BINARY).bin
 
+# Version management — bumps the daily build counter and regenerates version_build.h.
+# BuildInfo.o depends on this so it rebuilds (and only it recompiles) on every
+# non-clean build invocation.
+.PHONY: bump_version
+bump_version:
+	@../../scripts/bump_build.sh
+
+$(BUILD_DIR)/BuildInfo.o: bump_version
+
 # Generate binary file from ELF
 $(BINARY).bin: $(BINARY).elf
 	@printf "  OBJCOPY $@\n"

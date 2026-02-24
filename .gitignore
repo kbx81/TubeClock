@@ -2,3 +2,5 @@
 .hypothesis
 .vscode
 build/
+src/v1/version_build.h
+src/v1/.build_state

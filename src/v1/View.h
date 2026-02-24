@@ -33,7 +33,8 @@ enum ViewMode : uint8_t
   ViewMode4,
   ViewMode5,
   ViewMode6,
-  ViewMode7
+  ViewMode7,
+  ViewMode8
 };
 
 

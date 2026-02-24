@@ -17,6 +17,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
 #include "Application.h"
+#include "BuildInfo.h"
 #include "DateTime.h"
 #include "DisplayManager.h"
 #include "GpsReceiver.h"
@@ -70,7 +71,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
   {
     if (--_selectedView < 0)
     {
-      _selectedView = static_cast<uint8_t>(DisplayItem::StartupResult);
+      _selectedView = static_cast<uint8_t>(DisplayItem::FirmwareVersion);
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
@@ -78,7 +79,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::U)
   {
-    if (++_selectedView > static_cast<uint8_t>(DisplayItem::StartupResult))
+    if (++_selectedView > static_cast<uint8_t>(DisplayItem::FirmwareVersion))
     {
       _selectedView = 0;
     }
@@ -214,11 +215,23 @@ void SystemStatusView::loop()
       tcDisp.setTubeToValue(2, static_cast<uint8_t>(rtcStartupResult));
       break;
 
+    case DisplayItem::FirmwareVersion:
+      dotsBitmap = 0b1010;  // lower dots only
+      // kFirmwareVersion is always "M.m.BB" — fixed positions (build zero-padded to 2 digits)
+      tcDisp.setTubeToValue(5, 0);
+      tcDisp.setTubeToValue(4, kFirmwareVersion[0] - '0');  // major
+      tcDisp.setTubeToValue(3, 0);
+      tcDisp.setTubeToValue(2, kFirmwareVersion[2] - '0');  // minor
+      tcDisp.setTubeToValue(1, kFirmwareVersion[4] - '0');  // build tens
+      tcDisp.setTubeToValue(0, kFirmwareVersion[5] - '0');  // build ones
+      break;
+
     default:
       break;
   }
 
-  if (_selectedView != DisplayItem::TubeLifetime)
+  if (_selectedView != DisplayItem::TubeLifetime &&
+      _selectedView != DisplayItem::FirmwareVersion)
   {
     tcDisp.setTubeToValue(4, _selectedView);
   }
