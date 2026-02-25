@@ -71,7 +71,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
   {
     if (--_selectedView < 0)
     {
-      _selectedView = static_cast<uint8_t>(DisplayItem::FirmwareVersion);
+      _selectedView = static_cast<uint8_t>(DisplayItem::BuildNumber);
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
@@ -79,7 +79,7 @@ bool SystemStatusView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::U)
   {
-    if (++_selectedView > static_cast<uint8_t>(DisplayItem::FirmwareVersion))
+    if (++_selectedView > static_cast<uint8_t>(DisplayItem::BuildNumber))
     {
       _selectedView = 0;
     }
@@ -216,14 +216,30 @@ void SystemStatusView::loop()
       break;
 
     case DisplayItem::FirmwareVersion:
+      // kFirmwareVersion is always "M.m.PP" — fixed positions (patch zero-padded to 2 digits)
       dotsBitmap = 0b1010;  // lower dots only
-      // kFirmwareVersion is always "M.m.BB" — fixed positions (build zero-padded to 2 digits)
       tcDisp.setTubeToValue(5, 0);
       tcDisp.setTubeToValue(4, kFirmwareVersion[0] - '0');  // major
       tcDisp.setTubeToValue(3, 0);
       tcDisp.setTubeToValue(2, kFirmwareVersion[2] - '0');  // minor
-      tcDisp.setTubeToValue(1, kFirmwareVersion[4] - '0');  // build tens
-      tcDisp.setTubeToValue(0, kFirmwareVersion[5] - '0');  // build ones
+      tcDisp.setTubeToValue(1, kFirmwareVersion[4] - '0');  // patch tens
+      tcDisp.setTubeToValue(0, kFirmwareVersion[5] - '0');  // patch ones
+      break;
+
+    case DisplayItem::BuildNumber:
+      tcDisp.setDisplayFromWord(kFirmwareBuild);
+      for (uint8_t i = tcDisp.cTubeCount - 1; i > 0; i--)
+      {
+        if (tcDisp.getTubeValue(i) == 0)
+        {
+          tubeIntensityBitmap &= ~(1 << i);  // blank tube if digit is 0
+        }
+        else
+        {
+          break;  // stop blanking tubes once we hit a non-zero digit
+        }
+      }
+      tubeIntensityBitmap |= 0b110000;
       break;
 
     default:

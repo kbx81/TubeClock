@@ -510,6 +510,8 @@ static void _txProcessQueue()
     case NotificationType::Boot:
       _txBeginResponse("BOOT");
       _txAppendString(kFirmwareVersion);
+      _txAppendChar(',');
+      _txAppendDecimal(kFirmwareBuild, 1);
       _txSendResponse();
       break;
 
