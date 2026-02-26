@@ -34,6 +34,9 @@ namespace kbxTubeClock {
 const uint32_t TimerCounterView::cMaxBcdValue = 999999;
 
 
+static TimerCounterView* s_instance = nullptr;
+
+
 TimerCounterView::TimerCounterView()
   : _lastTime(0),
     _timerValue(0),
@@ -41,6 +44,43 @@ TimerCounterView::TimerCounterView()
     _countUp(false),
     _alarmReady(false)
 {
+  s_instance = this;
+}
+
+
+void TimerCounterView::setCountUp(bool countUp)
+{
+  if (!s_instance) return;
+  s_instance->_countUp = countUp;
+  const uint16_t resetVal = Application::getSettingsPtr()
+    ->getRawSetting(Settings::Setting::TimerResetValue);
+  s_instance->_alarmReady = countUp
+    ? (s_instance->_timerValue != resetVal)
+    : (s_instance->_timerValue != 0);
+}
+
+
+void TimerCounterView::setTimerValue(uint32_t value)
+{
+  if (!s_instance) return;
+  s_instance->_timerValue = value;
+  const uint16_t resetVal = Application::getSettingsPtr()
+    ->getRawSetting(Settings::Setting::TimerResetValue);
+  s_instance->_alarmReady = s_instance->_countUp
+    ? (value != resetVal)
+    : (value != 0);
+}
+
+
+uint32_t TimerCounterView::getTimerValue()
+{
+  return s_instance ? s_instance->_timerValue : 0;
+}
+
+
+bool TimerCounterView::getCountUp()
+{
+  return s_instance ? s_instance->_countUp : false;
 }
 
 

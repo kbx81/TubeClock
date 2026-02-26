@@ -216,14 +216,14 @@ void SystemStatusView::loop()
       break;
 
     case DisplayItem::FirmwareVersion:
-      // kFirmwareVersion is always "M.m.PP" — fixed positions (patch zero-padded to 2 digits)
+      // kFirmwareVersion is always "YY.MM.PP" — all components zero-padded to 2 digits.
       dotsBitmap = 0b1010;  // lower dots only
-      tcDisp.setTubeToValue(5, 0);
-      tcDisp.setTubeToValue(4, kFirmwareVersion[0] - '0');  // major
-      tcDisp.setTubeToValue(3, 0);
-      tcDisp.setTubeToValue(2, kFirmwareVersion[2] - '0');  // minor
-      tcDisp.setTubeToValue(1, kFirmwareVersion[4] - '0');  // patch tens
-      tcDisp.setTubeToValue(0, kFirmwareVersion[5] - '0');  // patch ones
+      tcDisp.setTubeToValue(5, kFirmwareVersion[0] - '0');  // year tens
+      tcDisp.setTubeToValue(4, kFirmwareVersion[1] - '0');  // year ones
+      tcDisp.setTubeToValue(3, kFirmwareVersion[3] - '0');  // month tens
+      tcDisp.setTubeToValue(2, kFirmwareVersion[4] - '0');  // month ones
+      tcDisp.setTubeToValue(1, kFirmwareVersion[6] - '0');  // patch tens
+      tcDisp.setTubeToValue(0, kFirmwareVersion[7] - '0');  // patch ones
       break;
 
     case DisplayItem::BuildNumber:

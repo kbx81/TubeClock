@@ -19,7 +19,7 @@ The aim of this file is to describe common mistakes and confusion points that ag
 
 ## Building the Firmware
 
-Run builds in the `src/v1/` directory.
+Run builds in the `src/v1/` directory. Builds only take a few seconds, so running `make clean` first is harmless and recommended.
 
 ```bash
 cd src/v1

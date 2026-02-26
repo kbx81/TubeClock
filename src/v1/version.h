@@ -1,8 +1,10 @@
 #pragma once
 
-// Firmware version — manually increment these when making significant changes.
+// Calendar-based versioning: YY.MM.patch
+//   Major = 2-digit year, Minor = month (1–12, NO leading zero — avoids octal literals),
+//   Patch = sequential release within the month (also no leading zero).
 // Build number increments automatically at compile time (see scripts/bump_build.sh)
-// and resets whenever any version component changes.
-#define FIRMWARE_VERSION_MAJOR 1
-#define FIRMWARE_VERSION_MINOR 0
-#define FIRMWARE_VERSION_PATCH 0
+// and resets when major (year) or minor (month) changes.
+#define FIRMWARE_VERSION_MAJOR 26
+#define FIRMWARE_VERSION_MINOR 2
+#define FIRMWARE_VERSION_PATCH 1

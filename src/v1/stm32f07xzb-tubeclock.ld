@@ -28,3 +28,13 @@ PROVIDE(__settings_flash_end = ORIGIN(settings) + LENGTH(settings));
 
 /* Include the common ld script */
 INCLUDE cortex-m-generic.ld
+
+/* No-init section: survives system reset but is not zeroed by startup code.
+ * Used for bootloader entry flag. */
+SECTIONS
+{
+  .noinit (NOLOAD) :
+  {
+    *(.noinit .noinit.*)
+  } >ram
+}

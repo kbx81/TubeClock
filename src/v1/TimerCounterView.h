@@ -44,6 +44,11 @@ public: // Implement the TimerCounterView class
   static const uint32_t cMaxBcdValue;
 
   TimerCounterView();
+
+  static void setCountUp(bool countUp);
+  static void setTimerValue(uint32_t value);
+  static uint32_t getTimerValue();
+  static bool getCountUp();
   virtual void enter() override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;

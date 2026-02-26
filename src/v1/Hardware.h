@@ -150,6 +150,26 @@ namespace Hardware {
   static const uint32_t cTargetHardwareVersion = HARDWARE_VERSION;
 
 
+  /// @brief Check whether a bootloader reset was requested (reads .noinit magic)
+  ///  Must be called before initialize() — requires no peripheral clocks.
+  bool     isBootloaderFlagSet();
+
+  /// @brief Enter the STM32 system bootloader (called from main if flag is set)
+  ///  Clears the flag, then jumps to system memory at 0x1FFFC800.
+  [[noreturn]] void enterBootloader();
+
+  /// @brief Set the bootloader flag (arm bootloader on next reset; does not reset)
+  ///
+  void setBootloaderFlag();
+
+  /// @brief Clear the bootloader flag (disarm a previously armed bootloader entry)
+  ///
+  void clearBootloaderFlag();
+
+  /// @brief Trigger a system reset (noreturn)
+  ///  Called from SerialRemote once the HBOOT2 ACK has been transmitted.
+  [[noreturn]] void systemReset();
+
   /// @brief Initialize the hardware
   ///
   void     initialize();

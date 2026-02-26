@@ -56,10 +56,9 @@ namespace SerialRemote
   void notifyModeChange(uint8_t mode, uint8_t viewMode);
 
   /// @brief Notify the remote of a key event
-  /// @param keyMask Bitmask of the key
-  /// @param pressed true if pressed, false if released
+  /// @param keyMask Full bitmask of all currently pressed keys (all 6 bits); 0 means all released
   ///
-  void notifyKeyEvent(uint8_t keyMask, bool pressed);
+  void notifyKeyEvent(uint8_t keyMask);
 }
 
 

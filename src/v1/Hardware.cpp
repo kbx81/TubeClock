@@ -70,6 +70,13 @@ namespace kbxTubeClock {
 namespace Hardware {
 
 
+// Bootloader flag -- placed in .noinit so it survives a system reset
+// but is NOT preserved across power-on resets.
+//
+static __attribute__((section(".noinit"))) uint32_t _bootloaderMagic;
+static constexpr uint32_t cBootloaderMagic = 0xDEADB007u;
+
+
 // I2C1 state
 //
 enum I2cState : uint8_t {
@@ -1241,6 +1248,45 @@ void _syncRtcWithGps()
     setDateTime(gpsTime);
     _lastRtcGpsSyncHour = gpsTime.hour();
   }
+}
+
+
+bool isBootloaderFlagSet()
+{
+  return (_bootloaderMagic == cBootloaderMagic);
+}
+
+
+void enterBootloader()
+{
+  _bootloaderMagic = 0;
+  asm volatile("cpsid i" ::: "memory");  // disable all interrupts (set PRIMASK)
+  // STM32F072 system bootloader is at system memory base 0x1FFFC800.
+  // Word 0 is the initial stack pointer; word 1 is the reset handler address.
+  const volatile uint32_t* sysboot = reinterpret_cast<const volatile uint32_t*>(0x1FFFC800u);
+  uint32_t sp = sysboot[0];
+  uint32_t pc = sysboot[1];
+  asm volatile("msr msp, %0" :: "r"(sp) : "memory");
+  reinterpret_cast<void(*)()>(pc)();
+  while (true) {}  // unreachable; satisfies [[noreturn]]
+}
+
+
+void setBootloaderFlag()
+{
+  _bootloaderMagic = cBootloaderMagic;
+}
+
+
+void clearBootloaderFlag()
+{
+  _bootloaderMagic = 0;
+}
+
+
+void systemReset()
+{
+  scb_reset_system();
 }
 
 

@@ -18,6 +18,7 @@
 //
 #include <cstdint>
 
+#include "AlarmHandler.h"
 #include "Application.h"
 #include "BuildInfo.h"
 #include "DateTime.h"
@@ -28,6 +29,7 @@
 #include "RtttlPlayer.h"
 #include "SerialRemote.h"
 #include "Settings.h"
+#include "TimerCounterView.h"
 
 #if HARDWARE_VERSION == 1
   #include "Hardware_v1.h"
@@ -120,6 +122,9 @@ static Usart* _rxUsart3Ptr = nullptr;
 // command handler can send a single authoritative response with final state
 static bool _suppressNotifications = false;
 
+// Set when HBOOT command is received; reset is deferred until TX is idle
+static bool _bootloaderResetPending = false;
+
 
 // --- TX notification/response queue ---
 //
@@ -157,15 +162,23 @@ enum class NotificationType : uint8_t {
   CmdTempSourceError, // Temperature sensor type change error (M/S command)
   CmdSettingValue,    // Single setting number + value (S command)
   CmdSettingSaved,    // Flash save result (S/W command)
+  CmdSettingsErased,  // Flash erase result (S/ERASE command)
   CmdBuzzerStatus,    // RTTTL play/stop state (B command)
+  CmdBootloader,      // HBOOT0/1/2 command acknowledgement
+  // --- Timer/alarm ---
+  CmdTimerStatus,     // R command response: timer state + value
+  CmdAlarmClear,      // RA command response: alarm clear acknowledgement
+  AlarmActive,        // Unsolicited: any alarm went active (rising edge)
 };
 
 struct QueueEntry {
   NotificationType type;
   union {
-    struct { uint8_t mask; bool pressed; } key;  // KeyEvent
-    uint8_t settingNum;                           // CmdSettingValue
-    bool    saveOk;                               // CmdSettingSaved
+    uint8_t keyMask;    // KeyEvent
+    uint8_t settingNum; // CmdSettingValue
+    bool    saveOk;     // CmdSettingSaved
+    uint8_t bootSubCmd; // CmdBootloader (0/1/2)
+    bool    wasActive;  // CmdAlarmClear
   } data;
 };
 
@@ -187,6 +200,7 @@ static RgbLed _prevLed;
 static uint16_t _prevAdcLight = 0;
 static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
+static bool _prevAlarmActive = false;
 
 
 // --- Helper: convert nibble to hex char ---
@@ -476,9 +490,7 @@ static void _txProcessQueue()
 
     case NotificationType::KeyEvent:
       _txBeginResponse("K");
-      _txAppendDecimal(entry.data.key.mask, 1);
-      _txAppendChar(',');
-      _txAppendChar(entry.data.key.pressed ? '1' : '0');
+      _txAppendDecimal(entry.data.keyMask, 1);
       _txSendResponse();
       break;
 
@@ -576,9 +588,51 @@ static void _txProcessQueue()
       _txSendResponse();
       break;
 
+    case NotificationType::CmdSettingsErased:
+      _txBeginResponse("SERASE");
+      _txAppendChar(entry.data.saveOk ? '1' : '0');
+      _txSendResponse();
+      break;
+
     case NotificationType::CmdBuzzerStatus:
       _txBeginResponse("B");
       _txAppendChar(RtttlPlayer::isPlaying() ? 'P' : 'S');
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdBootloader:
+      _txBeginResponse("HBOOT");
+      _txAppendChar(static_cast<char>('0' + entry.data.bootSubCmd));
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdTimerStatus:
+    {
+      uint8_t vm = static_cast<uint8_t>(Application::getViewMode());
+      char state = 'S';
+      if (Application::getOperatingMode() ==
+          Application::OperatingMode::OperatingModeTimerCounter)
+      {
+        if      (vm == 1) state = 'U';
+        else if (vm == 2) state = 'D';
+        else if (vm == 3) state = 'R';
+      }
+      _txBeginResponse("R");
+      _txAppendChar(state);
+      _txAppendChar(',');
+      _txAppendDecimal(TimerCounterView::getTimerValue(), 1);
+      _txSendResponse();
+      break;
+    }
+
+    case NotificationType::CmdAlarmClear:
+      _txBeginResponse("RA");
+      _txAppendChar(entry.data.wasActive ? '1' : '0');
+      _txSendResponse();
+      break;
+
+    case NotificationType::AlarmActive:
+      _txBeginResponse("RALM");
       _txSendResponse();
       break;
 
@@ -827,8 +881,21 @@ void process()
     _enqueueNotification(NotificationType::RtttlDone);
   }
 
+  // Check for alarm activation (rising edge only)
+  {
+    bool alarmActive = AlarmHandler::isAlarmActive();
+    if (alarmActive && !_prevAlarmActive)
+      _enqueueNotification(NotificationType::AlarmActive);
+    _prevAlarmActive = alarmActive;
+  }
+
   // Send next queued notification/response when TX is idle (both USARTs done)
   _txProcessQueue();
+
+  // If a bootloader reset is pending, wait until the ACK has been fully
+  // transmitted (queue empty + both USARTs idle) then trigger the system reset.
+  if (_bootloaderResetPending && !_txBusy() && _queueEmpty())
+    Hardware::systemReset();  // noreturn; flag already set by BOOT2 handler
 
   if (!_rxCommandReady)
   {
@@ -851,16 +918,15 @@ void notifyModeChange(uint8_t mode, uint8_t viewMode)
 }
 
 
-void notifyKeyEvent(uint8_t keyMask, bool pressed)
+void notifyKeyEvent(uint8_t keyMask)
 {
   if (_suppressNotifications) return;
-  // KeyEvents are not coalesced -- each press/release is a distinct event
+  // KeyEvents are not coalesced -- each state change is a distinct event
   if (!_queueFull())
   {
     QueueEntry e;
     e.type = NotificationType::KeyEvent;
-    e.data.key.mask = keyMask;
-    e.data.key.pressed = pressed;
+    e.data.keyMask = keyMask;
     _queueEnqueue(e);
   }
 }
@@ -955,6 +1021,24 @@ static void _handleCommand(const char* payload, uint8_t length)
         Hardware::setHvState(s2 == 'N');
         QueueEntry e;
         e.type = NotificationType::CmdHvState;
+        _queueEnqueue(e);
+      }
+      else if (s0 == 'B' && s1 == 'O' && s2 == 'O' && length >= 7 && payload[5] == 'T'
+               && (payload[6] == '0' || payload[6] == '1' || payload[6] == '2'))
+      {
+        // "$TCCHBOOT0" -- disable bootloader on next boot (clear flag)
+        // "$TCCHBOOT1" -- enable bootloader on next boot (set flag, no reset)
+        // "$TCCHBOOT2" -- enter bootloader now (set flag, reset after ACK)
+        uint8_t sub = static_cast<uint8_t>(payload[6] - '0');
+        if (sub == 0)
+          Hardware::clearBootloaderFlag();
+        else
+          Hardware::setBootloaderFlag();
+        if (sub == 2)
+          _bootloaderResetPending = true;
+        QueueEntry e;
+        e.type = NotificationType::CmdBootloader;
+        e.data.bootSubCmd = sub;
         _queueEnqueue(e);
       }
       break;
@@ -1078,6 +1162,18 @@ static void _handleCommand(const char* payload, uint8_t length)
         break;
       }
 
+      // "$TCCSERASE" -- factory reset: erase settings flash area
+      if (length >= 7 && payload[2] == 'E' && payload[3] == 'R'
+          && payload[4] == 'A' && payload[5] == 'S' && payload[6] == 'E')
+      {
+        uint32_t result = Hardware::eraseFlash(Settings::cSettingsFlashAddress);
+        QueueEntry e;
+        e.type = NotificationType::CmdSettingsErased;
+        e.data.saveOk = (result == 0);
+        _queueEnqueue(e);
+        break;
+      }
+
       uint8_t idx = 2;
       int32_t settingNum = _parseDecimal(payload, idx, length);
 
@@ -1159,6 +1255,71 @@ static void _handleCommand(const char* payload, uint8_t length)
       {
         QueueEntry e;
         e.type = NotificationType::CmdBuzzerStatus;
+        _queueEnqueue(e);
+      }
+      break;
+    }
+
+    // --- Timer/Counter ---
+    case 'R':
+    {
+      if (length < 3) break;
+      char action = payload[2];
+
+      if (action == 'A')
+      {
+        // "$TCCRA" -- clear alarm (does not change mode)
+        QueueEntry e;
+        e.type = NotificationType::CmdAlarmClear;
+        e.data.wasActive = AlarmHandler::isAlarmActive();
+        AlarmHandler::clearAlarm();
+        _prevAlarmActive = false;  // suppress redundant AlarmActive notification
+        _queueEnqueue(e);
+        break;
+      }
+
+      // All other R commands switch to timer mode
+      _suppressNotifications = true;
+      Application::setOperatingMode(
+        Application::OperatingMode::OperatingModeTimerCounter);
+
+      if (action == 'U')
+      {
+        TimerCounterView::setCountUp(true);
+        Application::setViewMode(static_cast<ViewMode>(1));  // TimerRunUp
+      }
+      else if (action == 'D')
+      {
+        TimerCounterView::setCountUp(false);
+        Application::setViewMode(static_cast<ViewMode>(2));  // TimerRunDown
+      }
+      else if (action == 'S')
+      {
+        Application::setViewMode(static_cast<ViewMode>(0));  // TimerStop
+      }
+      else if (action == 'R')
+      {
+        if (length > 3)
+        {
+          // "$TCCRR<seconds>" -- load arbitrary value, keep direction
+          uint8_t idx = 3;
+          int32_t val = _parseDecimal(payload, idx, length);
+          if (val >= 0 && val <= static_cast<int32_t>(TimerCounterView::cMaxBcdValue))
+            TimerCounterView::setTimerValue(static_cast<uint32_t>(val));
+          Application::setViewMode(static_cast<ViewMode>(0));  // TimerStop
+        }
+        else
+        {
+          // "$TCCRR" -- reset via standard mechanism (uses TimerResetValue setting)
+          Application::setViewMode(static_cast<ViewMode>(3));  // TimerReset
+        }
+      }
+
+      _suppressNotifications = false;
+
+      {
+        QueueEntry e;
+        e.type = NotificationType::CmdTimerStatus;
         _queueEnqueue(e);
       }
       break;

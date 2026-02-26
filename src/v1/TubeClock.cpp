@@ -167,6 +167,11 @@ void usart3_4_isr(void)
 /* Where all life begins...more or less */
 int main()
 {
+	// Must check before Hardware::initialize() — reads only a RAM variable,
+	// no peripheral clocks needed.
+	if (Hardware::isBootloaderFlagSet())
+		Hardware::enterBootloader();
+
 	Hardware::initialize();
 
   	Application::initialize();

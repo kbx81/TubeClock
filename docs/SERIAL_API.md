@@ -247,6 +247,31 @@ Enables the high-voltage supply for the Nixie tubes.
 
 Disables the high-voltage supply for the Nixie tubes.
 
+#### Bootloader Control
+
+```
+-> $TCCHBOOT0*XX\n      Disable: clear bootloader-on-next-boot flag
+-> $TCCHBOOT1*XX\n      Enable:  set flag; bootloader runs on next reset
+-> $TCCHBOOT2*XX\n      Enter:   set flag then reset immediately
+
+<- $TCSHBOOT0*XX\n
+<- $TCSHBOOT1*XX\n
+<- $TCSHBOOT2*XX\n      (ACK sent before reset fires)
+```
+
+Controls entry into the STM32F072 factory bootloader. The clock may be
+re-flashed via USART1 (PA9 TX / PA10 RX) or USART2 (PA14 TX / PA15 RX)
+using the standard STM32 bootloader protocol.
+
+- **BOOT0** clears the bootloader flag, cancelling a previously armed BOOT1.
+- **BOOT1** arms the flag. The clock operates normally until the next reset (e.g.
+  via the external MCU asserting NRST), at which point it jumps to the bootloader
+  instead of running the application.
+- **BOOT2** arms the flag and triggers a system reset immediately after the ACK
+  is transmitted. Equivalent to BOOT1 followed by a NRST pulse.
+
+Normal operation resumes on the next power cycle or reset with BOOT0 low.
+
 ---
 
 ### T -- Time
@@ -524,7 +549,7 @@ Example: `$TCCS7*XX\n` queries setting 7 (FadeDuration); response: `$TCSS7,500*X
 
 Sets setting `nn` to `value` (unsigned 16-bit integer). The response confirms the new value. After setting a value, the clock's active settings are refreshed immediately.
 
-Example: `$TCCS17,128*XX\n` sets BeeperVolume (17) to 128.
+Example: `$TCCS17,5*XX\n` sets BeeperVolume (17) to 5.
 
 **Note:** Set Setting updates the in-memory settings only. Use Save Settings to persist changes across power cycles.
 
@@ -540,6 +565,21 @@ Saves the current in-memory settings to flash. To prevent unnecessary flash wear
 - **result**: `1` = saved successfully (or already up to date), `0` = flash write error
 
 Example: `$TCSSW1*XX\n` — settings saved (or unchanged).
+
+#### Erase Settings (Factory Reset)
+
+```
+-> $TCCSERASE*XX\n
+<- $TCSSERASE<result>*XX\n
+```
+
+Erases the settings flash area, removing all user preferences. On the next reboot the clock will load factory defaults.
+
+- **result**: `1` = erased successfully, `0` = erase error
+
+**Note:** The in-memory settings are not modified by this command. The clock continues running with its current in-memory settings until restarted. To apply factory defaults immediately, reset the clock.
+
+Example: `$TCSSERASE1*XX\n` — settings flash erased.
 
 #### Setting Index Reference
 
@@ -591,6 +631,90 @@ Example: `$TCSSW1*XX\n` — settings saved (or unchanged).
 
 ---
 
+### R -- Timer/Counter
+
+Control the timer/counter (operating mode 3: `TimerCounter`). All commands except `RA` (clear alarm) automatically switch to `OperatingModeTimerCounter`.
+
+#### Run Up
+
+```
+-> $TCCRU*XX\n
+<- $TCSRU,<value>*XX\n
+```
+
+Sets count direction to up and starts the timer counting from its current value. The response includes the state character and current timer value (see Response Format below).
+
+#### Run Down
+
+```
+-> $TCCRD*XX\n
+<- $TCSRD,<value>*XX\n
+```
+
+Sets count direction to down and starts the timer counting from its current value.
+
+#### Stop
+
+```
+-> $TCCRS*XX\n
+<- $TCSRS,<value>*XX\n
+```
+
+Pauses the timer at its current value.
+
+#### Reset
+
+```
+-> $TCCRR*XX\n
+<- $TCSRR,<value>*XX\n
+```
+
+Reloads the timer from the `TimerResetValue` setting (index 26): if counting up, resets to 0; if counting down, resets to the setting value. Same behavior as pressing key C. The response state will be `R` briefly (timer is in reset sub-mode), then the view transitions to stopped.
+
+#### Reset to N Seconds
+
+```
+-> $TCCRR<seconds>*XX\n
+<- $TCSRS,<seconds>*XX\n
+```
+
+Loads an arbitrary value `<seconds>` into the timer (range 0–999999) and stops without changing the current count direction. The response state is `S` (stopped).
+
+Example: `$TCCRR30*XX\n` loads 30 into the timer and stops.
+
+#### Clear Alarm
+
+```
+-> $TCCRA*XX\n
+<- $TCSRA<0|1>*XX\n
+```
+
+Clears any active timer/counter alarm. Does **not** change the operating mode. The response value is:
+- `1` — alarm was active and has been cleared
+- `0` — no alarm was active
+
+#### Response Format
+
+Timer command responses (U/D/S/R actions):
+
+```
+$TCSR<state>,<value>*XX\n
+```
+
+| Field | Description |
+|-------|-------------|
+| `<state>` | `U` = running up, `D` = running down, `S` = stopped, `R` = reset (transient) |
+| `<value>` | Current timer value as a decimal integer (live at dequeue time) |
+
+Examples:
+```
+$TCSRU,45*XX\n    (running up, timer at 45)
+$TCSRD,30*XX\n    (running down, timer at 30)
+$TCSRS,0*XX\n     (stopped at 0)
+```
+
+---
+
 ## Unsolicited Notifications
 
 The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are buffered in a transmit queue and sent when the TX path becomes idle (after both USART output channels finish transmitting the previous message). Unsolicited notification types are coalesced — at most one pending entry per type is kept in the queue, so only the latest state is sent when the queue drains. Key events are an exception and are never coalesced; each press and release is individually queued. If the queue is full (capacity 8), new entries are silently dropped. The external MCU can always poll for current state if a notification is missed.
@@ -598,12 +722,12 @@ The clock sends these notifications automatically when state changes occur, with
 ### Boot
 
 ```
-<- $TCSBOOT<version>*XX\n
+<- $TCSBOOT<version>,<build>*XX\n
 ```
 
-Sent once immediately after the clock finishes initialization, before any other unsolicited notifications. The `<version>` field is the firmware version string in `M.m.BB` format (major, minor, two-digit zero-padded build number).
+Sent once immediately after the clock finishes initialization, before any other unsolicited notifications. `<version>` is the firmware version string. Calendar-based versioning is used: `YY.MM.patch` with each field having two-digits, zero-padded when necessary. `<build>` is the monotonically incrementing build counter.
 
-Example: `$TCSBOOT1.0.05*XX\n`
+Example: `$TCSBOOT26.03.01,12*XX\n`
 
 ---
 
@@ -619,17 +743,23 @@ Sent when the operating mode or view mode changes (e.g. user navigates menus, al
 ### Key Event
 
 ```
-<- $TCSK<bitmask>,<state>*XX\n
+<- $TCSK<bitmask>*XX\n
 ```
 
-Sent on key press and release:
-- **bitmask**: Decimal bitmask of the key (see Keys table above)
-- **state**: `1` for pressed, `0` for released
+Sent whenever the set of pressed keys changes. **bitmask** is a decimal bitmask of **all currently pressed keys** (see Keys table above). A value of `0` means all keys have been released. The external MCU can compare successive bitmasks to determine which keys were pressed or released.
 
-Example sequence for pressing and releasing the Enter key:
+Example sequence for pressing U and E simultaneously, then releasing both:
 ```
-<- $TCSK4,1*XX\n      (Enter pressed)
-<- $TCSK4,0*XX\n      (Enter released)
+<- $TCSK5*XX\n      (U=1 and E=4 both pressed, bitmask=5)
+<- $TCSK0*XX\n      (all keys released)
+```
+
+Example sequence for pressing U, then also pressing E, then releasing U:
+```
+<- $TCSK1*XX\n      (U pressed)
+<- $TCSK5*XX\n      (E also pressed; bitmask now 5 = U+E)
+<- $TCSK4*XX\n      (U released; E still held, bitmask=4)
+<- $TCSK0*XX\n      (E released)
 ```
 
 ### LED Color Change
@@ -671,6 +801,16 @@ Sent whenever new ADC readings are obtained and at least one value (light level,
 ```
 
 Sent when RTTTL playback finishes. Fires when the last note has been accepted into the hardware tone queue; the final note(s) may still be audible briefly. This notification is suppressed if playback is stopped via the `$TCCBS` command.
+
+### Alarm Active
+
+```
+<- $TCSRALM*XX\n
+```
+
+Sent (unsolicited) whenever any alarm transitions from inactive to active (rising edge). This fires for the timer/counter alarm when the countdown reaches zero (count-down mode) or the target value (count-up mode). Only the rising edge is reported; no further notification is sent while the alarm remains active.
+
+After receiving this notification, send `$TCCRA*XX\n` to clear the alarm.
 
 ---
 

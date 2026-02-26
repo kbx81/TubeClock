@@ -51,6 +51,11 @@ namespace Keys {
   //
   static Key _currentPressedKey = None;
 
+  // Full hardware key bitmask from the last scanKeys() call, used to detect
+  // any change in multi-key state for serial remote notifications
+  //
+  static uint8_t _prevSerialKeyMask = 0;
+
   // The number of checks since a key was pressed down
   //
   static uint16_t _keyPressedTimeCount = 0;
@@ -113,24 +118,29 @@ namespace Keys {
 
   void scanKeys()
   {
-    auto key = currentlyPressedKey();
+    auto key = currentlyPressedKey();  // also calls Hardware::buttonsRefresh()
     if (_currentPressedKey != key)
     {
-      if (_currentPressedKey != None)
-      {
-        SerialRemote::notifyKeyEvent(_currentPressedKey, false);
-      }
       _currentPressedKey = key;
       _keyPressedTimeCount = 0;
       _repeatMode = false;
       if (key != None)
       {
         addKeyPress(key);
-        SerialRemote::notifyKeyEvent(key, true);
       }
     }
     // key repeating could be handled here, but we'll do it seperately (below)
     //  so that the timing of the repeats is more consistent
+
+    // Notify serial remote whenever the full hardware key state changes.
+    // Hardware::buttons() returns the cached value from the buttonsRefresh()
+    // call above; no re-refresh is needed.
+    const uint8_t fullMask = Hardware::buttons();
+    if (fullMask != _prevSerialKeyMask)
+    {
+      _prevSerialKeyMask = fullMask;
+      SerialRemote::notifyKeyEvent(fullMask);
+    }
   }
 
 
