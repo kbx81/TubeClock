@@ -86,19 +86,19 @@ static bool _connected = false;
 void initialize()
 {
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,           // gpio port on which CS line lives
-    .gpioPin        = Hardware::cNssTemperaturePin, // gpio pin on which CS line lives
-    .strobeCs       = false,                // CS line is strobed upon xfer completion if true
-    .polarity       = true,                 // CS/CE polarity (true = active high)
+    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
-    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
     .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
-    .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
-    .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
-    .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
-    .dataSize       = SPI_CR2_DS_8BIT,      // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,   // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
+    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
+    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
+    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
+    .gpioPin        = Hardware::cNssTemperaturePin,     // gpio pin on which CS line lives
+    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
+    .strobeCs       = false,                            // CS line is strobed upon xfer completion if true
+    .polarity       = true,                             // CS/CE polarity (true = active high)
+    .cpol           = true,                             // Clock polarity (idle high)
+    .cpha           = true,                             // Clock phase (transition 2)
+    .lsbFirst       = false,                            // MSB first
   };
 
   _spiMaster = Hardware::getSpiMaster();

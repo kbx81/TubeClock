@@ -39,10 +39,6 @@ static const uint16_t cSecondsPerHour = 3600;
 // The number of seconds per minute.
 static const uint16_t cSecondsPerMinute = 60;
 
-// The number of days for a regular year.
-static const uint32_t cDaysPerNormalYear = 365;
-
-
 // Calculate the day of the week
 // Using the formula from: http://www.tondering.dk/claus/cal/chrweek.php
 static uint8_t calculateDayOfWeek(int16_t year, int16_t month, int16_t day)
@@ -68,19 +64,6 @@ static inline uint8_t getMaxDayPerMonth(uint16_t year, uint8_t month)
     return 29;
   }
   return cDaysPerMonth[month];
-}
-
-
-static inline uint32_t getDaysForYear(uint16_t year)
-{
-  if (isLeapYear(year))
-  {
-    return cDaysPerNormalYear + 1;
-  }
-  else
-  {
-    return cDaysPerNormalYear;
-  }
 }
 
 
@@ -395,14 +378,10 @@ int32_t DateTime::secondsTo(const DateTime &other) const
 
 uint32_t DateTime::toSecondsSince2000() const
 {
-  // This calculation will require some CPU cycles.
-  // It's a programmatic solution, not a mathematical one.
-
-  uint32_t seconds = 0;
-  for (uint16_t year = 2000; year < _year; ++year)
-  {
-    seconds += (getDaysForYear(year) * static_cast<uint32_t>(cSecondsPerDay));
-  }
+  // For 2000-2099: leap years occur every 4 years with no century exception.
+  // (y * 365 + (y+3)/4) gives the exact number of days in the first y complete years.
+  const uint16_t y = _year - 2000;
+  uint32_t seconds = ((uint32_t)y * 365u + (y + 3u) / 4u) * (uint32_t)cSecondsPerDay;
   for (uint8_t month = 1; month < _month; ++month)
   {
     seconds += (static_cast<uint32_t>(getMaxDayPerMonth(_year, month)) * static_cast<uint32_t>(cSecondsPerDay));
@@ -423,9 +402,7 @@ bool DateTime::isFirst() const
 
 DateTime DateTime::fromSecondsSince2000(uint32_t secondsSince2000)
 {
-  // This calculation will require some CPU cycles. It is a
-  // programmatic solution, not a mathematical one. This function
-  // is approximate 6 times slower than mathematical implementations.
+
 
   // Calculate the time
   uint32_t secondsSinceMidnight = secondsSince2000 % cSecondsPerDay;
@@ -436,16 +413,20 @@ DateTime DateTime::fromSecondsSince2000(uint32_t secondsSince2000)
   // Calculate the date
   uint32_t days = secondsSince2000 / static_cast<uint32_t>(cSecondsPerDay);
   const uint8_t dayOfWeek = (days + 6) % 7; // 2000-01-01 was Saturday (6)
-  uint16_t year = 2000;
-  uint32_t daysForThisSection = getDaysForYear(year);
-  while (days >= daysForThisSection)
+  // Estimate complete years since 2000; days/365 may overshoot by 1 at leap-year
+  // boundaries, so recompute exact days used and step back once if needed.
+  // Valid for 2000-2099 (no century non-leap exception in this range).
+  uint16_t y = (uint16_t)(days / 365u);
+  uint32_t daysUsed = (uint32_t)y * 365u + (y + 3u) / 4u;
+  if (daysUsed > days)
   {
-    ++year;
-    days -= daysForThisSection;
-    daysForThisSection = getDaysForYear(year);
+    --y;
+    daysUsed = (uint32_t)y * 365u + (y + 3u) / 4u;
   }
+  uint16_t year = 2000u + y;
+  days -= daysUsed;
   uint16_t month = 1;
-  daysForThisSection = getMaxDayPerMonth(year, month);
+  uint32_t daysForThisSection = getMaxDayPerMonth(year, month);
   while (days >= daysForThisSection)
   {
     ++month;

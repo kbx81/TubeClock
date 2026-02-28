@@ -179,19 +179,22 @@ namespace Application {
   ///
   ExternalControl getExternalControlState();
 
-  /// @brief Get application settings
+  /// @brief Get a pointer to the application settings
   ///
-  Settings getSettings();
   Settings* getSettingsPtr();
 
   /// @brief Refreshes hardware from current application settings
   ///
   void refreshSettings();
 
-  /// @brief Set new application settings, also calls refreshSettings()
-  /// @param settings New settings to apply to the applications and hardware
+  /// @brief Notify the application that settings have been modified in-place via getSettingsPtr()
   ///
-  void setSettings(const Settings &settings);
+  void notifySettingsChanged();
+
+  /// @brief Queue a serial notification that a numbered setting was changed via the local UI
+  /// @param settingNum The setting index that changed
+  ///
+  void notifySettingChanged(uint8_t settingNum);
 
   /// @brief Saves current settings to flash, skipping write if unchanged
   /// @return true on success (saved or already up to date), false on write error

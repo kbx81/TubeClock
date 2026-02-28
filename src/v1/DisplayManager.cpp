@@ -95,12 +95,6 @@ static uint8_t _pwmTickCounter = 0;
 //
 static uint8_t _pwmValues[cPwmNumberOfDevices][cPwmChannelsPerDevice] __attribute__((aligned(4)));
 
-// Master intensity lookup table (256 entries, uint8_t -> uint8_t)
-// Maps input intensity (0-255) to output intensity (0-255) with master dimming applied
-// Initialized by initialize() based on _masterIntensity setting
-//
-static uint8_t _intensityLUT[256];
-
 // HV562x buffers - aligned for DMA transfers
 //
 static uint32_t _displayBufferIn[cPwmNumberOfDevices] __attribute__((aligned(4)));
@@ -169,8 +163,10 @@ void _setDisplayPwmValue(const uint8_t glyphNumber, const uint8_t glyphValue)
     uint8_t device = linearIndex >> 5;   // Fast divide by 32 (cPwmChannelsPerDevice)
     uint8_t channel = linearIndex & 0x1F; // Fast modulo 32
 
-    // Apply master intensity via lookup table and write to PWM buffer
-    _pwmValues[device][channel] = _intensityLUT[glyphValue];
+    // Apply master intensity: (glyphValue * _masterIntensity + 128) >> 8
+    // +128 provides rounding; >> 8 approximates /255 with max 1-LSB error.
+    // Max output: (255*255+128)>>8 = 254, satisfying the PWM > comparison requirement.
+    _pwmValues[device][channel] = (uint8_t)(((uint16_t)glyphValue * _masterIntensity + 128u) >> 8);
   }
 }
 
@@ -179,19 +175,19 @@ void initialize()
 {
   SpiMaster::SpiTransferReq *request = nullptr;
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,       // gpio port on which CS line lives
-    .gpioPin        = Hardware::cNssDisplayPin, // gpio pin on which CS line lives
-    .strobeCs       = true,                     // CS line is strobed upon xfer completion if true
-    .polarity       = true,                     // CS/CE polarity (true = active high)
+    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
     .misoPort       = Hardware::cSpi1AltPort,           // port on which slave inputs data
-    .misoPin        = Hardware::cSpi1MisoDisplayPin,    // pin on which slave inputs data
     .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
-    .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
-    .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_1,    // Clock Phase
-    .lsbFirst       = SPI_CR1_LSBFIRST,     // Frame format -- lsb/msb first
-    .dataSize       = SPI_CR2_DS_8BIT,      // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,   // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
+    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
+    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
+    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
+    .gpioPin        = Hardware::cNssDisplayPin,         // gpio pin on which CS line lives
+    .misoPin        = Hardware::cSpi1MisoDisplayPin,    // pin on which slave inputs data
+    .strobeCs       = true,                             // CS line is strobed upon xfer completion if true
+    .polarity       = true,                             // CS/CE polarity (true = active high)
+    .cpol           = true,                             // Clock polarity (idle high)
+    .cpha           = false,                            // Clock phase (transition 1)
+    .lsbFirst       = true,                             // LSB first
   };
 
   // Initialize master intensity to full brightness
@@ -396,20 +392,6 @@ uint8_t getMasterIntensity()
 void setMasterIntensity(const uint8_t intensity)
 {
   _masterIntensity = intensity;
-
-  // Build the master intensity lookup table
-  // Maps input intensity (0-255) to output intensity (0-254) with master dimming applied
-  // Note: Output is clamped to 254 max because PWM uses > comparison
-  // With > comparison: value=254 gives 255/256 duty (99.6%), value=255 gives 255/256 duty
-  // So we map everything to 0-254 range to avoid the ambiguity
-  // Use rounding instead of truncation for better accuracy at low intensities
-  for (uint16_t i = 0; i < 256; i++)
-  {
-    // Add 127 (half of 255) for rounding before division
-    uint16_t scaled = ((uint32_t)i * _masterIntensity + 127) / 255;
-    // Clamp to 254 maximum to work correctly with > comparison in PWM
-    _intensityLUT[i] = (scaled >= 254) ? 254 : scaled;
-  }
 }
 
 

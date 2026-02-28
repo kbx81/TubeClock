@@ -932,6 +932,20 @@ void notifyKeyEvent(uint8_t keyMask)
 }
 
 
+void notifySettingChanged(uint8_t settingNum)
+{
+  // Reuse the CmdSettingValue path; not coalesced so each changed
+  // setting gets its own notification even when multiple change at once.
+  if (!_queueFull())
+  {
+    QueueEntry e;
+    e.type = NotificationType::CmdSettingValue;
+    e.data.settingNum = settingNum;
+    _queueEnqueue(e);
+  }
+}
+
+
 // --- Command handler dispatch ---
 static void _handleCommand(const char* payload, uint8_t length)
 {

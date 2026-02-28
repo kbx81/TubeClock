@@ -70,10 +70,6 @@ private:
   ///
   uint8_t _relatedSetting;
 
-  /// @brief Settings to be used by the view
-  ///
-  Settings _settings;
-
 };
 
 }

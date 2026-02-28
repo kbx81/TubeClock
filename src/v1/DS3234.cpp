@@ -106,8 +106,8 @@ static uint16_t _yearBase = 2000;
 // SPI buffers
 //
 static uint8_t _spiRefreshBufferIn[cNumberOfRegisters];
-static uint8_t _spiWorkingBufferIn[cNumberOfRegisters];
-static uint8_t _spiWorkingBufferOut[cNumberOfRegisters];
+static uint8_t _spiWorkingBufferIn[cSramMaxRWSize + 1];  // largest read: cSramMaxRWSize data + 1 address byte
+static uint8_t _spiWorkingBufferOut[cNumberOfRegisters + 1];  // largest write: 1 address byte + cNumberOfRegisters data bytes
 
 // A full copy of DS3234 registers, refreshed by calling the refresh() function
 // ...dirty black magic, but it works...
@@ -151,19 +151,19 @@ static inline uint8_t convertBinToBcd(const uint8_t bin)
 void initialize()
 {
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,   // gpio port on which CS line lives
-    .gpioPin        = Hardware::cNssRtcPin, // gpio pin on which CS line lives
-    .strobeCs       = false,                // CS line is strobed upon xfer completion if true
-    .polarity       = false,                // CS/CE polarity (true = active high)
+    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
     .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
-    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
     .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
-    .cpol           = SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE,  // Clock polarity
-    .cpha           = SPI_CR1_CPHA_CLK_TRANSITION_2,    // Clock Phase
-    .lsbFirst       = SPI_CR1_MSBFIRST,     // Frame format -- lsb/msb first
-    .dataSize       = SPI_CR2_DS_8BIT,      // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,   // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT    // Peripheral word width (8, 16, 32 bit)
+    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
+    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
+    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
+    .gpioPin        = Hardware::cNssRtcPin,             // gpio pin on which CS line lives
+    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
+    .strobeCs       = false,                            // CS line is strobed upon xfer completion if true
+    .polarity       = false,                            // CS/CE polarity (true = active high)
+    .cpol           = true,                             // Clock polarity (idle high)
+    .cpha           = true,                             // Clock phase (transition 2)
+    .lsbFirst       = false,                            // MSB first
   };
 
   _spiMaster = Hardware::getSpiMaster();
@@ -241,7 +241,9 @@ bool isRunning()
 bool isValid()
 {
   // If the 7th bit (OSF) is zero, the oscillator has not stopped so the RTC is valid
-  return (_ds3234RegisterIn[cStatusRegister] & cOsfBit) == 0;
+  // Uses _ds3234Registers (the full refresh buffer) because checkConnection() populates
+  // it via a blocking refresh(true); _ds3234RegisterIn (working buffer) is not populated.
+  return (_ds3234Registers[cStatusRegister] & cOsfBit) == 0;
 }
 
 

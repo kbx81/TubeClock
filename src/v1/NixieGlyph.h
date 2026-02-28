@@ -65,8 +65,8 @@ public:
   ///
   uint8_t getIntensity() const;
 
-  /// @brief Get the duration over which the LED should change
-  /// @return fade duration used by LED
+  /// @brief Get the duration over which the glyph should change
+  /// @return fade duration used by glyph
   ///
   uint32_t getDuration() const;
 
@@ -80,7 +80,7 @@ public:
 
 private:
   uint8_t _intensity;       ///< Intensity of the glyph (0-255)
-  uint32_t _duration;       ///< Duration over which this LED should transition
+  uint32_t _duration;       ///< Duration over which this glyph should transition
 };
 
 }

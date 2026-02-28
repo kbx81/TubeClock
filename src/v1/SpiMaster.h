@@ -22,7 +22,8 @@
 //     a. Slave must get pointer to SpiMaster object (via Hardware::getSpiMaster())
 //     b. Slave calls SpiMaster::registerSlave() with its slave structure
 //     c. Slave stores returned slave ID
-// 3. Slave(s) initiate(s) transfers by calling SpiMaster::transfer() with slave ID
+// 3. Slave(s) populate SpiTransferReq buffer (from getTransferRequestBuffer()) and set
+//     state = SpiReqAckQueued to initiate a transfer via the queue
 #pragma once
 
 
@@ -57,28 +58,28 @@ public:
   ///
   struct SpiSlave {
     uint32_t gpioPort;        // gpio port on which CS line lives
-    uint16_t gpioPin;         // gpio pin on which CS line lives
-    bool     strobeCs;        // CS line is strobed upon xfer completion if true
-    bool     polarity;        // CS/CE polarity (active high = true)
     uint32_t misoPort;        // port on which slave inputs data
-    uint16_t misoPin;         // pin on which slave inputs data
     uint32_t br;              // Baudrate
-    uint32_t cpol;            // Clock polarity
-    uint32_t cpha;            // Clock Phase
-    uint32_t lsbFirst;        // Frame format -- lsb/msb first
     uint32_t dataSize;        // Data size (4 to 16 bits, see RM)
     uint32_t memorySize;      // Memory word width (8, 16, 32 bit)
     uint32_t peripheralSize;  // Peripheral word width (8, 16, 32 bit)
+    uint16_t gpioPin;         // gpio pin on which CS line lives
+    uint16_t misoPin;         // pin on which slave inputs data
+    bool     strobeCs;        // CS line is strobed upon xfer completion if true
+    bool     polarity;        // CS/CE polarity (active high = true)
+    bool     cpol;            // Clock polarity (true = idle high)
+    bool     cpha;            // Clock phase (true = transition 2)
+    bool     lsbFirst;        // Frame format (true = LSB first)
   };
 
   /// @brief Structure defining SPI transfer requests
   ///
   struct SpiTransferReq {
-    SpiReqAck state;
-    uint8_t slave;
     uint8_t *bufferIn;
     uint8_t *bufferOut;
     uint16_t length;
+    SpiReqAck state;
+    uint8_t slave;
   };
 
 public:
@@ -116,14 +117,14 @@ public:
   SpiTransferReq* getTransferRequestBuffer(const uint8_t slave);
 
   /// @brief Queues up a transfer via SPI via DMA
-  /// @param slave ID number to perform transfer for
+  /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck queueTransfer(const uint8_t slave, SpiTransferReq* request);
+  SpiReqAck queueTransfer(SpiTransferReq* request);
 
   /// @brief Transfers data in/out through the SPI via DMA
-  /// @param slave ID number to perform transfer for
+  /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck transfer(const uint8_t slave, SpiTransferReq* request);
+  SpiReqAck transfer(SpiTransferReq* request);
 
   /// @brief Indicates if a given slave's transfer has completed
   /// @return true if transfer is complete
@@ -154,16 +155,10 @@ private:
   void _activateCsCe(const uint8_t slave);
   void _deactivateCsCe(const uint8_t slave);
 
-  void _deactivateAllCsCe();
-
   void _configureMiso(const uint8_t slave);
   void _deconfigureMiso(const uint8_t slave);
 
   SpiReqAck _selectPeripheral(const uint8_t slave);
-
-  /// @brief value used to indicate no slave is active/selected
-  ///
-  static const uint8_t cNoSelectedSlave;
 
   /// @brief true while a DMA transfer is in flight
   ///

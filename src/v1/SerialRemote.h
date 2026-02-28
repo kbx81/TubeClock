@@ -59,6 +59,11 @@ namespace SerialRemote
   /// @param keyMask Full bitmask of all currently pressed keys (all 6 bits); 0 means all released
   ///
   void notifyKeyEvent(uint8_t keyMask);
+
+  /// @brief Notify the remote that a numbered setting was changed via the local UI
+  /// @param settingNum The setting index (0 – DmxAddress) that changed
+  ///
+  void notifySettingChanged(uint8_t settingNum);
 }
 
 

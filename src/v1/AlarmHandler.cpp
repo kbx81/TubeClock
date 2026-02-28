@@ -208,6 +208,7 @@ void _startHourlyChime(uint8_t hour)
         pos += sizeof(cHourlyP) - 1;
       }
     }
+    buf[pos] = 0;  // null terminator
   }
   RtttlPlayer::play(buf, pos);
 }
@@ -291,6 +292,13 @@ void initialize()
   {
     _ackTime[i] = Application::dateTime();
   }
+  // Suppress the startup chime if the RTC is not valid; without this guard the initial
+  // Pending state fires _executeAlarms() with incorrect/zeroed time, bypassing the
+  // rtcIsSet() check that normally protects the top-of-hour trigger path.
+  if (!Hardware::rtcIsSet())
+  {
+    _hourlyState = HourlyState::Idle;
+  }
 }
 
 
@@ -320,7 +328,10 @@ void loop()
     if ((pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::HourlyChime) == true)
         && (current.second(false) == 0) && (current.minute(false) == 0))
     {
-      _hourlyState = HourlyState::Pending;
+      if (_hourlyState == HourlyState::Idle)
+      {
+        _hourlyState = HourlyState::Pending;
+      }
     }
   }
 

@@ -45,11 +45,11 @@ void SetTempCalibrationView::enter(uint8_t /*relatedSetting*/)
 {
   _selectedSensor = static_cast<int8_t>(Application::getViewMode());
 
-  Settings settings = Application::getSettings();
+  Settings* pSettings = Application::getSettingsPtr();
 
   for (uint8_t i = 0; i < cSensorCount; i++)
   {
-    _calibrationValue[i] = (int16_t)settings.getRawSetting(cCalibrationSettings[i])
+    _calibrationValue[i] = (int16_t)pSettings->getRawSetting(cCalibrationSettings[i])
                            - Settings::cCalibrationMidpoint;
   }
 }
@@ -61,15 +61,14 @@ bool SetTempCalibrationView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::A)
   {
-    Settings settings = Application::getSettings();
+    Settings* pSettings = Application::getSettingsPtr();
 
     for (uint8_t i = 0; i < cSensorCount; i++)
     {
-      settings.setRawSetting(cCalibrationSettings[i],
+      pSettings->setRawSetting(cCalibrationSettings[i],
         static_cast<uint16_t>(_calibrationValue[i] + Settings::cCalibrationMidpoint));
+      Application::notifySettingChanged(cCalibrationSettings[i]);
     }
-
-    Application::setSettings(settings);
 
     DisplayManager::blink();
   }

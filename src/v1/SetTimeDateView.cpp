@@ -35,8 +35,7 @@ SetTimeDateView::SetTimeDateView()
   : _selectedItem(0),
     _workingDateTime(),
     _mode(Application::OperatingMode::OperatingModeSetClock),
-    _relatedSetting(0),
-    _settings(Settings())
+    _relatedSetting(0)
 {
 }
 
@@ -46,8 +45,6 @@ void SetTimeDateView::enter(uint8_t relatedSetting)
   _mode = Application::getOperatingMode();
   _relatedSetting = relatedSetting;
 
-  _settings = Application::getSettings();
-
   switch (_mode)
   {
     case Application::OperatingMode::OperatingModeSetClock:
@@ -56,14 +53,14 @@ void SetTimeDateView::enter(uint8_t relatedSetting)
     break;
 
     default:
-    _workingDateTime = _settings.getTime(_relatedSetting);
+    _workingDateTime = Application::getSettingsPtr()->getTime(_relatedSetting);
     break;
   }
 
   // ...so we can highlight digits as necessary
   Application::setIntensity(NixieGlyph::cGlyphMaximumIntensity);
 
-  DisplayManager::setStatusLedAutoRefreshing(_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
+  DisplayManager::setStatusLedAutoRefreshing(Application::getSettingsPtr()->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
 }
 
 
@@ -98,8 +95,8 @@ bool SetTimeDateView::keyHandler(Keys::Key key)
       break;
 
       default:
-      _settings.setTime(_relatedSetting, setDateTime);
-      Application::setSettings(_settings);
+      Application::getSettingsPtr()->setTime(_relatedSetting, setDateTime);
+      Application::notifySettingsChanged();
       break;
     }
 
@@ -227,7 +224,8 @@ void SetTimeDateView::loop()
 {
   RgbLed statusLed;
   Display::dateTimeDisplaySelection dateTimeItem = Display::dateTimeDisplaySelection::dateDisplayYYMMDD;
-  bool display12Hour = _settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour);
+  Settings* pSettings = Application::getSettingsPtr();
+  bool display12Hour = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour);
   uint32_t dotsBitmap = 0b1111;
   uint8_t highlightStart = _selectedItem;
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
@@ -238,7 +236,7 @@ void SetTimeDateView::loop()
   {
     dotsBitmap = 0b1010;
 
-    switch (_settings.getRawSetting(Settings::DateFormat))
+    switch (pSettings->getRawSetting(Settings::DateFormat))
     {
       case 2:
       dateTimeItem = Display::dateTimeDisplaySelection::dateDisplayMMDDYY;

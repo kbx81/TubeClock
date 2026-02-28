@@ -78,7 +78,10 @@ SpiMaster::SpiReqAck SpiMaster::_configureMaster(const uint8_t slave)
     spi_reset(_params.spi);
 
     // Set up SPI in Master mode as requested
-    if (spi_init_master(_params.spi, _slave[slave].br, _slave[slave].cpol, _slave[slave].cpha, _slave[slave].lsbFirst) == 0)
+    if (spi_init_master(_params.spi, _slave[slave].br,
+      _slave[slave].cpol ? SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE : SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
+      _slave[slave].cpha ? SPI_CR1_CPHA_CLK_TRANSITION_2 : SPI_CR1_CPHA_CLK_TRANSITION_1,
+      _slave[slave].lsbFirst ? SPI_CR1_LSBFIRST : SPI_CR1_MSBFIRST) == 0)
     {
       result = SpiReqAck::SpiReqAckOk;
     }
@@ -129,15 +132,6 @@ void SpiMaster::_deactivateCsCe(const uint8_t slave)
     {
       gpio_set(_slave[slave].gpioPort, _slave[slave].gpioPin);
     }
-  }
-}
-
-
-void SpiMaster::_deactivateAllCsCe()
-{
-  for (uint8_t slave = 0; slave < _nextSlave; slave++)
-  {
-    _deactivateCsCe(slave);
   }
 }
 
@@ -212,15 +206,17 @@ SpiMaster::SpiTransferReq* SpiMaster::getTransferRequestBuffer(const uint8_t sla
 {
   if (slave < _nextSlave)
   {
+    _transferRequest[slave].slave = slave;
     return &_transferRequest[slave];
   }
   return nullptr;
 }
 
 
-SpiMaster::SpiReqAck SpiMaster::queueTransfer(const uint8_t slave, SpiTransferReq* request)
+SpiMaster::SpiReqAck SpiMaster::queueTransfer(SpiTransferReq* request)
 {
   SpiReqAck status = SpiReqAck::SpiReqAckBusy;
+  const uint8_t slave = request->slave;
 
   if (slave < _nextSlave)
   {
@@ -242,11 +238,11 @@ SpiMaster::SpiReqAck SpiMaster::queueTransfer(const uint8_t slave, SpiTransferRe
 }
 
 
-// Hardware::HwReqAck SpiMaster::transfer(const Hardware::SpiPeripheral peripheral, uint8_t *bufferIn, uint8_t *bufferOut, const uint16_t length)
-SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* request)
+SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq* request)
 {
   uint32_t dmaEnable = 0;
   volatile uint8_t temp_data __attribute__ ((unused));
+  const uint8_t slave = request->slave;
 
   if (_transferInProgress)
   {
@@ -289,8 +285,8 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
       dma_set_number_of_data(_params.dmaController, _params.channelRx, request->length);
       dma_set_read_from_peripheral(_params.dmaController, _params.channelRx);
       dma_enable_memory_increment_mode(_params.dmaController, _params.channelRx);
-      dma_set_peripheral_size(_params.dmaController, _params.channelRx, _slave[request->slave].peripheralSize);
-      dma_set_memory_size(_params.dmaController, _params.channelRx, _slave[request->slave].memorySize);
+      dma_set_peripheral_size(_params.dmaController, _params.channelRx, _slave[slave].peripheralSize);
+      dma_set_memory_size(_params.dmaController, _params.channelRx, _slave[slave].memorySize);
       dma_set_priority(_params.dmaController, _params.channelRx, DMA_CCR_PL_VERY_HIGH);
       // Enable DMA transfer complete interrupt
     	dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelRx);
@@ -309,8 +305,8 @@ SpiMaster::SpiReqAck SpiMaster::transfer(const uint8_t slave, SpiTransferReq* re
       dma_set_number_of_data(_params.dmaController, _params.channelTx, request->length);
       dma_set_read_from_memory(_params.dmaController, _params.channelTx);
       dma_enable_memory_increment_mode(_params.dmaController, _params.channelTx);
-      dma_set_peripheral_size(_params.dmaController, _params.channelTx, _slave[request->slave].peripheralSize);
-      dma_set_memory_size(_params.dmaController, _params.channelTx, _slave[request->slave].memorySize);
+      dma_set_peripheral_size(_params.dmaController, _params.channelTx, _slave[slave].peripheralSize);
+      dma_set_memory_size(_params.dmaController, _params.channelTx, _slave[slave].memorySize);
       dma_set_priority(_params.dmaController, _params.channelTx, DMA_CCR_PL_HIGH);
       // Enable DMA transfer complete interrupt
     	dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelTx);
@@ -348,7 +344,7 @@ bool SpiMaster::processQueue()
   {
     if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued)
     {
-      transfer(slave, &_transferRequest[slave]);
+      transfer(&_transferRequest[slave]);
       // return indicating a transfer was initiated
       return true;
     }

@@ -32,10 +32,11 @@
 // at build time and show an error if it's out of range.
 // ---------------------------------------------------------------------------
 //
+#include <cstring>
+
 #include "Application.h"
 #include "DateTime.h"
 #include "Hardware.h"
-#include "RgbLed.h"
 #include "Settings.h"
 
 // Linker-provided symbol for the settings flash address (must be outside namespace)
@@ -46,13 +47,19 @@ namespace kbxTubeClock {
   // Default settings profiles
   // Each profile contains default values for all 28 settings
   // Profile selection is controlled by SETTINGS_PROFILE macro (set in Makefile)
+  // To add a new profile, add a new #elif block below and update the error message.
 
   struct SettingsProfile {
     const uint16_t settings[Settings::Setting::DmxAddress + 1];
   };
 
+  #ifndef SETTINGS_PROFILE
+  #define SETTINGS_PROFILE 0
+  #endif
+
+  #if SETTINGS_PROFILE == 0
   // Profile 0: Standard US/North America defaults (DST enabled, 12-hour, Fahrenheit)
-  static const SettingsProfile cProfileStandard = {
+  static const SettingsProfile cActiveProfile = {
     {
       0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
       0b11100000000, // BeepStates
@@ -84,9 +91,9 @@ namespace kbxTubeClock {
       0              // DmxAddress
     }
   };
-
+  #elif SETTINGS_PROFILE == 1
   // Profile 1: European defaults (24-hour, Celsius, no DST handling)
-  static const SettingsProfile cProfileEuropean = {
+  static const SettingsProfile cActiveProfile = {
     {
       0b1011101100,  // SystemOptions: 24hr, Celsius, auto intensity
       0b11100000000, // BeepStates
@@ -118,9 +125,9 @@ namespace kbxTubeClock {
       0              // DmxAddress
     }
   };
-
+  #elif SETTINGS_PROFILE == 2
   // Profile 2: Minimal/Silent (no beeps, no effects, basic display)
-  static const SettingsProfile cProfileMinimal = {
+  static const SettingsProfile cActiveProfile = {
     {
       0b0000100000,  // SystemOptions: 24hr, auto intensity only
       0b00000000000, // BeepStates: all disabled
@@ -152,9 +159,9 @@ namespace kbxTubeClock {
       0              // DmxAddress
     }
   };
-
+  #elif SETTINGS_PROFILE == 3
   // Profile 3: kbx's preferred defaults (DST enabled, 12-hour, Fahrenheit)
-  static const SettingsProfile cProfileKbx = {
+  static const SettingsProfile cActiveProfile = {
     {
       0b1011111111,  // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
       0b11100000000, // BeepStates
@@ -186,26 +193,9 @@ namespace kbxTubeClock {
       0              // DmxAddress
     }
   };
-
-  // Array of all available profiles
-  static const SettingsProfile* const cSettingsProfiles[] = {
-    &cProfileStandard,
-    &cProfileEuropean,
-    &cProfileMinimal,
-    &cProfileKbx,
-  };
-
-  // Select the profile based on build-time macro (defaults to Standard)
-  #ifndef SETTINGS_PROFILE
-  #define SETTINGS_PROFILE 0
+  #else
+  #error "SETTINGS_PROFILE is out of range; update Settings.cpp to add a new profile"
   #endif
-
-  // Compile-time validation of SETTINGS_PROFILE range
-  constexpr uint32_t cNumProfiles = sizeof(cSettingsProfiles) / sizeof(cSettingsProfiles[0]);
-  static_assert(SETTINGS_PROFILE >= 0 && SETTINGS_PROFILE < cNumProfiles,
-                "SETTINGS_PROFILE is out of range - update cSettingsProfiles and SETTINGS_PROFILE");
-
-  static const SettingsProfile* const cActiveProfile = cSettingsProfiles[SETTINGS_PROFILE];
 
   // where settings will be read/written in FLASH
   const uint32_t Settings::cSettingsFlashAddress = reinterpret_cast<uint32_t>(&__settings_flash_start);
@@ -257,10 +247,7 @@ namespace kbxTubeClock {
     }
 
     // Load settings from the active profile selected at build time
-    for (uint8_t i = 0; i <= static_cast<uint8_t>(Setting::DmxAddress); i++)
-    {
-      _setting[i] = cActiveProfile->settings[i];
-    }
+    memcpy(_setting, cActiveProfile.settings, sizeof(_setting));
   }
 
 
@@ -394,7 +381,7 @@ namespace kbxTubeClock {
   bool Settings::hvState()
   {
     DateTime currentTime = Application::dateTime();
-    int32_t i, delta,
+    int32_t delta,
             currentSecondsSinceMidnight = (int32_t)currentTime.secondsSinceMidnight(false),
             // minSecs = 0,  // first/earliest slot
             prevSecs = -Application::cSecondsInADay, // slot most recently passed
@@ -408,7 +395,7 @@ namespace kbxTubeClock {
     if (Hardware::rtcIsSet() == true)
     {
       // find minimum, maximum, just passed, and next to pass values
-      for (i = static_cast<uint8_t>(Slot::Slot1); i <= static_cast<uint8_t>(Slot::Slot8); i++)
+      for (uint8_t i = static_cast<uint8_t>(Slot::Slot1); i <= static_cast<uint8_t>(Slot::Slot8); i++)
       {
         delta = (int32_t)_time[i].secondsSinceMidnight(false) - currentSecondsSinceMidnight;
 

@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
-#include <string.h>
+#include <cstring>
 
 #include "Hardware.h"
 #include "GpsReceiver.h"
@@ -69,10 +69,6 @@ static const uint8_t cGpsNmeaHeaderLength = 7;
 //
 static const uint8_t cGpsDateTimeLength = 6;
 
-// the length of the number of satellites string we expect to receive
-//
-static const uint8_t cGpsNumSatellitesLength = 2;
-
 // the number of commas seen before we receive the date
 //
 static const uint8_t cGpsPreDateCommaCount = 7;
@@ -97,18 +93,14 @@ static uint8_t _rxCharCount = 0;
 //
 static char _rxValidChar = 0;
 
-// buffer for sentence header
+// buffer for sentence header (7 bytes, .bss — init value irrelevant, ISR overwrites all bytes)
 //
-static char _rxHeaderChar[] = "$GPRMC,";
+static char _rxHeaderChar[7];
 
 // date and time incoming character buffers
 //
 static char _rxDateChar[6];
 static char _rxTimeChar[6];
-
-// number of satellite character buffer
-//
-static char _rxNumSatellitesChar[2];
 
 // number of  minutes added to GPS time to compute local time
 //
@@ -132,13 +124,6 @@ void initialize()
   _gpsUsart = Hardware::getUsart(0);  // USART1
 }
 
-
-/// @brief Updates _numSatellites based on the receive buffer
-///
-void _rxGsvComplete()
-{
-  _numSatellites = ((_rxNumSatellitesChar[0] - '0') * 10) + (_rxNumSatellitesChar[1] - '0');
-}
 
 
 /// @brief Updates our DateTime object based on the receive buffers
@@ -274,15 +259,18 @@ void rxIsr()
       }
       break;
 
-    // read in the two-digit number of satellites
+    // read in the two-digit number of satellites — accumulate directly to avoid buffer
     case GpsRxState::GpsRxNumSatellites:
-      _rxNumSatellitesChar[_rxCharCount] = rxChar;
-
-      if (++_rxCharCount >= cGpsNumSatellitesLength)
+      if (_rxCharCount == 0)
       {
+        _numSatellites = (rxChar - '0') * 10;
+        ++_rxCharCount;
+      }
+      else
+      {
+        _numSatellites += rxChar - '0';
         _rxState = GpsRxState::GpsRxIdle;
         _rxCharCount = 0;
-        _rxGsvComplete();
       }
       break;
 
@@ -292,13 +280,13 @@ void rxIsr()
       // if we've received enough characters, compare the strings for validity
       if (++_rxCharCount >= cGpsNmeaHeaderLength)
       {
-        if (strcmp(cGpsParseStrGSV, _rxHeaderChar) == 0)
+        if (memcmp(cGpsParseStrGSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0)
         {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsGSV;
           _rxCharCount = 0;
         }
-        else if (strcmp(cGpsParseStrRMC, _rxHeaderChar) == 0)
+        else if (memcmp(cGpsParseStrRMC, _rxHeaderChar, cGpsNmeaHeaderLength) == 0)
         {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsRMC;

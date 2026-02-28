@@ -59,10 +59,7 @@ private:
   //
   uint8_t _relatedSetting;
 
-  // Settings to be used by the view
-  //
-  Settings _settings;
-
 };
+
 
 }

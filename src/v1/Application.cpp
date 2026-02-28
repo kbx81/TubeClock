@@ -238,7 +238,7 @@ DateTime dateTime()
 
   // Check if the second has changed in the hardware RTC
   // With PPS configured for EXTI_TRIGGER_RISING, this will update exactly once per second
-  if (_currentTime.second() != hardwareTime.second())
+  if (_currentTime.second() != hardwareTime.second() || _currentTime.isFirst())
   {
     _currentTime = hardwareTime;
 
@@ -403,12 +403,6 @@ ExternalControl getExternalControlState()
 }
 
 
-Settings getSettings()
-{
-  return _settings;
-}
-
-
 Settings* getSettingsPtr()
 {
   return &_settings;
@@ -449,13 +443,18 @@ void refreshSettings()
 }
 
 
-void setSettings(const Settings &settings)
+void notifySettingsChanged()
 {
-  _settings = settings;
-
   refreshSettings();
 
   _settingsModified = true;
+}
+
+
+void notifySettingChanged(uint8_t settingNum)
+{
+  SerialRemote::notifySettingChanged(settingNum);
+  notifySettingsChanged();
 }
 
 
@@ -510,9 +509,10 @@ bool isDst(const DateTime &currentTime)
 //
 void _updateIntensityPercentage(const bool quick = false)
 {
-  // Convert light level (0-4095) to intensity (0-255)
-  // Need accurate conversion here - the bit shift approximation was too inaccurate
-  uint16_t currentIntensity = (Hardware::lightLevel() * 255) / 4095;
+  // Convert light level (0-4095) to intensity (0-255).
+  // >> 4 maps identically to the exact formula at the endpoints and differs by
+  // at most 1 count in the middle, which the ±2 deadband below absorbs.
+  uint16_t currentIntensity = Hardware::lightLevel() >> 4;
 
   // Enforce minimum intensity
   if (currentIntensity < _minimumIntensity)
@@ -675,6 +675,8 @@ void loop()
       AlarmHandler::loop();
     }
 
+    bool dmxSignalActive = Dmx512Rx::signalIsActive();
+
     // If the idle counter has maxed out, kick back to the appropriate display mode
     if (_idleCounter >= cMaximumIdleCount)
     {
@@ -682,7 +684,7 @@ void loop()
       if (!_wasIdle)
       {
         _wasIdle = true;
-        if (Dmx512Rx::signalIsActive())
+        if (dmxSignalActive)
         {
           Hardware::setHvState(true);
         }
@@ -693,7 +695,7 @@ void loop()
       }
 
       // If there is an active signal, update _externalControlMode
-      if (Dmx512Rx::signalIsActive())
+      if (dmxSignalActive)
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);
@@ -725,9 +727,9 @@ void loop()
     }
 
     // Deal with changes in the DMX-512 signal state
-    if (Dmx512Rx::signalIsActive() != _previousDmxState)
+    if (dmxSignalActive != _previousDmxState)
     {
-      _previousDmxState = Dmx512Rx::signalIsActive();
+      _previousDmxState = dmxSignalActive;
 
       if (_previousDmxState)
       {

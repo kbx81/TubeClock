@@ -51,23 +51,15 @@ Display::Display()
 
 
 Display::Display(const uint32_t word)
+  : Display()
 {
-  for (uint8_t tube = 0; tube < cTubeCount; tube++)
-  {
-    _tube[tube].setIntensity(NixieGlyph::cGlyphMaximumIntensity);
-  }
-
   setDisplayFromWord(word);
 }
 
 
 Display::Display(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0)
+  : Display()
 {
-  for (uint8_t tube = 0; tube < cTubeCount; tube++)
-  {
-    _tube[tube].setIntensity(NixieGlyph::cGlyphMaximumIntensity);
-  }
-
   setDisplayFromBytes(byte2, byte1, byte0);
 }
 
@@ -88,15 +80,7 @@ bool Display::operator==(const Display &other) const
 
 bool Display::operator!=(const Display &other) const
 {
-  for (uint8_t i = 0; i < cTubeCount; i++)
-  {
-    if (_tube[i] != other._tube[i])
-    {
-      return true;
-    }
-  }
-
-  return false;
+  return !(*this == other);
 }
 
 
@@ -124,17 +108,14 @@ void Display::setDisplayFromWord(const uint32_t word, const uint8_t bitmap)
 
 void Display::setDisplayFromBytes(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap)
 {
-  auto encoded0 = uint32ToBcd(byte0),
-       encoded1 = uint32ToBcd(byte1),
-       encoded2 = uint32ToBcd(byte2);
   uint8_t i = 0;
 
-  _tube[i++].setGlyph(encoded0 & 0x0f);
-  _tube[i++].setGlyph((encoded0 >> 4) & 0x0f);
-  _tube[i++].setGlyph(encoded1 & 0x0f);
-  _tube[i++].setGlyph((encoded1 >> 4) & 0x0f);
-  _tube[i++].setGlyph(encoded2 & 0x0f);
-  _tube[i++].setGlyph((encoded2 >> 4) & 0x0f);
+  _tube[i++].setGlyph(byte0 % 10);
+  _tube[i++].setGlyph(byte0 / 10 % 10);
+  _tube[i++].setGlyph(byte1 % 10);
+  _tube[i++].setGlyph(byte1 / 10 % 10);
+  _tube[i++].setGlyph(byte2 % 10);
+  _tube[i++].setGlyph(byte2 / 10 % 10);
 
   setTubesOff(bitmap);
 }

@@ -30,8 +30,7 @@ namespace kbxTubeClock {
 SetValueView::SetValueView()
   : _setValue(0),
     _maxValue(0),
-    _relatedSetting(Settings::Setting::TimerResetValue),
-    _settings(Settings())
+    _relatedSetting(Settings::Setting::TimerResetValue)
 {
 }
 
@@ -40,9 +39,7 @@ void SetValueView::enter(uint8_t relatedSetting)
 {
   _relatedSetting = relatedSetting;
 
-  _settings = Application::getSettings();
-
-  _setValue = _settings.getRawSetting(_relatedSetting);
+  _setValue = Application::getSettingsPtr()->getRawSetting(_relatedSetting);
   _maxValue = Settings::cSettingData[_relatedSetting];
 }
 
@@ -53,8 +50,8 @@ bool SetValueView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::A)
   {
-    _settings.setRawSetting(_relatedSetting, _setValue);
-    Application::setSettings(_settings);
+    Application::getSettingsPtr()->setRawSetting(_relatedSetting, _setValue);
+    Application::notifySettingChanged(_relatedSetting);
 
     DisplayManager::blink();
   }
@@ -153,7 +150,7 @@ void SetValueView::loop()
   Display tcDisp(displayedValue);
   tcDisp.setDots(dotsBitmap, dot);
 
-  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff) == true)
+  if (Application::getSettingsPtr()->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff) == true)
   {
     tcDisp.setMsdTubesOff();
   }

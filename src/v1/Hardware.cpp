@@ -491,8 +491,6 @@ void _clockSetup()
 
   rcc_periph_clock_enable(RCC_DMA);
 
-  rcc_periph_clock_enable(RCC_PWR);
-
   rcc_periph_clock_enable(RCC_CRC);
 
   rcc_periph_clock_enable(RCC_TIM1);
@@ -1354,8 +1352,14 @@ void initialize()
   {
     uint8_t buffer[] = { 0, 0x08 };
 
-    // checkConnection() refreshes the status register so this will work without a refresh()
+    // checkConnection() does a blocking refresh() so _ds3234Registers are valid here;
+    // populate _currentDateTime now so Application::dateTime() returns real data immediately
+    // instead of zeros, which would persist until the first PPS-triggered DMA refresh.
     _rtcIsSet = DS3234::isValid();
+    if (_rtcIsSet)
+    {
+      _currentDateTime = DS3234::getDateTime();
+    }
     // enable PPS and 32 kHz outputs
     while (DS3234::setRegister(0x0e, buffer, 2, true) != SpiMaster::SpiReqAck::SpiReqAckOk);
     if (_externalTemperatureSensor == TempSensorType::STM32ADC)
@@ -2444,7 +2448,10 @@ void systickIsr()
 
     _incrementOnTimeSecondsCounter();
   }
-  _refreshPeripherals();
+  if (_refreshRTCNow || _rtcReadPending || _refreshTempNow || _tempReadPending)
+  {
+    _refreshPeripherals();
+  }
 
   // Light sensor sampling (500ms interval = 2 Hz)
   if (_adcSampleTimerLight++ >= cAdcSampleIntervalLight)
@@ -2504,8 +2511,9 @@ void systickIsr()
     }
   }
 
-  if (_batteryMeasuringCounter++ > cBatteryMeasuringTimeout)
+  if (++_batteryMeasuringCounter >= cBatteryMeasuringTimeout)
   {
+    _batteryMeasuringCounter = 0;
     adc_disable_vbat_sensor();
   }
 }

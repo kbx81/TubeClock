@@ -22,8 +22,6 @@
 #include <cstdint>
 
 #include "DateTime.h"
-#include "Hardware.h"
-#include "RgbLed.h"
 
 
 namespace kbxTubeClock {
