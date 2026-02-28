@@ -44,7 +44,7 @@ namespace RtttlPlayer
 // and the Arduino Tone library.
 //
 static const uint16_t cNotes[] = {
-  1,                                                                         // silence (below cToneFrequencyMinimum; Hardware treats as timed silence)
+  1,    // silence (below cToneFrequencyMinimum; Hardware treats as timed silence)
   262,  277,  294,  311,  330,  349,  370,  392,  415,  440,  466,  494,   // C4-B4
   523,  554,  587,  622,  659,  698,  740,  784,  831,  880,  932,  988,   // C5-B5
   1047, 1109, 1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976,  // C6-B6

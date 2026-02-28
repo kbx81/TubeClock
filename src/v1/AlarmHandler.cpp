@@ -17,6 +17,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
 #include <cstdint>
+#include <cstring>
 
 #include <libopencm3/stm32/rtc.h>
 #include "AlarmHandler.h"
@@ -25,7 +26,7 @@
 #include "DisplayManager.h"
 #include "Hardware.h"
 #include "Keys.h"
-#include "Pitches.h"
+#include "RtttlPlayer.h"
 #include "Settings.h"
 
 
@@ -36,63 +37,64 @@ namespace AlarmHandler {
 
 // Latching external alarm input number
 //
-const uint8_t cLatchingAlarmInputNumber = 0;
+constexpr uint8_t cLatchingAlarmInputNumber = 0;
 
 // Momentary external alarm input number
 //
-const uint8_t cMomentaryAlarmInputNumber = 1;
+constexpr uint8_t cMomentaryAlarmInputNumber = 1;
 
-// Alarm tone durations and frequencies
+// Alarm melody as an RTTTL string (loops until alarm is cleared)
+// BPM=200 → whole=1200ms; default duration=eighth(150ms), octave=6
+//   c7=150ms, 4g=300ms, 16p≈75ms, 4g=300ms, a=150ms, g=150ms, p=150ms, b=150ms, c7=150ms, 2p=600ms
 //
-const uint16_t cHourlyAlarmToneDuration = 75;
-// const uint16_t cHourlyAlarmToneFrequencies[] = { NOTE_D6, NOTE_A6 };
-const uint16_t cHourlyAlarmToneFrequencies[] = { NOTE_E6, NOTE_E7 };
-// Be creative and create your own melody!
-//   *** Array lengths MUST MATCH ***
-// const uint16_t cAlarmToneDurations[]   = { 75, 75, 75, 75, 75, 75, 75, 700 };
-// const uint16_t cAlarmToneFrequencies[] = { NOTE_D7, NOTE_REST, NOTE_D7, NOTE_REST, NOTE_D7, NOTE_REST, NOTE_D7, NOTE_REST };
-const uint16_t cAlarmToneDurations[]   = { 150, 300, 50, 300, 150, 150, 150, 150, 150, 700 };
-const uint16_t cAlarmToneFrequencies[] = { NOTE_C7, NOTE_G6, NOTE_REST, NOTE_G6, NOTE_A6, NOTE_G6, NOTE_REST, NOTE_B6, NOTE_C7, NOTE_REST };
+static const char cAlarmTone[] = "alarm:d=8,o=6,b=180:c7,4g,16p,4g,a,g,p,b,c7,2p";
+
+// RTTTL header for hourly chime (notes added based on hour value)
+//
+static const char cHourlyHeader[] = "chime:d=16,o=6,b=180:";
+
+// Notes for hourly chime
+//
+static const char cHourly0[] = "e5";   // bit 0
+static const char cHourly1[] = "e7";   // bit 1
+static const char cHourlyP[] = ",16p,"; // pause between notes (commas included)
 
 // Number of time slot alarms available
 //
-const uint8_t cTimeSlotAlarmCount = 8;
+constexpr uint8_t cTimeSlotAlarmCount = 8;
 
 // Number of external alarms available
 //
-const uint8_t cExtAlarmCount = 3;
+constexpr uint8_t cExtAlarmCount = 3;
 
 // Total number of alarms available
 //
-const uint8_t cAlarmCount = cTimeSlotAlarmCount + cExtAlarmCount;
+constexpr uint8_t cAlarmCount = cTimeSlotAlarmCount + cExtAlarmCount;
 
 // Bit indicating the timer/counter alarm should sound
 //
-const uint8_t cExtAlarmShift = 8;
+constexpr uint8_t cExtAlarmShift = 8;
 
 // Bit indicating the timer/counter alarm should sound
 //
-const uint8_t cTimerCounterAlarmBit = 8;
+constexpr uint8_t cTimerCounterAlarmBit = 8;
 
 // Bit indicating the latching (external) alarm should sound
 //
-const uint8_t cExtLatchingAlarmBit = 9;
+constexpr uint8_t cExtLatchingAlarmBit = 9;
 
 // Bit indicating the momentary (external) alarm should sound
 //
-const uint8_t cExtMomentaryAlarmBit = 10;
+constexpr uint8_t cExtMomentaryAlarmBit = 10;
 
 // Indicates which alarm(s) is/are active. Low 8 bits correspond to time slots
 //
 uint16_t _activeAlarms = 0;
 
-// Counter for alarm beeps
+// Hourly chime state; initial Pending state produces a start-up beep
 //
-uint8_t _beepCounter = 0;
-
-// Indicates hourly alarm should sound
-//  Initial state of 'true' produces a nice start-up beep
-bool _hourlyAlarmActive = true;
+enum class HourlyState : uint8_t { Idle = 0, Pending, Playing };
+HourlyState _hourlyState = HourlyState::Pending;
 
 // The state of the pin the last time we checked it
 //
@@ -109,10 +111,9 @@ DateTime _ackTime[cTimeSlotAlarmCount];
 
 // checks if any alarm boundaries have been crossed
 // returns a bitmap indicating which alarms are active
-uint16_t _getActiveTimeSlotAlarms()
+uint16_t _getActiveTimeSlotAlarms(const DateTime& current, Settings* pSettings)
 {
-  DateTime slot, current = Application::dateTime();
-  Settings *pSettings = Application::getSettingsPtr();
+  DateTime slot;
   uint16_t activeAlarms = 0;
   // first we'll look at the time slots
   for (uint8_t i = static_cast<uint8_t>(Settings::Slot::Slot1); i <= static_cast<uint8_t>(Settings::Slot::Slot8); i++)
@@ -175,13 +176,48 @@ uint16_t _getActiveExternalAlarms()
 }
 
 
+// Builds and starts an RTTTL string encoding 'hour' as binary beeps.
+// Each bit of hour (LSb first) maps to e6 (bit=0) or e7 (bit=1),
+// separated by 16th-note rests. At BPM=200, one 16th note = 75ms.
+// Hour zero gets a single low (e6) beep.
+//
+void _startHourlyChime(uint8_t hour)
+{
+  // Max size: cHourlyHeader(21) + 5 notes * "e7"(2) + 4 pauses * ",16p,"(5) = 21+10+20 = 51
+  char buf[56];
+  uint8_t pos = sizeof(cHourlyHeader) - 1;
+
+  memcpy(buf, cHourlyHeader, pos);
+
+  if (hour == 0)
+  {
+    buf[pos++] = 'e'; buf[pos++] = '6';
+  }
+  else
+  {
+    while (hour > 0)
+    {
+      static_assert(sizeof(cHourly0) == sizeof(cHourly1), "Note strings must have equal length");
+      const char *note = (hour & 1) ? cHourly1 : cHourly0;
+      memcpy(buf + pos, note, sizeof(cHourly0) - 1);
+      pos += sizeof(cHourly0) - 1;
+      hour >>= 1;
+      if (hour > 0)
+      {
+        memcpy(buf + pos, cHourlyP, sizeof(cHourlyP) - 1);
+        pos += sizeof(cHourlyP) - 1;
+      }
+    }
+  }
+  RtttlPlayer::play(buf, pos);
+}
+
+
 // executes alarms based on _activeAlarms and _hourlyAlarmActive
 //
-void _executeAlarms()
+void _executeAlarms(const DateTime& current, Settings* pSettings)
 {
-  DateTime current = Application::dateTime();
-  Settings *pSettings = Application::getSettingsPtr();
-  uint8_t tone = 0, hour = current.hour(false, pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
+  uint8_t hour = current.hour(false, pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour));
   bool weBeeping = false, weBlinking = false;
   // determine if we need to be beeping and/or blinking
   if (_activeAlarms != 0)
@@ -206,17 +242,12 @@ void _executeAlarms()
     // finally, make beeping and blinking happen as necessary
     if (weBeeping == true)
     {
-      if (_beepCounter >= sizeof(cAlarmToneDurations) / 2) // words / 2 = bytes
+      if (!RtttlPlayer::isPlaying())
       {
-        _beepCounter = 0;
-      }
-
-      if (Hardware::tone(cAlarmToneFrequencies[_beepCounter], cAlarmToneDurations[_beepCounter]) != Hardware::HwReqAck::HwReqAckError)
-      {
-        _beepCounter++;
+        RtttlPlayer::play(cAlarmTone, sizeof(cAlarmTone) - 1);
       }
       // cancel this since some other, more important alarm is active
-      _hourlyAlarmActive = false;
+      _hourlyState = HourlyState::Idle;
     }
 
     if (weBlinking == true)
@@ -229,65 +260,27 @@ void _executeAlarms()
       DisplayManager::setDisplayBlanking(RTC_SSR & (1 << 6));
     }
   }
-  else if (_hourlyAlarmActive == true)
+  else if (_hourlyState != HourlyState::Idle)
   {
     if (hour == _lastHourlyBeepHour)
     {
       // ignore the request if we already beeped this hour
-      _hourlyAlarmActive = false;
+      _hourlyState = HourlyState::Idle;
     }
-    else
+    else if (_hourlyState == HourlyState::Playing)
     {
-      // emit at least one (low) beep at hour zero
-      if (hour == 0)
+      if (!RtttlPlayer::isPlaying())
       {
-        Hardware::tone(cHourlyAlarmToneFrequencies[tone], cHourlyAlarmToneDuration);
-        _beepCounter = 0;
+        // chime has finished playing
         _lastHourlyBeepHour = hour;
-        _hourlyAlarmActive = false;
-      }
-      else
-      {
-        // we use bit 0 to determine if we should beep or pause/rest...so...
-        // below we roll bit 0 off to get the number of bits we need to rotate
-        tone = (hour >> (_beepCounter >> 1));
-
-        // if tone is greater than zero, let's make some (more) beeps!
-        if (tone > 0)
-        {
-          // here we check if we should beep or pause by checking bit 0
-          if ((_beepCounter & 1) == 0)
-          {
-            // this makes a beep based on the LSb of the hour
-            if (Hardware::tone(cHourlyAlarmToneFrequencies[tone & 1], cHourlyAlarmToneDuration) != Hardware::HwReqAck::HwReqAckError)
-            {
-              // we end up here if Hardware accepted our beep, so we can move onto the next beep/bit
-              _beepCounter++;
-            }
-          }
-          else
-          {
-            // this produces a pause/rest
-            if (Hardware::tone(1, cHourlyAlarmToneDuration) != Hardware::HwReqAck::HwReqAckError)
-            {
-              // we end up here if Hardware accepted our beep, so we can move onto the next beep/bit
-              _beepCounter++;
-            }
-          }
-        }
-        else
-        {
-          // if tone was zero, there are no more (relevant) bits to beep about
-          _beepCounter = 0;
-          _lastHourlyBeepHour = hour;
-          _hourlyAlarmActive = false;
-        }
+        _hourlyState = HourlyState::Idle;
       }
     }
-  }
-  else
-  {
-    _beepCounter = 0;
+    else if (!RtttlPlayer::isPlaying())
+    {
+      _startHourlyChime(hour);
+      _hourlyState = HourlyState::Playing;
+    }
   }
 }
 
@@ -312,7 +305,7 @@ void keyHandler(Keys::Key key)
 
 void loop()
 {
-  DateTime current = Application::dateTime();
+  const DateTime current = Application::dateTime();
   Settings *pSettings = Application::getSettingsPtr();
 
   // first, check/get the external alarm inputs
@@ -321,17 +314,17 @@ void loop()
   // next, if the clock is set, check if any alarm boundaries have been crossed, triggering an alarm
   if (Hardware::rtcIsSet())
   {
-    _activeAlarms |= _getActiveTimeSlotAlarms();
+    _activeAlarms |= _getActiveTimeSlotAlarms(current, pSettings);
 
     // if the minutes and seconds are both zero, it's the top of the hour, so trigger the hourly alarm
     if ((pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::HourlyChime) == true)
         && (current.second(false) == 0) && (current.minute(false) == 0))
     {
-      _hourlyAlarmActive = true;
+      _hourlyState = HourlyState::Pending;
     }
   }
 
-  _executeAlarms();
+  _executeAlarms(current, pSettings);
 }
 
 
@@ -343,7 +336,7 @@ bool isAlarmActive()
 
 void clearAlarm()
 {
-  _hourlyAlarmActive = false;
+  _hourlyState = HourlyState::Idle;
 
   if (_activeAlarms == 0) return;
 
@@ -360,7 +353,7 @@ void clearAlarm()
       _activeAlarms &= (~(1 << i));
     }
   }
-  _beepCounter = 0;
+  RtttlPlayer::stop();
   // restore the display, etc. in case the alarm(s) changed anything
   Application::refreshSettings();
 }
