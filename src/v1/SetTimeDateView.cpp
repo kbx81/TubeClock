@@ -35,14 +35,16 @@ SetTimeDateView::SetTimeDateView()
   : _selectedItem(0),
     _workingDateTime(),
     _mode(Application::OperatingMode::OperatingModeSetClock),
+    _relatedSetting(0),
     _settings(Settings())
 {
 }
 
 
-void SetTimeDateView::enter()
+void SetTimeDateView::enter(uint8_t relatedSetting)
 {
   _mode = Application::getOperatingMode();
+  _relatedSetting = relatedSetting;
 
   _settings = Application::getSettings();
 
@@ -54,7 +56,7 @@ void SetTimeDateView::enter()
     break;
 
     default:
-    _workingDateTime = _settings.getTime(Application::getOperatingModeRelatedSetting(_mode));
+    _workingDateTime = _settings.getTime(_relatedSetting);
     break;
   }
 
@@ -96,7 +98,7 @@ bool SetTimeDateView::keyHandler(Keys::Key key)
       break;
 
       default:
-      _settings.setTime(Application::getOperatingModeRelatedSetting(_mode), setDateTime);
+      _settings.setTime(_relatedSetting, setDateTime);
       Application::setSettings(_settings);
       break;
     }

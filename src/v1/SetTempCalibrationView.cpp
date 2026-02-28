@@ -41,7 +41,7 @@ SetTempCalibrationView::SetTempCalibrationView()
 }
 
 
-void SetTempCalibrationView::enter()
+void SetTempCalibrationView::enter(uint8_t /*relatedSetting*/)
 {
   _selectedSensor = static_cast<int8_t>(Application::getViewMode());
 

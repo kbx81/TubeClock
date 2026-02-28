@@ -50,7 +50,7 @@ class SystemStatusView : public View {
 ///
 public: // Implement the SystemStatusView class
   SystemStatusView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

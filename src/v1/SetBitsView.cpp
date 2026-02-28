@@ -29,20 +29,20 @@ SetBitsView::SetBitsView()
   : _setBits(0),
     _bitsMask(0),
     _selectedBit(0),
-    _mode(Application::OperatingMode::OperatingModeSetSystemOptions),
+    _relatedSetting(Settings::Setting::SystemOptions),
     _settings(Settings())
 {
 }
 
 
-void SetBitsView::enter()
+void SetBitsView::enter(uint8_t relatedSetting)
 {
-  _mode = Application::getOperatingMode();
+  _relatedSetting = relatedSetting;
 
   _settings = Application::getSettings();
 
-  _setBits = _settings.getRawSetting(Application::getOperatingModeRelatedSetting(_mode));
-  _bitsMask = Settings::cSettingData[Application::getOperatingModeRelatedSetting(_mode)];
+  _setBits = _settings.getRawSetting(_relatedSetting);
+  _bitsMask = Settings::cSettingData[_relatedSetting];
 
   _selectedBit = 0;
 }
@@ -54,7 +54,7 @@ bool SetBitsView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::A)
   {
-    _settings.setRawSetting(Application::getOperatingModeRelatedSetting(_mode), _setBits);
+    _settings.setRawSetting(_relatedSetting, _setBits);
     Application::setSettings(_settings);
 
     DisplayManager::blink();

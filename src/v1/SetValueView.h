@@ -21,7 +21,6 @@
 
 #include <cstdint>
 
-#include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
@@ -34,7 +33,7 @@ class SetValueView : public View {
 //
 public: // Implement the SetValue class
   SetValueView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
@@ -47,9 +46,9 @@ private:
   //
   uint16_t _maxValue;
 
-  // the main application's mode
+  // the setting index this view is editing
   //
-  Application::OperatingMode _mode;
+  uint8_t _relatedSetting;
 
   // Settings to be used by the view
   //

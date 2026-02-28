@@ -40,7 +40,7 @@ TestDisplayView::TestDisplayView()
 }
 
 
-void TestDisplayView::enter()
+void TestDisplayView::enter(uint8_t /*relatedSetting*/)
 {
   _mode = Application::getOperatingMode();
 

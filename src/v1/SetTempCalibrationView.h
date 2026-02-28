@@ -34,7 +34,7 @@ public:
   static const uint8_t cSensorCount = 4;
 
   SetTempCalibrationView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

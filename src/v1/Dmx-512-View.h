@@ -34,7 +34,7 @@ class Dmx512View : public View {
 //
 public: // Implement the Dmx512View class
   Dmx512View();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

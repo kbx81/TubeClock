@@ -45,8 +45,9 @@ class View {
 
   public:
     /// The method which is called before this view is displayed
+    /// @param relatedSetting The setting index this view is responsible for editing
     ///
-    virtual void enter();
+    virtual void enter(uint8_t relatedSetting);
 
     /// Called before loop for any pressed key
     ///

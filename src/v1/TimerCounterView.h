@@ -49,7 +49,7 @@ public: // Implement the TimerCounterView class
   static void setTimerValue(uint32_t value);
   static uint32_t getTimerValue();
   static bool getCountUp();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

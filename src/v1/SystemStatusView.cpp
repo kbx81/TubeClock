@@ -41,7 +41,7 @@ SystemStatusView::SystemStatusView()
 }
 
 
-void SystemStatusView::enter()
+void SystemStatusView::enter(uint8_t /*relatedSetting*/)
 {
   DisplayManager::setStatusLedAutoRefreshing(true);
 }

@@ -38,7 +38,7 @@ Dmx512View::Dmx512View()
 }
 
 
-void Dmx512View::enter()
+void Dmx512View::enter(uint8_t /*relatedSetting*/)
 {
   _mode = Application::getOperatingMode();
 

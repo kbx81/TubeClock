@@ -33,7 +33,7 @@ MainMenuView::MainMenuView()
 }
 
 
-void MainMenuView::enter()
+void MainMenuView::enter(uint8_t /*relatedSetting*/)
 {
   // correct the mode if it's out of range
   if ((_selectedMode == 0) || (_selectedMode > Application::OperatingMode::OperatingModeSlot8Time))

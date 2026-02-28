@@ -21,7 +21,6 @@
 
 #include <cstdint>
 
-#include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
@@ -39,7 +38,7 @@ static const uint16_t cLowlightPercentage;
 //
 public: // Implement the SetValue class
   SetBitsView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
@@ -56,9 +55,9 @@ private:
   //
   uint8_t _selectedBit;
 
-  // the main application's mode
+  // the setting index this view is editing
   //
-  Application::OperatingMode _mode;
+  uint8_t _relatedSetting;
 
   // Settings to be used by the view
   //

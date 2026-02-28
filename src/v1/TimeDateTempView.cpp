@@ -45,7 +45,7 @@ TimeDateTempView::TimeDateTempView()
 }
 
 
-void TimeDateTempView::enter()
+void TimeDateTempView::enter(uint8_t /*relatedSetting*/)
 {
   Settings *pSettings = Application::getSettingsPtr();
 

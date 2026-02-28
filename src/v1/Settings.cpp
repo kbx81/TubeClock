@@ -70,17 +70,17 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour (2 AM)
       500,           // EffectDuration
       300,           // EffectFrequency
-      20,            // MinimumIntensity
+      10,            // MinimumIntensity
       3,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
       79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
       79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
-      0,             // DateFormat
+      2,             // DateFormat (MM.DD.YY)
       32,            // TimeZone
       0,             // ColonBehavior
-      30,            // TimerResetValue
+      60,            // TimerResetValue
       0              // DmxAddress
     }
   };
@@ -104,17 +104,17 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour
       500,           // EffectDuration
       300,           // EffectFrequency
-      20,            // MinimumIntensity
+      10,            // MinimumIntensity
       3,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
       79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
       79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
-      1,             // DateFormat (DD.MM.YYYY)
+      1,             // DateFormat (DD.MM.YY)
       56,            // TimeZone
       0,             // ColonBehavior
-      30,            // TimerResetValue
+      60,            // TimerResetValue
       0              // DmxAddress
     }
   };
@@ -138,17 +138,17 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour
       0,             // EffectDuration (effects disabled)
       0,             // EffectFrequency (effects disabled)
-      20,            // MinimumIntensity
+      10,            // MinimumIntensity
       0,             // BeeperVolume (silent)
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
       79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
       79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
-      0,             // DateFormat
+      0,             // DateFormat (YY.MM.DD)
       56,            // TimeZone
       0,             // ColonBehavior
-      30,            // TimerResetValue
+      60,            // TimerResetValue
       0              // DmxAddress
     }
   };
@@ -172,17 +172,17 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour (2 AM)
       500,           // EffectDuration
       300,           // EffectFrequency
-      20,            // MinimumIntensity
+      10,            // MinimumIntensity
       2,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
       79,            // TemperatureCalibrationDS1722 (79 = -2.0C)
       79,            // TemperatureCalibrationLM74 (79 = -2.0C)
       0,             // DisplayRefreshInterval
-      0,             // DateFormat
+      0,             // DateFormat (YY.MM.DD)
       32,            // TimeZone
       0,             // ColonBehavior
-      30,            // TimerResetValue
+      60,            // TimerResetValue
       0              // DmxAddress
     }
   };

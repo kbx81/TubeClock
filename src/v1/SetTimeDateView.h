@@ -49,7 +49,7 @@ public:
 ///
 public: // Implement the SetTimeDateView class
   SetTimeDateView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
@@ -62,9 +62,13 @@ private:
   ///
   DateTime _workingDateTime;
 
-  /// @brief the main application's mode
+  /// @brief the main application's mode (drives clock/date/slot behavioral dispatch)
   ///
   Application::OperatingMode _mode;
+
+  /// @brief the setting index passed at enter() time (used for slot save operations)
+  ///
+  uint8_t _relatedSetting;
 
   /// @brief Settings to be used by the view
   ///

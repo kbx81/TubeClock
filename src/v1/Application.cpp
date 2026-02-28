@@ -347,8 +347,9 @@ void setOperatingMode(OperatingMode mode)
   // set the new mode
   _applicationMode = mode;
   _viewMode = ViewMode::ViewMode0;
-  _currentView = cModeViews[static_cast<uint8_t>(cViewDescriptor[static_cast<uint8_t>(mode)].view)];
-  _currentView->enter();
+  const viewDescriptor &vd = cViewDescriptor[static_cast<uint8_t>(mode)];
+  _currentView = cModeViews[static_cast<uint8_t>(vd.view)];
+  _currentView->enter(vd.relatedSettingNumber);
   // reset idle counter so the auto-return doesn't immediately override this mode
   _idleCounter = 0;
   // this enables controller() immediately upon entering this mode

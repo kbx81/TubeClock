@@ -19,7 +19,7 @@
 #include "View.h"
 
 
-void View::enter()
+void View::enter(uint8_t /*relatedSetting*/)
 {
   // do nothing by default
 }

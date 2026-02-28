@@ -44,7 +44,7 @@ enum FixedDisplayItem : uint8_t
 //
 public: // Implement the TimeDateTempView class
   TimeDateTempView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

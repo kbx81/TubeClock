@@ -30,22 +30,20 @@ namespace kbxTubeClock {
 SetValueView::SetValueView()
   : _setValue(0),
     _maxValue(0),
-    _mode(Application::OperatingMode::OperatingModeSetTimerResetValue),
+    _relatedSetting(Settings::Setting::TimerResetValue),
     _settings(Settings())
 {
 }
 
 
-void SetValueView::enter()
+void SetValueView::enter(uint8_t relatedSetting)
 {
-  _mode = Application::getOperatingMode();
+  _relatedSetting = relatedSetting;
 
   _settings = Application::getSettings();
 
-  // Subtract the first in the OperatingModeSetDurationClock series from the
-  //   current mode to get the value we're modifying
-  _setValue = _settings.getRawSetting(Application::getOperatingModeRelatedSetting(_mode));
-  _maxValue = Settings::cSettingData[Application::getOperatingModeRelatedSetting(_mode)];
+  _setValue = _settings.getRawSetting(_relatedSetting);
+  _maxValue = Settings::cSettingData[_relatedSetting];
 }
 
 
@@ -55,9 +53,7 @@ bool SetValueView::keyHandler(Keys::Key key)
 
   if (key == Keys::Key::A)
   {
-    // Subtract the first in the OperatingModeSetDurationClock series from the
-    //   current mode to get the value we're modifying
-    _settings.setRawSetting(Application::getOperatingModeRelatedSetting(_mode), _setValue);
+    _settings.setRawSetting(_relatedSetting, _setValue);
     Application::setSettings(_settings);
 
     DisplayManager::blink();
@@ -128,15 +124,15 @@ void SetValueView::loop()
   DateTime offsetTime(2001, 1, 1);  // ensure date after 2000/1/1 in case of subtraction
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
 
-  switch (_mode)
+  switch (_relatedSetting)
   {
     // this is because DMX-512 starts counting at one and not at zero
-    case Application::OperatingMode::OperatingModeSetDMX512Address:
+    case Settings::Setting::DmxAddress:
       displayedValue += 1;
       break;
 
     // make time zone display logical
-    case Application::OperatingMode::OperatingModeSetTimeZone:
+    case Settings::Setting::TimeZone:
       if (offsetInMinutes < 0)
       {
         dotsBitmap = 0b0001;    // negative value/offset indicator

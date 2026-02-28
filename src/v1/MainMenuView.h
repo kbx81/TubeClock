@@ -33,7 +33,7 @@ class MainMenuView : public View {
 //
 public: // Implement the MainMainView class
   MainMenuView();
-  virtual void enter() override;
+  virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

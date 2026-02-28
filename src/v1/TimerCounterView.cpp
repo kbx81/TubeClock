@@ -84,7 +84,7 @@ bool TimerCounterView::getCountUp()
 }
 
 
-void TimerCounterView::enter()
+void TimerCounterView::enter(uint8_t /*relatedSetting*/)
 {
   // we don't use the status LED, so turn it off in case it was left on
   DisplayManager::writeStatusLed(RgbLed());
