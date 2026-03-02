@@ -6,5 +6,5 @@
 // Build number increments automatically at compile time (see scripts/bump_build.sh)
 // and resets when major (year) or minor (month) changes.
 #define FIRMWARE_VERSION_MAJOR 26
-#define FIRMWARE_VERSION_MINOR 2
+#define FIRMWARE_VERSION_MINOR 3
 #define FIRMWARE_VERSION_PATCH 1
