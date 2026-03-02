@@ -77,7 +77,7 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour (2 AM)
       500,           // EffectDuration
       300,           // EffectFrequency
-      10,            // MinimumIntensity
+      8,             // MinimumIntensity
       3,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
@@ -111,7 +111,7 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour
       500,           // EffectDuration
       300,           // EffectFrequency
-      10,            // MinimumIntensity
+      8,             // MinimumIntensity
       3,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
@@ -145,7 +145,7 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour
       0,             // EffectDuration (effects disabled)
       0,             // EffectFrequency (effects disabled)
-      10,            // MinimumIntensity
+      8,             // MinimumIntensity
       0,             // BeeperVolume (silent)
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)
@@ -179,7 +179,7 @@ namespace kbxTubeClock {
       2,             // DstSwitchHour (2 AM)
       500,           // EffectDuration
       300,           // EffectFrequency
-      10,            // MinimumIntensity
+      8,             // MinimumIntensity
       2,             // BeeperVolume
       4,             // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
       79,            // TemperatureCalibrationDS3234 (79 = -2.0C)

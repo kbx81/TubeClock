@@ -458,13 +458,13 @@ void _loadCrossfaders(const Display &display)
   {
     for (uint8_t glyph = 0; glyph < NixieTube::cGlyphsPerTube; glyph++)
     {
-      _crossfader[(tube * NixieTube::cGlyphsPerTube) + glyph].startNewFadeIfDifferent(display.getTubeRaw(tube).getGlyphRaw(NixieTube::cGlyphsPerTube - 1 - glyph));
+      _crossfader[(tube * NixieTube::cGlyphsPerTube) + glyph].startNewFade(display.getTubeRaw(tube).getGlyphRaw(NixieTube::cGlyphsPerTube - 1 - glyph));
     }
   }
   // ...and here we load the dot crossfaders
   for (uint8_t dot = 0; dot < Display::cDotCount; dot++)
   {
-    _crossfader[(Display::cGlyphCount) + dot].startNewFadeIfDifferent(display.getDotRaw(dot));
+    _crossfader[(Display::cGlyphCount) + dot].startNewFade(display.getDotRaw(dot));
   }
 }
 
@@ -479,14 +479,14 @@ void writeDisplay(const Display &display, const RgbLed &statusLed)
 {
   _loadCrossfaders(display);
 
-  // _crossfader[Display::cPixelCount].startNewFadeIfDifferent(statusLed);
+  // _crossfader[Display::cPixelCount].startNewFade(statusLed);
   writeStatusLed(statusLed);
 }
 
 
 void writeStatusLed(const RgbLed &statusLed)
 {
-  // _crossfader[Display::cPixelCount].startNewFadeIfDifferent(statusLed);
+  // _crossfader[Display::cPixelCount].startNewFade(statusLed);
   if (_statusLed == statusLed) return;
   _statusLed = statusLed;
   _refreshStatusLed = true;

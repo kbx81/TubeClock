@@ -16,43 +16,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>
 //
+#include <cstdint>
+
 #include "NixieGlyph.h"
 #include "NixieGlyphCrossfader.h"
 
-/// @mainpage
-///
-/// @section intro_sec Introduction
-///
-/// This library contains a class to manage crossfading of glyphs on the Tube
-/// Clock's Nixie display.
-///
-/// @section requirements_sec Requirements
-///
-/// This library is written in a manner so as to be compatible on a range of
-/// CPUs/MCUs. It has been tested on Arduino and STM32F0 platforms. It requires
-/// a modern C++ compiler (C++11).
-///
-/// @section classes_sec Classes
-///
-/// There is only the NixieGlyphCrossfader::NixieGlyphCrossfader class. Read the
-/// documentation of this class for all details.
-///
 
 namespace kbxTubeClock {
-
-
-NixieGlyphCrossfader::NixieGlyphCrossfader()
-  : _active(NixieGlyph()),
-    _start(NixieGlyph()),
-    _target(NixieGlyph())
-{
-}
-
-
-bool NixieGlyphCrossfader::fadeIsActive()
-{
-  return (_active.getDuration() < _target.getDuration());
-}
 
 
 NixieGlyph NixieGlyphCrossfader::getActive() const
@@ -61,33 +31,21 @@ NixieGlyph NixieGlyphCrossfader::getActive() const
 }
 
 
-NixieGlyph NixieGlyphCrossfader::getTargetWithDuration() const
-{
-  return _target;
-}
-
-
-void NixieGlyphCrossfader::resetFade()
-{
-  if (_target.getDuration() == 0)
-  {
-    // Duration 0 means instant transition — snap immediately to avoid
-    // stale _active values being read by refresh() before the next tick()
-    _active = _target;
-    _start = _target;
-  }
-  else
-  {
-    // reset the crossfade timer/counter
-    _active.setDuration(0);
-    // where we are is where the fade starts now
-    _start = _active;
-  }
-}
-
-
 void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget)
 {
+  if (newTarget.getIntensity() == _target.getIntensity())
+  {
+    // Intensity unchanged. If duration=0 is requested and a fade is still in
+    // progress, snap to target immediately — this allows a mode switch to
+    // interrupt an in-progress fade even when the intensity already matches.
+    if (newTarget.getDuration() == 0 && _active.getDuration() < _target.getDuration())
+    {
+      _active = _target;
+      _active.setDuration(_target.getDuration() + 1);
+    }
+    return;
+  }
+
   // Save current position and reset tick counter BEFORE updating _target.
   // This prevents a race with tick() (ISR): if tick() fires after _target is
   // set but before the counter is reset, it sees currentTick >= totalTicks
@@ -108,15 +66,6 @@ void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget)
 }
 
 
-void NixieGlyphCrossfader::startNewFadeIfDifferent(const NixieGlyph &newTarget)
-{
-  if (newTarget != _target)
-  {
-    startNewFade(newTarget);
-  }
-}
-
-
 void NixieGlyphCrossfader::tick()
 {
   // the _active NixieGlyph object's duration value is the current number of ticks into the fade
@@ -129,66 +78,15 @@ void NixieGlyphCrossfader::tick()
     _active.setFromLinearInterpolation(currentTick, totalTicks, _start, _target);
     _active.setDuration(currentTick + 1);
   }
-  else if (currentTick >= totalTicks)
+  else if (currentTick == totalTicks)
   {
-    // ensure _active has reached the _target values
+    // Snap to target exactly once; push duration past totalTicks so subsequent
+    // ticks fall through to the implicit else (do nothing), avoiding repeated
+    // writes to _active and the concurrent-update hazard with main-loop callers
     _active = _target;
-    // this kicks us into a "do nothing" state
-    // _active.setDuration(currentTick + 1);
+    _active.setDuration(totalTicks + 1);
   }
-}
-
-
-void NixieGlyphCrossfader::updateFadeDuration(const uint32_t newDuration)
-{
-  _target.setDuration(newDuration);
-}
-
-
-void NixieGlyphCrossfader::updateFadeDuration(const NixieGlyph &newDuration)
-{
-  _target.setDuration(newDuration.getDuration());
-}
-
-
-void NixieGlyphCrossfader::updateFadeTarget(const NixieGlyph &newTarget, const bool startNewFade)
-{
-  auto duration = _target.getDuration();
-
-  if (startNewFade == true)
-  {
-    // Reset counter before updating target to prevent ISR race (see startNewFade)
-    _start = _active;
-    _active.setDuration(0);
-  }
-
-  _target = newTarget;
-  _target.setDuration(duration);
-
-  if (startNewFade == true && _target.getDuration() == 0)
-  {
-    _active = _target;
-    _start = _target;
-  }
-}
-
-
-void NixieGlyphCrossfader::updateFadeTargetAndDuration(const NixieGlyph &newTarget, const bool startNewFade)
-{
-  if (startNewFade == true)
-  {
-    // Reset counter before updating target to prevent ISR race (see startNewFade)
-    _start = _active;
-    _active.setDuration(0);
-  }
-
-  _target = newTarget;
-
-  if (startNewFade == true && _target.getDuration() == 0)
-  {
-    _active = _target;
-    _start = _target;
-  }
+  // else: currentTick > totalTicks — fade already complete, nothing to do
 }
 
 

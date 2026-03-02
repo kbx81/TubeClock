@@ -38,8 +38,8 @@ TimeDateTempView::TimeDateTempView()
   : _currentTemperature(0),
     _currentTime(Application::dateTime()),
     _statusLed(RgbLed()),
-    _animationCountdown(0),
-    _switchCountdown(0),
+    _animationElapsed(0),
+    _switchElapsed(0),
     _mode(Application::OperatingMode::OperatingModeFixedDisplay)
 {
 }
@@ -53,9 +53,9 @@ void TimeDateTempView::enter(uint8_t /*relatedSetting*/)
 
   _currentTime = Application::dateTime();
 
-  _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
+  _animationElapsed = 0;
 
-  _switchCountdown = _getItemDuration(static_cast<FixedDisplayItem>(Application::getViewMode()));
+  _switchElapsed = 0;
 
   DisplayManager::setStatusLedAutoRefreshing(pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm));
 }
@@ -128,9 +128,8 @@ bool TimeDateTempView::keyHandler(Keys::Key key)
 
   if (tick == true)
   {
-    Settings *pSettings = Application::getSettingsPtr();
-    _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
-    _switchCountdown = _getItemDuration(static_cast<FixedDisplayItem>(Application::getViewMode()));
+    _animationElapsed = 0;
+    _switchElapsed = 0;
   }
 
   return tick;
@@ -151,15 +150,9 @@ void TimeDateTempView::loop()
   {
     _currentTime = Application::dateTime();
     _currentTemperature = Hardware::temperature(displayFahrenheit);
-    // decrement countdowns on each tick
-    if (_animationCountdown > 0)
-    {
-      _animationCountdown--;
-    }
-    if (_switchCountdown > 0)
-    {
-      _switchCountdown--;
-    }
+    // advance counters on each tick
+    _animationElapsed++;
+    _switchElapsed++;
   }
   // set status LED to appropriate color if enabled as AM/PM indicator
   if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm) == true)
@@ -187,7 +180,7 @@ void TimeDateTempView::loop()
   }
 
   // rotate the display if it's time to do so
-  if ((_mode == Application::OperatingMode::OperatingModeToggleDisplay) && (_switchCountdown == 0))
+  if ((_mode == Application::OperatingMode::OperatingModeToggleDisplay) && (_switchElapsed >= _getItemDuration(currentDisplayItem)))
   {
     switch (currentDisplayItem)
     {
@@ -204,20 +197,20 @@ void TimeDateTempView::loop()
     }
 
     Application::setViewMode(static_cast<ViewMode>(nextDisplayItem));
-    _switchCountdown = _getItemDuration(nextDisplayItem);
+    _switchElapsed = 0;
     // also trigger an animation if it is enabled
     if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::TriggerEffectOnRotate) == true)
     {
       // this will trigger an animation based on the condition below
-      _animationCountdown = 0;
+      _animationElapsed = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
     }
   }
   // run an animation if it's time to do so
-  if ((_animationCountdown == 0) && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
+  if ((_animationElapsed >= pSettings->getRawSetting(Settings::Setting::EffectFrequency)) && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
   {
     Animator::run();
 
-    _animationCountdown = pSettings->getRawSetting(Settings::Setting::EffectFrequency);
+    _animationElapsed = 0;
 
     Animator::setInitialDisplay(tcDisp);
     // only modify the final display if it's really necessary (due to rotation)
@@ -275,11 +268,10 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
 {
   Application::ExternalControl externalControlState = Application::getExternalControlState();
   Settings *pSettings = Application::getSettingsPtr();
-  uint32_t dotsBitmap = _getDotsBitmap(),
-           secondsSinceMidnight = _currentTime.secondsSinceMidnight(false);
+  uint32_t dotsBitmap = _getDotsBitmap();
   uint16_t duration = pSettings->getRawSetting(Settings::Setting::FadeDuration);
   bool     msdsOff = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff);
-  uint8_t tubeIntensityBitmap = 0b111111;
+  uint8_t  tubeIntensityBitmap = 0b111111;
 
   if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum)
   {
@@ -302,7 +294,7 @@ void TimeDateTempView::_setDisplay(Display *display, const FixedDisplayItem item
 
       case FixedDisplayItem::TimeSeconds:
         dotsBitmap = 0;       // no dots for seconds display
-        display->setDisplayFromWord(secondsSinceMidnight);
+        display->setDisplayFromWord(_currentTime.secondsSinceMidnight(false));
         for (uint8_t i = display->cTubeCount - 1; msdsOff && i > 0; i--)
         {
           if (display->getTubeValue(i) == 0)

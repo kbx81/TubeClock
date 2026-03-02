@@ -86,13 +86,13 @@ private:
   //
   RgbLed   _statusLed;
 
-  // countdown (in seconds) until the next display animation
+  // seconds elapsed since the last display animation
   //
-  uint16_t _animationCountdown;
+  uint16_t _animationElapsed;
 
-  // countdown (in seconds) until the next display switch
+  // seconds elapsed since the last display switch
   //
-  uint16_t _switchCountdown;
+  uint16_t _switchElapsed;
 
   // the main application's mode
   //

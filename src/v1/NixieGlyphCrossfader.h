@@ -19,8 +19,6 @@
 #pragma once
 
 
-#include <cstdint>
-
 #include "NixieGlyph.h"
 
 
@@ -32,15 +30,7 @@ namespace kbxTubeClock {
 class NixieGlyphCrossfader
 {
 public:
-  /// @brief Default constructor
-  ///
-  NixieGlyphCrossfader();
-
-  /// @brief Returns true if a crossfade is in progress
-  ///
-  /// @return true if a crosfade is currently in progress/not complete
-  ///
-  bool fadeIsActive();
+  NixieGlyphCrossfader() : _active(), _start(), _target() {}
 
   /// @brief Gets the fader's active/current value
   ///
@@ -48,53 +38,18 @@ public:
   ///
   NixieGlyph getActive() const;
 
-  /// @brief Gets the fader's target values
-  ///
-  /// @return fader's target values, fade duration included
-  ///
-  NixieGlyph getTargetWithDuration() const;
-
-  /// @brief Restarts fade to target from active values with existing duration
-  ///
-  void resetFade();
-
   /// @brief Starts a new fade with (a) new target value(s)
+  /// No-op if the target intensity is unchanged, EXCEPT: if duration=0 is
+  /// requested and a fade is still in progress, the fader snaps to the current
+  /// target immediately so a mode switch can cleanly interrupt a running fade.
   ///
-  /// @param newTarget New RGB target values for fader, including duration
+  /// @param newTarget New target values for fader, including duration
   ///
   void startNewFade(const NixieGlyph &newTarget);
-
-  /// @brief Starts a new fade with (a) new target value(s) if target values are different from existing values
-  ///
-  /// @param newTarget New RGB target values for fader, including duration
-  ///
-  void startNewFadeIfDifferent(const NixieGlyph &newTarget);
 
   /// @brief Advances all crossfades currently in progress (call at fixed intervals)
   ///
   void tick();
-
-  /// @brief Updates fade duration only
-  ///
-  /// @param newDuration New duration for fader (RgbLed RGB values ignored)
-  ///
-  void updateFadeDuration(const uint32_t newDuration);
-  void updateFadeDuration(const NixieGlyph &newDuration);
-
-  /// @brief Updates fade target value(s) only (resumes fade if it was completed)
-  ///
-  /// @param newTarget New target value(s) for fader
-  /// @param startNewFade New fade begins if true
-  ///
-  void updateFadeTarget(const NixieGlyph &newTarget, const bool startNewFade = false);
-
-  /// @brief Updates fade target value(s) and duration (resumes fade if it was completed)
-  ///
-  /// @param newTarget New target value(s) for fader including duration
-  /// @param startNewFade New fade begins if true
-  ///
-  void updateFadeTargetAndDuration(const NixieGlyph &newTarget, const bool startNewFade = false);
-
 
 private:
   NixieGlyph _active;   ///< current values of fader, duration value = tick counter

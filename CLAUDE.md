@@ -37,6 +37,8 @@ Output binary files are generated in `../../build/v1/`:
 - `TubeClock.bin` - Raw binary for flashing
 - `TubeClock.map` - Memory map file
 
+You can check the binary size from within the `src/v1` directory by running `arm-none-eabi-size ../../build/v1/TubeClock.elf`.
+
 ## Important Implementation Notes
 
 This is an embedded system with limited processing power/speed, storage (flash memory) and RAM. Implementations should be as lean as possible.

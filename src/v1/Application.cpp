@@ -216,17 +216,11 @@ void initialize()
   {
     setIntensity(255);  // Full brightness
   }
-  // setOperatingMode() will refreshSettings()
-  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StartupToToggle))
-  {
-    setOperatingMode(OperatingMode::OperatingModeToggleDisplay);
-  }
-  else
-  {
-    setOperatingMode(OperatingMode::OperatingModeFixedDisplay);
-  }
 
   Hardware::setHvState(true);
+
+  // we boot with _idleCounter = cMaximumIdleCount; idle mode results in calling
+  //  setOperatingMode() from loop() right away, which will also refreshSettings()
 }
 
 
