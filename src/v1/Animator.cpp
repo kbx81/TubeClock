@@ -34,7 +34,7 @@ namespace Animator {
 
 // Number
 //
-const uint8_t cMaxAnimationId = 10;
+const uint8_t cMaxAnimationId = 13;
 
 // Per-tube stagger offsets (0-5) for the staggered-start animation
 //
@@ -43,6 +43,26 @@ static const uint8_t cBaseStagger[Display::cTubeCount] = {3, 0, 5, 1, 4, 2};
 // The animation ID triggered by the last call to run()
 //
 uint16_t _animationId = 0;
+
+// Bitmask of animations not yet played in the current shuffle cycle (bits 0-12)
+//
+uint16_t _animationsRemaining = (1u << (cMaxAnimationId + 1)) - 1u;
+
+// Bitmask of wipe digits not yet used in the current shuffle cycle (bits 0-9)
+//
+uint16_t _wipeRemaining = (1u << 10) - 1u;
+
+// Transition digit (0-9) used for wipe animations
+//
+uint8_t _wipeValue = 0;
+
+// Per-animation random tube order for the random-roll animation
+//
+uint8_t _rollOrder[Display::cTubeCount];
+
+// LCG state for random animation selection
+//
+uint32_t _rngState = 1u;
 
 // The last frame written to the display. Ensures all frames are displayed.
 //
@@ -82,12 +102,90 @@ uint16_t _currentFrame(const uint16_t totalNumberOfFrames)
 }
 
 
-// Rolls over values > 9 (input is at most 18 given tube values 0-9 plus offset 0-9)
+// Rolls over values > 9 (input is at most 19 given tube values 0-9 plus offset 0-10)
 //
 uint8_t _rollOverer(uint8_t value)
 {
   if (value >= 10) value -= 10;
   return value;
+}
+
+
+// LCG random number generator
+//
+static uint32_t _rand()
+{
+  _rngState = _rngState * 1664525u + 1013904223u;
+  return _rngState;
+}
+
+
+// Picks a random value from a shuffle pool bitmask, resetting it when exhausted.
+//  pool covers bits 0..maxIdx; a set bit means that value has not yet been returned this cycle.
+//
+static uint8_t _pickFromPool(uint16_t &pool, const uint8_t maxIdx)
+{
+  if (pool == 0)
+  {
+    pool = (1u << (maxIdx + 1)) - 1u;
+  }
+
+  // Count set bits
+  uint8_t count = 0;
+  for (uint16_t tmp = pool; tmp; tmp >>= 1)
+  {
+    count += (tmp & 1u);
+  }
+
+  // Pick random index among set bits
+  uint8_t pick = static_cast<uint8_t>(_rand() % count);
+
+  // Find and return the Nth set bit index
+  for (uint8_t idx = 0; idx <= maxIdx; idx++)
+  {
+    if (pool & (1u << idx))
+    {
+      if (pick == 0)
+      {
+        pool &= ~(1u << idx);
+        return idx;
+      }
+      pick--;
+    }
+  }
+
+  return 0; // unreachable
+}
+
+
+
+// Picks a random animation from the remaining pool, resetting it when exhausted
+//
+static uint8_t _pickAnimation()
+{
+  if (_animationsRemaining == 0)
+  {
+    _rngState ^= RTC_SSR;
+  }
+  return _pickFromPool(_animationsRemaining, cMaxAnimationId);
+}
+
+
+// Fills _rollOrder with a Fisher-Yates random permutation of tube indices 0..cTubeCount-1
+//
+static void _shuffleTubeOrder()
+{
+  for (uint8_t i = 0; i < Display::cTubeCount; i++)
+  {
+    _rollOrder[i] = i;
+  }
+  for (uint8_t i = Display::cTubeCount - 1; i > 0; i--)
+  {
+    const uint8_t j   = static_cast<uint8_t>(_rand() % (i + 1u));
+    const uint8_t tmp = _rollOrder[i];
+    _rollOrder[i]     = _rollOrder[j];
+    _rollOrder[j]     = tmp;
+  }
 }
 
 
@@ -109,55 +207,71 @@ Display _frameGenerator0()
 }
 
 
-// Slide in from left
+// Shared helper for slide animations. fromLeft=true: slide in from left; fromLeft=false: slide in from right.
+//  Initial display scrolls off the opposite side; final display enters from the named side.
 //
-Display _frameGenerator1()
+static Display _frameGeneratorSlide(const bool fromLeft)
 {
   Display frame;
-  uint8_t frameNumber = _currentFrame(Display::cTubeCount);  // six tubes
+  const uint8_t frameNumber = _currentFrame(Display::cTubeCount);
   uint8_t t = 0;
 
-  // set from _initial -- does not run when frameNumber == 6
+  // set from _initial -- does not run when frameNumber == Display::cTubeCount
   for (t = 0; t < Display::cTubeCount - frameNumber; t++)
   {
-    frame.setTubeToValue(t + frameNumber, _initial.getTubeValue(t));
-
-    frame.setTubeIntensity(t + frameNumber, _initial.getTubeIntensity(t));
+    const uint8_t pos = fromLeft ? (t + frameNumber) : t;
+    const uint8_t src = fromLeft ? t : (t + frameNumber);
+    frame.setTubeToValue(pos, _initial.getTubeValue(src));
+    frame.setTubeIntensity(pos, _initial.getTubeIntensity(src));
   }
   // set from _final -- does not run when frameNumber == 0
   for (t = 0; t < frameNumber; t++)
   {
-    frame.setTubeToValue(frameNumber - 1 - t, _final.getTubeValue(Display::cTubeCount - 1 - t));
-
-    frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+    const uint8_t pos = fromLeft ? t : (Display::cTubeCount - frameNumber + t);
+    const uint8_t src = fromLeft ? (Display::cTubeCount - frameNumber + t) : t;
+    frame.setTubeToValue(pos, _final.getTubeValue(src));
+    frame.setTubeIntensity(pos, _final.getTubeIntensity(src));
   }
 
   return frame;
 }
 
 
-// One digit at a time roll from left
+// Slide in from left
 //
-Display _frameGenerator2()
+Display _frameGenerator1() { return _frameGeneratorSlide(true);  }
+
+
+// Slide in from right
+//
+Display _frameGenerator2() { return _frameGeneratorSlide(false); }
+
+
+// Shared helper for single-digit roll animations. fromLeft=true: roll from left; fromLeft=false: roll from right.
+//
+static Display _frameGeneratorRoll(const bool fromLeft)
 {
   Display frame;
-  uint8_t frameNumber = _currentFrame(10 * 6); // 10 digits by 6 tubes
-  uint8_t workingTube = (frameNumber * 0xCCCDu) >> 19,   // gives us 0 to (Display::cGlyphCount - 1)
-           workingValue = frameNumber - workingTube * 10, // gives us 0 - 9
+  uint8_t frameNumber  = _currentFrame(10 * 6); // 10 digits by 6 tubes
+  uint8_t phase        = (frameNumber * 0xCCCDu) >> 19,   // gives us 0 to 5
+           workingTube  = fromLeft ? phase : (Display::cTubeCount - 1 - phase),
+           workingValue = frameNumber - phase * 10,         // gives us 0 - 9
            t = 0;
 
-  // set from _initial -- does not run when frameNumber == 6
-  for (t = workingTube; t < Display::cTubeCount; t++)
+  // set from _initial (not-yet-rolled tubes)
+  for (t = fromLeft ? (workingTube + 1) : 0;
+       t < (fromLeft ? Display::cTubeCount : workingTube);
+       t++)
   {
     frame.setTubeToValue(t, _initial.getTubeValue(t));
-
     frame.setTubeIntensity(t, _initial.getTubeIntensity(t));
   }
-  // set from _final -- does not run when frameNumber == 0
-  for (t = 0; t < workingTube; t++)
+  // set from _final (already-rolled tubes)
+  for (t = fromLeft ? 0 : (workingTube + 1);
+       t < (fromLeft ? workingTube : Display::cTubeCount);
+       t++)
   {
     frame.setTubeToValue(t, _final.getTubeValue(t));
-
     frame.setTubeIntensity(t, _final.getTubeIntensity(t));
   }
 
@@ -168,9 +282,57 @@ Display _frameGenerator2()
 }
 
 
+// One digit at a time roll in random tube order
+//
+static Display _frameGeneratorRollRandom()
+{
+  Display frame;
+  uint8_t frameNumber  = _currentFrame(10 * 6); // 10 digits by 6 tubes
+  uint8_t phase        = (frameNumber * 0xCCCDu) >> 19,   // gives us 0 to 5
+          workingTube  = _rollOrder[phase],
+          workingValue = frameNumber - phase * 10,         // gives us 0 - 9
+          t            = 0;
+
+  // set from _initial (not-yet-rolled tubes)
+  for (t = phase + 1; t < Display::cTubeCount; t++)
+  {
+    const uint8_t tube = _rollOrder[t];
+    frame.setTubeToValue(tube, _initial.getTubeValue(tube));
+    frame.setTubeIntensity(tube, _initial.getTubeIntensity(tube));
+  }
+  // set from _final (already-rolled tubes)
+  for (t = 0; t < phase; t++)
+  {
+    const uint8_t tube = _rollOrder[t];
+    frame.setTubeToValue(tube, _final.getTubeValue(tube));
+    frame.setTubeIntensity(tube, _final.getTubeIntensity(tube));
+  }
+
+  frame.setTubeToValue(workingTube, _rollOverer(_final.getTubeValue(workingTube) + workingValue));
+  frame.setTubeIntensity(workingTube, _final.getTubeIntensity(workingTube));
+
+  return frame;
+}
+
+
+// One digit at a time roll from left
+//
+Display _frameGenerator3() { return _frameGeneratorRoll(true);  }
+
+
+// One digit at a time roll from right
+//
+Display _frameGenerator4() { return _frameGeneratorRoll(false); }
+
+
+// One digit at a time roll in random tube order
+//
+Display _frameGenerator5() { return _frameGeneratorRollRandom(); }
+
+
 // Odds then Evens digits roll
 //
-Display _frameGenerator3()
+Display _frameGenerator6()
 {
   Display frame;
   uint8_t frameNumber = _currentFrame(10 * 2); // 10 digits by 2 groups
@@ -260,43 +422,18 @@ static Display _frameGeneratorPairs(const bool outerFirst)
 
 // Pairs of digits roll inward  --><--
 //
-Display _frameGenerator4() { return _frameGeneratorPairs(true);  }
+Display _frameGenerator7() { return _frameGeneratorPairs(true);  }
 
 
 // Pairs of digits roll outward  <-->
 //
-Display _frameGenerator5() { return _frameGeneratorPairs(false); }
-
-
-// Intensity crossfade: fade out initial values, swap, fade in final values
-//
-Display _frameGenerator6()
-{
-  Display frame;
-  const uint16_t progress = _currentFrame(256); // 0 to 256
-
-  for (uint8_t t = 0; t < Display::cTubeCount; t++)
-  {
-    if (progress < 128)
-    {
-      frame.setTubeToValue(t, _initial.getTubeValue(t));
-      frame.setTubeIntensity(t, ((uint16_t)_initial.getTubeIntensity(t) * (128 - progress)) >> 7);
-    }
-    else
-    {
-      frame.setTubeToValue(t, _final.getTubeValue(t));
-      frame.setTubeIntensity(t, ((uint16_t)_final.getTubeIntensity(t) * (progress - 128)) >> 7);
-    }
-  }
-
-  return frame;
-}
+Display _frameGenerator8() { return _frameGeneratorPairs(false); }
 
 
 // Variable-speed roll: each tube rolls at speed proportional to distance to its final digit;
 //  all tubes finish simultaneously
 //
-Display _frameGenerator7()
+Display _frameGenerator9()
 {
   Display frame;
   const uint8_t f = _currentFrame(9); // 0 to 9
@@ -306,7 +443,8 @@ Display _frameGenerator7()
     const uint8_t initialVal = _initial.getTubeValue(t);
     const uint8_t finalVal   = _final.getTubeValue(t);
     const uint8_t dist       = (initialVal - finalVal + 10) % 10;
-    const uint8_t offset     = dist - dist * f / 9;
+    const uint8_t eDist      = dist ? dist : 10u;  // ensure at least one full cycle
+    const uint8_t offset     = eDist - eDist * f / 9;
 
     frame.setTubeToValue(t, _rollOverer(finalVal + offset));
     frame.setTubeIntensity(t, _final.getTubeIntensity(t));
@@ -318,7 +456,7 @@ Display _frameGenerator7()
 
 // Staggered start: each tube begins its roll at a pseudo-random time
 //
-Display _frameGenerator8()
+Display _frameGenerator10()
 {
   Display frame;
   const uint8_t currentPhase = _currentFrame(15); // 0 to 15 (6 stagger slots + 9 roll frames)
@@ -349,38 +487,9 @@ Display _frameGenerator8()
 }
 
 
-// Brightness sweep: final values appear as an intensity wave moves left to right
-//
-Display _frameGenerator9()
-{
-  Display frame;
-  const uint16_t progress = _currentFrame(256); // 0 to 256
-
-  for (uint8_t t = 0; t < Display::cTubeCount; t++)
-  {
-    frame.setTubeToValue(t, _final.getTubeValue(t));
-
-    const uint16_t tubeStart = (uint16_t)t * 32u; // staggered start: 0, 32, 64, 96, 128, 160
-
-    if (progress >= tubeStart + 64u)
-    {
-      frame.setTubeIntensity(t, _final.getTubeIntensity(t));
-    }
-    else if (progress >= tubeStart)
-    {
-      // Linear ramp over 64 steps
-      frame.setTubeIntensity(t, ((uint16_t)_final.getTubeIntensity(t) * (progress - tubeStart)) >> 6);
-    }
-    // else: intensity stays at 0 (default)
-  }
-
-  return frame;
-}
-
-
 // Slot machine deceleration: fast roll slowing to a stop on final digits (quadratic ease-out)
 //
-Display _frameGenerator10()
+Display _frameGenerator11()
 {
   Display frame;
   // tn = normalized time 0..256; i = 19*tn*(512-tn)>>16 maps 0..256 -> 0..19 with ease-out
@@ -398,8 +507,96 @@ Display _frameGenerator10()
 }
 
 
+// Shared helper for wipe animations. fromLeft=true: wipes left-to-right; fromLeft=false: wipes right-to-left.
+//  Phase 1: initial display scrolls out in the wipe direction while X scrolls in from the opposite side.
+//  Phase 2: X scrolls out in the wipe direction while the final display scrolls in from the opposite side.
+//
+static Display _frameGeneratorWipe(const bool fromLeft)
+{
+  Display frame;
+  const uint8_t f = _currentFrame(12); // 0 to 12 (6 frames per phase)
+  uint8_t t;
+
+  if (f <= 6)
+  {
+    // Phase 1: X scrolls in, initial scrolls out
+    const uint8_t step = f;
+    if (fromLeft)
+    {
+      for (t = 0; t < step; t++)
+      {
+        frame.setTubeToValue(t, _wipeValue);
+        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      }
+      for (t = step; t < Display::cTubeCount; t++)
+      {
+        frame.setTubeToValue(t, _initial.getTubeValue(t - step));
+        frame.setTubeIntensity(t, _initial.getTubeIntensity(t - step));
+      }
+    }
+    else
+    {
+      for (t = 0; t < Display::cTubeCount - step; t++)
+      {
+        frame.setTubeToValue(t, _initial.getTubeValue(t + step));
+        frame.setTubeIntensity(t, _initial.getTubeIntensity(t + step));
+      }
+      for (t = Display::cTubeCount - step; t < Display::cTubeCount; t++)
+      {
+        frame.setTubeToValue(t, _wipeValue);
+        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      }
+    }
+  }
+  else
+  {
+    // Phase 2: final scrolls in, X scrolls out
+    const uint8_t step = f - 6; // 1 to 6
+    if (fromLeft)
+    {
+      for (t = 0; t < step; t++)
+      {
+        frame.setTubeToValue(t, _final.getTubeValue(Display::cTubeCount - step + t));
+        frame.setTubeIntensity(t, _final.getTubeIntensity(Display::cTubeCount - step + t));
+      }
+      for (t = step; t < Display::cTubeCount; t++)
+      {
+        frame.setTubeToValue(t, _wipeValue);
+        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      }
+    }
+    else
+    {
+      for (t = 0; t < Display::cTubeCount - step; t++)
+      {
+        frame.setTubeToValue(t, _wipeValue);
+        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      }
+      for (t = Display::cTubeCount - step; t < Display::cTubeCount; t++)
+      {
+        frame.setTubeToValue(t, _final.getTubeValue(t - (Display::cTubeCount - step)));
+        frame.setTubeIntensity(t, _final.getTubeIntensity(t));
+      }
+    }
+  }
+
+  return frame;
+}
+
+
+// Wipe right-to-left: initial scrolls left/X scrolls in from right, then X scrolls left/final scrolls in from right
+//
+Display _frameGenerator12() { return _frameGeneratorWipe(false); }
+
+
+// Wipe left-to-right: initial scrolls right/X scrolls in from left, then X scrolls right/final scrolls in from left
+//
+Display _frameGenerator13() { return _frameGeneratorWipe(true); }
+
+
 void initialize()
 {
+  _rngState ^= RTC_SSR;
 }
 
 
@@ -441,14 +638,21 @@ void run(const uint8_t animationId)
 {
   if (animationId == 0)
   {
-    if (++_animationId > cMaxAnimationId)
-    {
-      _animationId = 0;
-    }
+    _animationId = _pickAnimation();
   }
   else
   {
     _animationId = animationId - 1;
+  }
+
+  if (_animationId == 11 || _animationId == 12)
+  {
+    _wipeValue = _pickFromPool(_wipeRemaining, 9);
+  }
+
+  if (_animationId == 13)
+  {
+    _shuffleTubeOrder();
   }
 
   _runCounter = 0;
@@ -473,6 +677,9 @@ void loop()
     case 8:  tcDisp = _frameGenerator8();  break;
     case 9:  tcDisp = _frameGenerator9();  break;
     case 10: tcDisp = _frameGenerator10(); break;
+    case 11: tcDisp = _frameGenerator11(); break;
+    case 12: tcDisp = _frameGenerator12(); break;
+    case 13: tcDisp = _frameGenerator13(); break;
     default: tcDisp = _frameGenerator0();  break;
   }
 

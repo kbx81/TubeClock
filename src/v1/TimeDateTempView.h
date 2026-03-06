@@ -98,6 +98,10 @@ private:
   //
   Application::OperatingMode _mode;
 
+  // tracks the display item from the previous loop to detect external view mode changes
+  //
+  FixedDisplayItem _prevDisplayItem;
+
   // true if status LED should be refreshed by the next loop iteration
   //
   bool _refreshStatusLed = false;

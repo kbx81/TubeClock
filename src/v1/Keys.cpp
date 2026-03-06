@@ -28,11 +28,11 @@ namespace Keys {
 
   // The number of defined keys
   //
-  static const uint8_t cKeyCount = 6;
+  static const uint8_t cKeyCount = 7;
 
   // The key masks for all tested keys
   //
-  static const Key cKeyMasks[cKeyCount] = { A, B, C, E, D, U };
+  static const Key cKeyMasks[cKeyCount] = { A, B, C, E, D, U, Power };
 
   // The size of the key queue
   //

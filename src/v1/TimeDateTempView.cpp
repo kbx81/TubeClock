@@ -40,7 +40,8 @@ TimeDateTempView::TimeDateTempView()
     _statusLed(RgbLed()),
     _animationElapsed(0),
     _switchElapsed(0),
-    _mode(Application::OperatingMode::OperatingModeFixedDisplay)
+    _mode(Application::OperatingMode::OperatingModeFixedDisplay),
+    _prevDisplayItem(FixedDisplayItem::Time)
 {
 }
 
@@ -56,6 +57,8 @@ void TimeDateTempView::enter(uint8_t /*relatedSetting*/)
   _animationElapsed = 0;
 
   _switchElapsed = 0;
+
+  _prevDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode());
 
   DisplayManager::setStatusLedAutoRefreshing(pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm));
 }
@@ -126,12 +129,6 @@ bool TimeDateTempView::keyHandler(Keys::Key key)
     tick = true;
   }
 
-  if (tick == true)
-  {
-    _animationElapsed = 0;
-    _switchElapsed = 0;
-  }
-
   return tick;
 }
 
@@ -143,6 +140,13 @@ void TimeDateTempView::loop()
   Display  tcDisp;
   FixedDisplayItem currentDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode()),
                    nextDisplayItem = currentDisplayItem;
+
+  if (currentDisplayItem != _prevDisplayItem)
+  {
+    _animationElapsed = 0;
+    _switchElapsed = 0;
+  }
+  _prevDisplayItem = currentDisplayItem;
   bool displayFahrenheit = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DisplayFahrenheit);
 
   // update these only as needed -- keeps temperature from bouncing incessantly

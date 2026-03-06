@@ -60,6 +60,10 @@ namespace SerialRemote
   ///
   void notifyKeyEvent(uint8_t keyMask);
 
+  /// @brief Notify the remote that the HV supply state was changed via the local UI
+  ///
+  void notifyHvStateChanged();
+
   /// @brief Notify the remote that a numbered setting was changed via the local UI
   /// @param settingNum The setting index (0 – DmxAddress) that changed
   ///

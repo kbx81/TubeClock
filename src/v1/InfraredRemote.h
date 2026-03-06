@@ -48,7 +48,8 @@ namespace InfraredRemote
     E     = 3,
     D     = 4,
     U     = 5,
-    Count = 6,
+    Power = 6,
+    Count = 7,
     None  = 0xff
   };
 

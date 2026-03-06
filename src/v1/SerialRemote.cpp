@@ -932,6 +932,12 @@ void notifyKeyEvent(uint8_t keyMask)
 }
 
 
+void notifyHvStateChanged()
+{
+  _enqueueNotification(NotificationType::CmdHvState);
+}
+
+
 void notifySettingChanged(uint8_t settingNum)
 {
   // Reuse the CmdSettingValue path; not coalesced so each changed
@@ -1260,6 +1266,22 @@ static void _handleCommand(const char* payload, uint8_t length)
         {
           // "$TCCBS" -- stop playback
           RtttlPlayer::stop();
+          _queueCancelType(NotificationType::RtttlDone);
+        }
+        else if (action == 'C')
+        {
+          // "$TCCBC[hh]" -- play hourly chime; optional hour 0-23, else current hour
+          uint8_t hour = 255;
+          if (length > 3)
+          {
+            uint8_t idx = 3;
+            int32_t n = _parseDecimal(payload, idx, length);
+            if (n >= 0 && n <= 23)
+            {
+              hour = static_cast<uint8_t>(n);
+            }
+          }
+          AlarmHandler::playChime(hour);
           _queueCancelType(NotificationType::RtttlDone);
         }
         // else: 'Q' or any other sub-command falls through to send status

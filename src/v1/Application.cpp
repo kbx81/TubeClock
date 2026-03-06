@@ -595,6 +595,16 @@ void tick()
 }
 
 
+// Sets the HV state and notifies the serial remote; no-op if state is unchanged
+//
+static void _setHvState(const bool hvEnabled)
+{
+  if (Hardware::getHvState() == hvEnabled) return;
+  Hardware::setHvState(hvEnabled);
+  SerialRemote::notifyHvStateChanged();
+}
+
+
 // Here lies the main application loop
 //
 void loop()
@@ -622,30 +632,38 @@ void loop()
       // Reset the counter since there has been button/key activity
       _idleCounter = 0;
       _wasIdle = false;
-      Hardware::setHvState(true);
-      // If an alarm is active and external control is not, send keypresses there
-      if ((AlarmHandler::isAlarmActive())
-       && (_externalControlMode == Application::ExternalControl::NoActiveExtControlEnum))
+      if (key == Keys::Power)
       {
-        AlarmHandler::keyHandler(key);
+        // Toggle the HV supply; don't dispatch to views
+        _setHvState(!Hardware::getHvState());
       }
       else
       {
-        if (Animator::isRunning())
+        _setHvState(true);
+        // If an alarm is active and external control is not, send keypresses there
+        if ((AlarmHandler::isAlarmActive())
+         && (_externalControlMode == Application::ExternalControl::NoActiveExtControlEnum))
         {
-          Animator::keyHandler(key);
+          AlarmHandler::keyHandler(key);
         }
-        if (_currentView->keyHandler(key))
+        else
         {
-          // The key did something, so make the tick sound
-          Hardware::tick();
-          // Take control back
-          _externalControlMode = ExternalControl::NoActiveExtControlEnum;
-          Dmx512Controller::setDmx512Active(false);
-          // Make sure the display is visible (skip if blink() is in progress)
-          if (!DisplayManager::isBlinkActive())
+          if (Animator::isRunning())
           {
-            DisplayManager::setDisplayBlanking(false);
+            Animator::keyHandler(key);
+          }
+          if (_currentView->keyHandler(key))
+          {
+            // The key did something, so make the tick sound
+            Hardware::tick();
+            // Take control back
+            _externalControlMode = ExternalControl::NoActiveExtControlEnum;
+            Dmx512Controller::setDmx512Active(false);
+            // Make sure the display is visible (skip if blink() is in progress)
+            if (!DisplayManager::isBlinkActive())
+            {
+              DisplayManager::setDisplayBlanking(false);
+            }
           }
         }
       }
@@ -680,11 +698,11 @@ void loop()
         _wasIdle = true;
         if (dmxSignalActive)
         {
-          Hardware::setHvState(true);
+          _setHvState(true);
         }
         else
         {
-          Hardware::setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
+          _setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
         }
       }
 
@@ -729,7 +747,7 @@ void loop()
       {
         _externalControlMode = ExternalControl::Dmx512ExtControlEnum;
         Dmx512Controller::setDmx512Active(true);
-        Hardware::setHvState(true);
+        _setHvState(true);
       }
       else
       {
@@ -738,7 +756,7 @@ void loop()
         AlarmHandler::clearAlarm();   // just in case...
         if (_idleCounter >= cMaximumIdleCount)
         {
-          Hardware::setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
+          _setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
         }
       }
       // Setting this mode activates the view but also kicks us back to the menu if there is no signal

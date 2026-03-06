@@ -102,6 +102,7 @@ static IrKeyCode _keyCodeTable[IrKey::Count] = {
   { 0xBF00, 0xF906 },  // E (remote: Stop/Mode)
   { 0xBF00, 0xF20D },  // D (remote: Down)
   { 0xBF00, 0xFA05 },  // U (remote: Up)
+  { 0xBF00, 0xFE01 },  // Power (remote: Play/Pause)
 };
 
 

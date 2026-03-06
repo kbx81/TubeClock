@@ -376,6 +376,25 @@ void activateTimerCounterAlarm()
 }
 
 
+void playChime(uint8_t hour)
+{
+  Settings *pSettings = Application::getSettingsPtr();
+  bool is12h = pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::Display12Hour);
+  if (hour > 23)
+  {
+    hour = Application::dateTime().hour(false, is12h);
+  }
+  else if (is12h)
+  {
+    if (hour == 0)       hour = 12;
+    else if (hour > 12)  hour -= 12;
+  }
+  _lastHourlyBeepHour = 255;  // prevent dedup suppression on next loop iteration
+  _startHourlyChime(hour);
+  _hourlyState = HourlyState::Playing;
+}
+
+
 }
 
 }

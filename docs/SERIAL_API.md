@@ -463,6 +463,20 @@ Example: play two notes (E and C in octave 5 at 120 BPM):
 
 Stops RTTTL playback immediately. The current note (already in the hardware tone queue) may finish playing. The response reports `S` (stopped).
 
+#### Play Hourly Chime
+
+```
+-> $TCCBC*XX\n           (play chime for current displayed hour)
+-> $TCCBC<hh>*XX\n       (play chime for hour hh, 0–23)
+<- $TCSBP*XX\n
+```
+
+Plays the hourly chime melody. With no argument, uses the current displayed hour — identical to the chime that fires automatically at the top of each hour. With an explicit `hh` argument (0–23), encodes that hour as the chime; the 12-hour display setting is applied when active (e.g. `0` → 12, `13` → 1).
+
+The chime encodes the hour as a binary sequence of beeps (LSb first): a low note for a 0-bit and a high note for a 1-bit, with 16th-note rests between notes. Hour 0 produces a single low beep.
+
+If playback is already in progress, it is interrupted and the chime starts immediately. The response reports current buzzer playback status (same as [Query Status](#query-status)).
+
 #### Query Status
 
 ```
@@ -801,6 +815,30 @@ Sent whenever new ADC readings are obtained and at least one value (light level,
 ```
 
 Sent when RTTTL playback finishes. Fires when the last note has been accepted into the hardware tone queue; the final note(s) may still be audible briefly. This notification is suppressed if playback is stopped via the `$TCCBS` command.
+
+### HV State Change
+
+```
+<- $TCSHV<0|1>*XX\n
+```
+
+Sent when the HV supply state is toggled via the IR remote (Play/Pause key). `1` = enabled, `0` = disabled. Format is identical to the `H/HV` command response. This notification is coalesced.
+
+**Note:** This notification is not sent for HV state changes triggered by serial `$TCCHVON`/`$TCCHVOF` commands — those are confirmed by the command response.
+
+---
+
+### Setting Changed
+
+```
+<- $TCSS<nn>,<value>*XX\n
+```
+
+Sent whenever a setting is changed via the clock's local UI (capacitive touch keys/menu navigation). Format is identical to the `S` command response — see the [Setting Index Reference](#setting-index-reference) for field descriptions.
+
+Unlike other unsolicited notifications, setting change events are **not coalesced**: each setting that changes produces its own notification. The value reflects the live setting state at the time the notification is transmitted. If the notification queue is full, entries are silently dropped (see [TX notification queue](#implementation-notes)).
+
+**Note:** This notification is not sent for settings changed via the serial `$TCCS` command — those are confirmed by the command response.
 
 ### Alarm Active
 

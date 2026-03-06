@@ -326,6 +326,14 @@ volatile static I2cState _i2cState = I2cState::I2cIdle;
 //
 static uint8_t _lastRtcGpsSyncHour = 255;
 
+// minimum GPS year considered plausible; rejects cold-start default epochs
+//
+static const uint16_t cGpsMinValidYear = 2020;
+
+// maximum drift (seconds) between GPS and system time before forcing a re-sync within the same hour
+//
+static const uint32_t cGpsMaxDriftSeconds = 120;
+
 // last second at which we incremented the counter
 //
 static uint8_t _onTimeLastSecond = 0;
@@ -411,6 +419,11 @@ volatile static uint8_t _ppsDelayCounter = 0;
 // true if a non-blocking DS3234 SPI refresh has been queued and we are
 //  waiting for the DMA transfer to complete before reading the result
 volatile static bool _rtcReadPending = false;
+
+// last raw RTC_TR value read from the STM32 internal RTC
+//  used to detect when the shadow register actually advances to a new second;
+//  initialized to ~0u (invalid) so the first read always commits an update
+static uint32_t _lastRtcTR = ~0u;
 
 // true if a non-blocking temperature sensor SPI refresh has been queued and
 //  we are waiting for the DMA transfer to complete before reading the result
@@ -1195,7 +1208,20 @@ void _refreshRTC()
 
   if (!_refreshRTCNow) return;
 
-  uint32_t dr = RTC_DR, tr = RTC_TR;
+  // Read TR first per STM32 RM: reading TR latches the shadow registers so DR
+  // is consistent.  Also use TR as a change-detection sentinel: when the GPS
+  // PPS fires we read here 10 ms later, but the STM32 RTC's own second
+  // boundary may not have crossed yet (phase offset from setDateTime()).
+  // If TR hasn't changed, leave _refreshRTCNow true so SysTick retries every
+  // 1 ms until the boundary fires.  This prevents display skips caused by the
+  // phase drifting across the cPpsRtcReadDelay threshold.
+  uint32_t tr = RTC_TR;
+  uint32_t dr = RTC_DR;   // MUST always read DR after TR to release the shadow-register
+                           // latch (STM32 RM §25.4.8): reading TR locks shadow regs until
+                           // DR is read; skipping this read prevents any future updates.
+  if (tr == _lastRtcTR) return;   // RTC hasn't ticked yet; retry next SysTick
+  _lastRtcTR = tr;
+
   uint16_t year = 2000;
   uint8_t month, day, hour, minute, second;
 
@@ -1219,7 +1245,6 @@ void _refreshRTC()
 
   _currentDateTime.setDate(year, month, day);
   _currentDateTime.setTime(hour, minute, second);
-  // _rtcIsSet = RTC_ISR & RTC_ISR_INITS;
 
   _refreshRTCNow = false;
 }
@@ -1240,8 +1265,15 @@ void _syncRtcWithGps()
 
   DateTime gpsTime = GpsReceiver::getLocalDateTime();
 
-  // Only sync RTCs once per hour when hour changes
-  if (gpsTime.hour() != _lastRtcGpsSyncHour)
+  // Reject implausible GPS time (e.g., cold-start default epoch year)
+  if (gpsTime.year() < cGpsMinValidYear) return;
+
+  // Sync RTCs when the hour changes OR when GPS time has drifted significantly from system
+  // time -- the drift check recovers from a bad time accepted at the first GPS fix
+  int32_t drift = _currentDateTime.secondsTo(gpsTime);
+  if (drift < 0) drift = -drift;
+
+  if (gpsTime.hour() != _lastRtcGpsSyncHour || (uint32_t)drift > cGpsMaxDriftSeconds)
   {
     setDateTime(gpsTime);
     _lastRtcGpsSyncHour = gpsTime.hour();
@@ -1576,6 +1608,10 @@ void setDateTime(const DateTime &dateTime)
 
   rtc_lock();
   rtc_wait_for_synchro();
+  // Reset sentinel so the next _refreshRTC() retry unconditionally commits the
+  // freshly-written time rather than skipping because TR happens to equal the
+  // previous value.
+  _lastRtcTR = ~0u;
   pwr_enable_backup_domain_write_protect();
 
   return;

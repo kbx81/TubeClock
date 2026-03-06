@@ -55,6 +55,11 @@ namespace AlarmHandler {
   /// @brief Activates the latching alarm
   ///
   void activateTimerCounterAlarm();
+
+  /// @brief Manually triggers the hourly chime.
+  /// @param hour Hour to encode (0-23). Pass 255 to use the current displayed hour.
+  ///
+  void playChime(uint8_t hour);
 }
 
 }
