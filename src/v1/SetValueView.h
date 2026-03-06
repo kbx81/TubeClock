@@ -18,26 +18,23 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class SetValueView : public View {
-
-// The view which displays the UI for setting times and dates
-//
-public: // Implement the SetValue class
+  // The view which displays the UI for setting times and dates
+  //
+ public:  // Implement the SetValue class
   SetValueView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // values the user will set
   //
   uint16_t _setValue;
@@ -49,8 +46,6 @@ private:
   // the setting index this view is editing
   //
   uint8_t _relatedSetting;
-
 };
 
-
-}
+}  // namespace kbxTubeClock

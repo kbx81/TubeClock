@@ -20,29 +20,24 @@
 
 #include <cstdint>
 
+namespace kbxTubeClock::UsbSerial {
 
-namespace kbxTubeClock {
+/// @brief Initialize the USB CDC-ACM interface (clocks, GPIO, USB device)
+///
+void initialize();
 
-namespace UsbSerial
-{
-  /// @brief Initialize the USB CDC-ACM interface (clocks, GPIO, USB device)
-  ///
-  void initialize();
+/// @brief Service pending USB events — call from usb_isr()
+///
+void poll();
 
-  /// @brief Service pending USB events — call from usb_isr()
-  ///
-  void poll();
+/// @brief Send data to the USB host
+/// @param data Pointer to data bytes
+/// @param len  Number of bytes (must be <= 64; silently dropped if busy)
+///
+void write(const uint8_t *data, uint16_t len);
 
-  /// @brief Send data to the USB host
-  /// @param data Pointer to data bytes
-  /// @param len  Number of bytes (must be <= 64; silently dropped if busy)
-  ///
-  void write(const uint8_t* data, uint16_t len);
+/// @brief True when the host has the port open (DTR asserted)
+///
+bool isConnected();
 
-  /// @brief True when the host has the port open (DTR asserted)
-  ///
-  bool isConnected();
-}
-
-
-}
+}  // namespace kbxTubeClock::UsbSerial

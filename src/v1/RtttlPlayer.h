@@ -18,36 +18,30 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
+namespace kbxTubeClock::RtttlPlayer {
 
-namespace kbxTubeClock {
+/// @brief Begin playing an RTTTL string (stops any current playback)
+/// @param rtttl Pointer to the RTTTL string (not required to be null-terminated)
+/// @param length Length of the RTTTL string in bytes
+///
+void play(const char *rtttl, uint8_t length);
 
-namespace RtttlPlayer
-{
-  /// @brief Begin playing an RTTTL string (stops any current playback)
-  /// @param rtttl Pointer to the RTTTL string (not required to be null-terminated)
-  /// @param length Length of the RTTTL string in bytes
-  ///
-  void play(const char* rtttl, uint8_t length);
+/// @brief Stop playback immediately
+///
+void stop();
 
-  /// @brief Stop playback immediately
-  ///
-  void stop();
+/// @brief Feed the next pending note into the Hardware tone queue (call from main loop)
+///
+void loop();
 
-  /// @brief Feed the next pending note into the Hardware tone queue (call from main loop)
-  ///
-  void loop();
+/// @brief Returns true if playback is currently active
+///
+bool isPlaying();
 
-  /// @brief Returns true if playback is currently active
-  ///
-  bool isPlaying();
+/// @brief Returns true once after playback completes, then clears itself
+///
+bool playingFinished();
 
-  /// @brief Returns true once after playback completes, then clears itself
-  ///
-  bool playingFinished();
-}
-
-
-}
+}  // namespace kbxTubeClock::RtttlPlayer

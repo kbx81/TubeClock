@@ -18,48 +18,44 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include <libopencm3/stm32/usart.h>
 
-
 namespace kbxTubeClock {
 
 class Usart {
-
-public:
-
+ public:
   /// @brief Request return codes
   ///
   enum UsartReqAck : uint8_t {
     UsartReqAckOk,
     UsartReqAckBusy,
     UsartReqAckError,
-    UsartReqAckQueued
+    UsartReqAckQueued,
   };
 
   /// @brief Structure defining USART object initialization
   ///
   struct UsartParams {
-    uint32_t usart;             // USART peripheral identifier
-    uint32_t dmaController;     // DMA controller base address (0 if no DMA)
-    uint8_t  channelRx;         // Receive DMA channel number: 1-7 for DMA1 (0 if no DMA)
-    uint8_t  channelTx;         // Transmit DMA channel number: 1-7 for DMA1 (0 if no DMA)
+    uint32_t usart;          // USART peripheral identifier
+    uint32_t dmaController;  // DMA controller base address (0 if no DMA)
+    uint8_t channelRx;       // Receive DMA channel number: 1-7 for DMA1 (0 if no DMA)
+    uint8_t channelTx;       // Transmit DMA channel number: 1-7 for DMA1 (0 if no DMA)
   };
 
   /// @brief Structure defining USART data transfer parameters
   ///
   struct UsartTransferParams {
-    uint32_t baudRate;          // Baud rate
-    uint32_t stopBits;          // Number of stop bits
-    uint32_t parity;            // Parity
-    uint32_t mode;              // Mode (Tx, Rx, Tx+Rx)
-    uint32_t flowControl;       // Flow control
-    uint32_t autoBaudMode;      // Enable auto-baud rate detection
-    uint8_t  dataBits;          // Number of data bits
-    bool     driverEnableMode;  // Enable hardware DE output (for RS-485)
-    bool     swapTxRx;          // Enable TX/RX pin swap (USART_CR2_SWAP)
+    uint32_t baudRate;      // Baud rate
+    uint32_t stopBits;      // Number of stop bits
+    uint32_t parity;        // Parity
+    uint32_t mode;          // Mode (Tx, Rx, Tx+Rx)
+    uint32_t flowControl;   // Flow control
+    uint32_t autoBaudMode;  // Enable auto-baud rate detection
+    uint8_t dataBits;       // Number of data bits
+    bool driverEnableMode;  // Enable hardware DE output (for RS-485)
+    bool swapTxRx;          // Enable TX/RX pin swap (USART_CR2_SWAP)
   };
 
   /// @brief Structure defining USART transfer requests
@@ -70,35 +66,32 @@ public:
     uint16_t length;
   };
 
-public:
-
-
+ public:
   /// @brief Default constructor
   ///
   Usart();
 
-
   /// @brief Initialize USART
   /// @param usartInit structure containing desired master configuration
   ///
-  void initialize(const UsartParams* usartInit);
+  void initialize(const UsartParams *usartInit);
 
   /// @brief Configure USART parameters
   /// @param usartTransferParams structure containing desired USART parameters
   ///
-  void configure(const UsartTransferParams* usartTransferParams);
+  void configure(const UsartTransferParams *usartTransferParams);
 
   /// @brief Recieves data in through the USART via DMA
   /// @param request Pointer to request structure used to receive
   /// @return UsartReqAck state of transfer request
   ///
-  UsartReqAck receiveDma(UsartTransferReq* request);
+  UsartReqAck receiveDma(UsartTransferReq *request);
 
   /// @brief Transmits/sends data out through the USART via DMA
   /// @param request Pointer to request structure used to transmit
   /// @return UsartReqAck state of transfer request
   ///
-  UsartReqAck transmitDma(UsartTransferReq* request);
+  UsartReqAck transmitDma(UsartTransferReq *request);
 
   /// @brief Called from DMA complete interrupt
   ///
@@ -141,15 +134,15 @@ public:
 
   /// @brief Check for and clear USART error flags (FE, NF, ORE)
   ///
-  inline bool hasErrors() const { return (USART_ISR(_params.usart) & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE)) != 0; }
+  inline bool hasErrors() const {
+    return (USART_ISR(_params.usart) & (USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE)) != 0;
+  }
   inline void clearErrors() const { USART_ICR(_params.usart) = USART_ISR_FE | USART_ISR_NF | USART_ISR_ORE; }
 
-private:
-
+ private:
   /// @brief our configuration
   ///
   UsartParams _params;
-
 };
 
-}
+}  // namespace kbxTubeClock

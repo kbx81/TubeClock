@@ -26,82 +26,59 @@
 #include "SystemStatusView.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
-
 
 namespace kbxTubeClock {
 
+SystemStatusView::SystemStatusView() : _selectedView(0) {}
 
-SystemStatusView::SystemStatusView()
-  : _selectedView(0)
-{
-}
+void SystemStatusView::enter(uint8_t /*relatedSetting*/) { DisplayManager::setStatusLedAutoRefreshing(true); }
 
-
-void SystemStatusView::enter(uint8_t /*relatedSetting*/)
-{
-  DisplayManager::setStatusLedAutoRefreshing(true);
-}
-
-
-bool SystemStatusView::keyHandler(Keys::Key key)
-{
+bool SystemStatusView::keyHandler(Keys::Key key) {
   bool tick = false;
 
-  if (key == Keys::Key::A)
-  {
+  if (key == Keys::Key::A) {
   }
 
-  if (key == Keys::Key::B)
-  {
+  if (key == Keys::Key::B) {
   }
 
-  if (key == Keys::Key::C)
-  {
-    if (_selectedView == DisplayItem::TubeLifetime)
-    {
+  if (key == Keys::Key::C) {
+    if (_selectedView == DisplayItem::TubeLifetime) {
       Hardware::onTimeSecondsReset();
     }
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (--_selectedView < 0)
-    {
+  if (key == Keys::Key::D) {
+    if (--_selectedView < 0) {
       _selectedView = static_cast<uint8_t>(DisplayItem::BuildNumber);
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
   }
 
-  if (key == Keys::Key::U)
-  {
-    if (++_selectedView > static_cast<uint8_t>(DisplayItem::BuildNumber))
-    {
+  if (key == Keys::Key::U) {
+    if (++_selectedView > static_cast<uint8_t>(DisplayItem::BuildNumber)) {
       _selectedView = 0;
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedView));
     tick = true;
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void SystemStatusView::loop()
-{
+void SystemStatusView::loop() {
   _selectedView = static_cast<int8_t>(Application::getViewMode());
 
-  auto voltageBatt = Hardware::voltageBatt(),
-       voltageVddA = Hardware::voltageVddA();
+  auto voltageBatt = Hardware::voltageBatt(), voltageVddA = Hardware::voltageVddA();
   auto rtcStartupResult = Hardware::getRTCStartupResult();
   bool settingsLoadResult = Application::getStartupSettingsLoadResult();
   uint32_t dotsBitmap = 0b0011;
@@ -110,45 +87,33 @@ void SystemStatusView::loop()
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
   Display tcDisp;
 
-  switch (_selectedView)
-  {
+  switch (_selectedView) {
     case DisplayItem::TubeLifetime:
       dotsBitmap = 0;
 
-      if (Hardware::onTimeSeconds() < Application::cSecondsInAnHour)
-      {
+      if (Hardware::onTimeSeconds() < Application::cSecondsInAnHour) {
         tcDisp.setDisplayFromWord(Hardware::onTimeSeconds());
-      }
-      else
-      {
+      } else {
         tcDisp.setDisplayFromWord(Hardware::onTimeSeconds() / Application::cSecondsInAnHour);
       }
       // If the PPS trigger is selected, light the status LED when the PPS signal is high
-      if (Hardware::getPeripheralRefreshTrigger() == Hardware::PeripheralRefreshTrigger::PpsExti)
-      {
-        if (Hardware::getPpsInputState() == true)
-        {
+      if (Hardware::getPeripheralRefreshTrigger() == Hardware::PeripheralRefreshTrigger::PpsExti) {
+        if (Hardware::getPpsInputState() == true) {
           statusLed = Application::nixieOrange;
         }
       }
       break;
 
     case DisplayItem::GpsStatus:
-      if (GpsReceiver::isConnected() == true)
-      {
+      if (GpsReceiver::isConnected() == true) {
         tubeIntensityBitmap = 0b110011;
         tcDisp.setDisplayFromWord(GpsReceiver::getSatellitesInView());
-        if (GpsReceiver::isValid() == true)
-        {
+        if (GpsReceiver::isValid() == true) {
           statusLed = Application::green;
-        }
-        else
-        {
+        } else {
           statusLed = Application::red;
         }
-      }
-      else
-      {
+      } else {
         tubeIntensityBitmap = 0b110000;
       }
       break;
@@ -159,12 +124,9 @@ void SystemStatusView::loop()
       tcDisp.setTubeToValue(1, 3);
       tcDisp.setTubeToValue(2, 2);
       tcDisp.setTubeToValue(3, 3);
-      if (Hardware::getRTCType() == Hardware::RtcType::DS323x)
-      {
+      if (Hardware::getRTCType() == Hardware::RtcType::DS323x) {
         statusLed = Application::green;
-      }
-      else
-      {
+      } else {
         statusLed = Application::red;
       }
       break;
@@ -175,12 +137,9 @@ void SystemStatusView::loop()
       tcDisp.setTubeToValue(1, 2);
       tcDisp.setTubeToValue(2, 7);
       tcDisp.setTubeToValue(3, 1);
-      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::DS1722))
-      {
+      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::DS1722)) {
         statusLed = Application::green;
-      }
-      else
-      {
+      } else {
         statusLed = Application::red;
       }
       break;
@@ -189,12 +148,9 @@ void SystemStatusView::loop()
       tubeIntensityBitmap = 0b110011;
       tcDisp.setTubeToValue(0, 4);
       tcDisp.setTubeToValue(1, 7);
-      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::LM74))
-      {
+      if (Hardware::isTempSensorDetected(Hardware::TempSensorType::LM74)) {
         statusLed = Application::green;
-      }
-      else
-      {
+      } else {
         statusLed = Application::red;
       }
       break;
@@ -217,7 +173,7 @@ void SystemStatusView::loop()
 
     case DisplayItem::FirmwareVersion:
       // kFirmwareVersion is always "YY.MM.PP" — all components zero-padded to 2 digits.
-      dotsBitmap = 0b1010;  // lower dots only
+      dotsBitmap = 0b1010;                                  // lower dots only
       tcDisp.setTubeToValue(5, kFirmwareVersion[0] - '0');  // year tens
       tcDisp.setTubeToValue(4, kFirmwareVersion[1] - '0');  // year ones
       tcDisp.setTubeToValue(3, kFirmwareVersion[3] - '0');  // month tens
@@ -228,14 +184,10 @@ void SystemStatusView::loop()
 
     case DisplayItem::BuildNumber:
       tcDisp.setDisplayFromWord(kFirmwareBuild);
-      for (uint8_t i = tcDisp.cTubeCount - 1; i > 0; i--)
-      {
-        if (tcDisp.getTubeValue(i) == 0)
-        {
+      for (uint8_t i = tcDisp.cTubeCount - 1; i > 0; i--) {
+        if (tcDisp.getTubeValue(i) == 0) {
           tubeIntensityBitmap &= ~(1 << i);  // blank tube if digit is 0
-        }
-        else
-        {
+        } else {
           break;  // stop blanking tubes once we hit a non-zero digit
         }
       }
@@ -246,9 +198,7 @@ void SystemStatusView::loop()
       break;
   }
 
-  if (_selectedView != DisplayItem::TubeLifetime &&
-      _selectedView != DisplayItem::FirmwareVersion)
-  {
+  if (_selectedView != DisplayItem::TubeLifetime && _selectedView != DisplayItem::FirmwareVersion) {
     tcDisp.setTubeToValue(4, _selectedView);
   }
   tcDisp.setTubeIntensities(NixieGlyph::cGlyphMaximumIntensity, 0, tubeIntensityBitmap);
@@ -256,5 +206,4 @@ void SystemStatusView::loop()
   DisplayManager::writeDisplay(tcDisp, statusLed);
 }
 
-
-}
+}  // namespace kbxTubeClock

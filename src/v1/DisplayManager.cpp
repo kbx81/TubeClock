@@ -54,15 +54,12 @@
 #include "SpiMaster.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
-namespace kbxTubeClock {
-
-namespace DisplayManager
-{
+namespace kbxTubeClock::DisplayManager {
 
 // Duration (ms) of each blank/visible phase in the blink() animation
 //
@@ -149,62 +146,54 @@ SpiMaster *_spiMaster = nullptr;
 //
 static uint8_t _slaveId = SpiMaster::cNoSlave;
 
-
 // Writes to PWM buffer corresponding to a glyph
 // Applies master intensity via lookup table
 //
-void _setDisplayPwmValue(const uint8_t glyphNumber, const uint8_t glyphValue)
-{
-  if (glyphNumber < cGlyphCount)
-  {
+void _setDisplayPwmValue(const uint8_t glyphNumber, const uint8_t glyphValue) {
+  if (glyphNumber < cGlyphCount) {
     uint8_t linearIndex = (cPwmNumberOfDevices * cPwmChannelsPerDevice) - 1 - glyphNumber;
     // Optimized division and modulo for power-of-2 (32 = 2^5)
     // Division by 32 = right shift by 5, modulo 32 = mask with 0x1F
-    uint8_t device = linearIndex >> 5;   // Fast divide by 32 (cPwmChannelsPerDevice)
-    uint8_t channel = linearIndex & 0x1F; // Fast modulo 32
+    uint8_t device = linearIndex >> 5;     // Fast divide by 32 (cPwmChannelsPerDevice)
+    uint8_t channel = linearIndex & 0x1F;  // Fast modulo 32
 
     // Apply master intensity: (glyphValue * _masterIntensity + 128) >> 8
     // +128 provides rounding; >> 8 approximates /255 with max 1-LSB error.
     // Max output: (255*255+128)>>8 = 254, satisfying the PWM > comparison requirement.
-    _pwmValues[device][channel] = (uint8_t)(((uint16_t)glyphValue * _masterIntensity + 128u) >> 8);
+    _pwmValues[device][channel] = (uint8_t) (((uint16_t) glyphValue * _masterIntensity + 128u) >> 8);
   }
 }
 
-
-void initialize()
-{
+void initialize() {
   SpiMaster::SpiTransferReq *request = nullptr;
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
-    .misoPort       = Hardware::cSpi1AltPort,           // port on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_8,     // Baudrate
-    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
-    .gpioPin        = Hardware::cNssDisplayPin,         // gpio pin on which CS line lives
-    .misoPin        = Hardware::cSpi1MisoDisplayPin,    // pin on which slave inputs data
-    .strobeCs       = true,                             // CS line is strobed upon xfer completion if true
-    .polarity       = true,                             // CS/CE polarity (true = active high)
-    .cpol           = true,                             // Clock polarity (idle high)
-    .cpha           = false,                            // Clock phase (transition 1)
-    .lsbFirst       = true,                             // LSB first
+      .gpioPort = Hardware::cNssPort,            // gpio port on which CS line lives
+      .misoPort = Hardware::cSpi1AltPort,        // port on which slave inputs data
+      .br = SPI_CR1_BAUDRATE_FPCLK_DIV_8,        // Baudrate
+      .dataSize = SPI_CR2_DS_8BIT,               // Data size (4 to 16 bits, see RM)
+      .memorySize = DMA_CCR_MSIZE_8BIT,          // Memory word width (8, 16, 32 bit)
+      .peripheralSize = DMA_CCR_PSIZE_8BIT,      // Peripheral word width (8, 16, 32 bit)
+      .gpioPin = Hardware::cNssDisplayPin,       // gpio pin on which CS line lives
+      .misoPin = Hardware::cSpi1MisoDisplayPin,  // pin on which slave inputs data
+      .strobeCs = true,                          // CS line is strobed upon xfer completion if true
+      .polarity = true,                          // CS/CE polarity (true = active high)
+      .cpol = true,                              // Clock polarity (idle high)
+      .cpha = false,                             // Clock phase (transition 1)
+      .lsbFirst = true,                          // LSB first
   };
 
   // Initialize master intensity to full brightness
   setMasterIntensity(255);
 
   // Initialize PWM buffer to zero
-  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
-  {
-    for (uint8_t c = 0; c < cPwmChannelsPerDevice; c++)
-    {
+  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++) {
+    for (uint8_t c = 0; c < cPwmChannelsPerDevice; c++) {
       _pwmValues[d][c] = 0;
     }
   }
 
   // Initialize display output buffers
-  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++)
-  {
+  for (uint8_t d = 0; d < cPwmNumberOfDevices; d++) {
     _displayBufferOut[d] = 0;
   }
 
@@ -215,58 +204,53 @@ void initialize()
   request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
   // Trigger a write of the first block of data to the drivers to zero them out
-  request->bufferIn = (uint8_t*)_displayBufferIn;
-  request->bufferOut = (uint8_t*)_displayBufferOut;
+  request->bufferIn = (uint8_t *) _displayBufferIn;
+  request->bufferOut = (uint8_t *) _displayBufferOut;
   request->length = cSpiBytesToSend;
   request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 }
 
-
-void refresh()
-{
+void refresh() {
   // Update PWM buffer when tick() requests it
   // The crossfader tick() calls happen in ISR for precise timing,
   // but we read the results and update PWM here to minimize ISR time
-  if (!_refreshIntensitiesNow) return;
+  if (!_refreshIntensitiesNow) {
+    return;
+  }
   _refreshIntensitiesNow = false;
 
   // Read crossfader states and update PWM buffer with master intensity applied
   NixieGlyph activeGlyph;
-  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
-  {
+  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++) {
     activeGlyph = _crossfader[glyphCrossfader].getActive();
     _setDisplayPwmValue(glyphCrossfader, activeGlyph.getIntensity());
   }
 
   // Refresh the status LED to play nicely with strobing via DMX-512
-  if (!_autoRefreshStatusLed) return;
-
-  if (_displayBlank)
-  {
-    Hardware::setStatusLed(RgbLed());
+  if (!_autoRefreshStatusLed) {
+    return;
   }
-  else if (_refreshStatusLed)
-  {
+
+  if (_displayBlank) {
+    Hardware::setStatusLed(RgbLed());
+  } else if (_refreshStatusLed) {
     RgbLed status = _statusLed;
     // Apply master intensity in full 12-bit precision, then gamma-correct for
     // perceptually linear brightness. This gives: perceived ∝ master/255 linearly,
     // and preserves color ratios across the full dimming range without quantization.
-    status.setRed(  ((uint32_t)status.getRed()   * _masterIntensity + 127) / 255);
-    status.setGreen(((uint32_t)status.getGreen() * _masterIntensity + 127) / 255);
-    status.setBlue( ((uint32_t)status.getBlue()  * _masterIntensity + 127) / 255);
+    status.setRed(((uint32_t) status.getRed() * _masterIntensity + 127) / 255);
+    status.setGreen(((uint32_t) status.getGreen() * _masterIntensity + 127) / 255);
+    status.setBlue(((uint32_t) status.getBlue() * _masterIntensity + 127) / 255);
     status.gammaCorrect12bit();
     Hardware::setStatusLed(status);
   }
 }
 
-
-void tick()
-{
+void tick() {
   // Called from systick ISR at 1000 Hz
   // Tick all crossfaders here to maintain precise 1ms timing for fade durations
   // But defer the PWM value updates to refresh() to minimize ISR time
-  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++)
-  {
+  for (uint8_t glyphCrossfader = 0; glyphCrossfader < cGlyphCount; glyphCrossfader++) {
     _crossfader[glyphCrossfader].tick();
   }
 
@@ -274,13 +258,10 @@ void tick()
   _refreshIntensitiesNow = true;
 
   // Advance the blink() state machine (phases remaining > 0 means animation active)
-  if (_blinkPhasesRemaining > 0)
-  {
-    if (--_blinkPhaseTimer == 0)
-    {
+  if (_blinkPhasesRemaining > 0) {
+    if (--_blinkPhaseTimer == 0) {
       _blinkPhasesRemaining--;
-      if (_blinkPhasesRemaining > 0)
-      {
+      if (_blinkPhasesRemaining > 0) {
         _blinkPhaseTimer = cDoubleBlinkDuration;
       }
       // Odd phases remaining → blank; even (or 0 = done) → visible
@@ -289,17 +270,13 @@ void tick()
   }
 }
 
-
-void tickPWM()
-{
+void tickPWM() {
   // During early init (display blanked), skip display SPI transfers but still
   // service the SPI queue so sensor/RTC blocking reads can complete.
   // Without this gate, the 15.4 kHz display transfers starve lower-priority
   // SPI slaves because processQueue() always finds slave 0 (display) first.
-  if (_displayBlank)
-  {
-    if (_spiMaster->busy() == false)
-    {
+  if (_displayBlank) {
+    if (_spiMaster->busy() == false) {
       _spiMaster->processQueue();
     }
     return;
@@ -307,14 +284,12 @@ void tickPWM()
 
   SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-  if (request != nullptr)
-  {
+  if (request != nullptr) {
     // Read then increment the tick counter - uint8_t naturally wraps at 256 (no masking needed!)
     auto tickCount = _pwmTickCounter++;
     // Process all 3 devices with 8-bit unrolling to improve performance
     // Total of 12 iterations (3 devices × 4 bytes) instead of 96
-    for (uint8_t device = 0; device < cPwmNumberOfDevices; device++)
-    {
+    for (uint8_t device = 0; device < cPwmNumberOfDevices; device++) {
       // Fully unrolled 32-bit PWM comparison for maximum performance
       // PWM logic: output is ON when intensity > counter
       // This handles all cases correctly:
@@ -324,41 +299,41 @@ void tickPWM()
       // Note: LUT clamps output to max 254 to work with > comparison
       uint32_t pwmBits = 0;
 
-      pwmBits |= ((uint32_t)(_pwmValues[device][0] > tickCount)) << 0;
-      pwmBits |= ((uint32_t)(_pwmValues[device][1] > tickCount)) << 1;
-      pwmBits |= ((uint32_t)(_pwmValues[device][2] > tickCount)) << 2;
-      pwmBits |= ((uint32_t)(_pwmValues[device][3] > tickCount)) << 3;
-      pwmBits |= ((uint32_t)(_pwmValues[device][4] > tickCount)) << 4;
-      pwmBits |= ((uint32_t)(_pwmValues[device][5] > tickCount)) << 5;
-      pwmBits |= ((uint32_t)(_pwmValues[device][6] > tickCount)) << 6;
-      pwmBits |= ((uint32_t)(_pwmValues[device][7] > tickCount)) << 7;
+      pwmBits |= ((uint32_t) (_pwmValues[device][0] > tickCount)) << 0;
+      pwmBits |= ((uint32_t) (_pwmValues[device][1] > tickCount)) << 1;
+      pwmBits |= ((uint32_t) (_pwmValues[device][2] > tickCount)) << 2;
+      pwmBits |= ((uint32_t) (_pwmValues[device][3] > tickCount)) << 3;
+      pwmBits |= ((uint32_t) (_pwmValues[device][4] > tickCount)) << 4;
+      pwmBits |= ((uint32_t) (_pwmValues[device][5] > tickCount)) << 5;
+      pwmBits |= ((uint32_t) (_pwmValues[device][6] > tickCount)) << 6;
+      pwmBits |= ((uint32_t) (_pwmValues[device][7] > tickCount)) << 7;
 
-      pwmBits |= ((uint32_t)(_pwmValues[device][8] > tickCount)) << 8;
-      pwmBits |= ((uint32_t)(_pwmValues[device][9] > tickCount)) << 9;
-      pwmBits |= ((uint32_t)(_pwmValues[device][10] > tickCount)) << 10;
-      pwmBits |= ((uint32_t)(_pwmValues[device][11] > tickCount)) << 11;
-      pwmBits |= ((uint32_t)(_pwmValues[device][12] > tickCount)) << 12;
-      pwmBits |= ((uint32_t)(_pwmValues[device][13] > tickCount)) << 13;
-      pwmBits |= ((uint32_t)(_pwmValues[device][14] > tickCount)) << 14;
-      pwmBits |= ((uint32_t)(_pwmValues[device][15] > tickCount)) << 15;
+      pwmBits |= ((uint32_t) (_pwmValues[device][8] > tickCount)) << 8;
+      pwmBits |= ((uint32_t) (_pwmValues[device][9] > tickCount)) << 9;
+      pwmBits |= ((uint32_t) (_pwmValues[device][10] > tickCount)) << 10;
+      pwmBits |= ((uint32_t) (_pwmValues[device][11] > tickCount)) << 11;
+      pwmBits |= ((uint32_t) (_pwmValues[device][12] > tickCount)) << 12;
+      pwmBits |= ((uint32_t) (_pwmValues[device][13] > tickCount)) << 13;
+      pwmBits |= ((uint32_t) (_pwmValues[device][14] > tickCount)) << 14;
+      pwmBits |= ((uint32_t) (_pwmValues[device][15] > tickCount)) << 15;
 
-      pwmBits |= ((uint32_t)(_pwmValues[device][16] > tickCount)) << 16;
-      pwmBits |= ((uint32_t)(_pwmValues[device][17] > tickCount)) << 17;
-      pwmBits |= ((uint32_t)(_pwmValues[device][18] > tickCount)) << 18;
-      pwmBits |= ((uint32_t)(_pwmValues[device][19] > tickCount)) << 19;
-      pwmBits |= ((uint32_t)(_pwmValues[device][20] > tickCount)) << 20;
-      pwmBits |= ((uint32_t)(_pwmValues[device][21] > tickCount)) << 21;
-      pwmBits |= ((uint32_t)(_pwmValues[device][22] > tickCount)) << 22;
-      pwmBits |= ((uint32_t)(_pwmValues[device][23] > tickCount)) << 23;
+      pwmBits |= ((uint32_t) (_pwmValues[device][16] > tickCount)) << 16;
+      pwmBits |= ((uint32_t) (_pwmValues[device][17] > tickCount)) << 17;
+      pwmBits |= ((uint32_t) (_pwmValues[device][18] > tickCount)) << 18;
+      pwmBits |= ((uint32_t) (_pwmValues[device][19] > tickCount)) << 19;
+      pwmBits |= ((uint32_t) (_pwmValues[device][20] > tickCount)) << 20;
+      pwmBits |= ((uint32_t) (_pwmValues[device][21] > tickCount)) << 21;
+      pwmBits |= ((uint32_t) (_pwmValues[device][22] > tickCount)) << 22;
+      pwmBits |= ((uint32_t) (_pwmValues[device][23] > tickCount)) << 23;
 
-      pwmBits |= ((uint32_t)(_pwmValues[device][24] > tickCount)) << 24;
-      pwmBits |= ((uint32_t)(_pwmValues[device][25] > tickCount)) << 25;
-      pwmBits |= ((uint32_t)(_pwmValues[device][26] > tickCount)) << 26;
-      pwmBits |= ((uint32_t)(_pwmValues[device][27] > tickCount)) << 27;
-      pwmBits |= ((uint32_t)(_pwmValues[device][28] > tickCount)) << 28;
-      pwmBits |= ((uint32_t)(_pwmValues[device][29] > tickCount)) << 29;
-      pwmBits |= ((uint32_t)(_pwmValues[device][30] > tickCount)) << 30;
-      pwmBits |= ((uint32_t)(_pwmValues[device][31] > tickCount)) << 31;
+      pwmBits |= ((uint32_t) (_pwmValues[device][24] > tickCount)) << 24;
+      pwmBits |= ((uint32_t) (_pwmValues[device][25] > tickCount)) << 25;
+      pwmBits |= ((uint32_t) (_pwmValues[device][26] > tickCount)) << 26;
+      pwmBits |= ((uint32_t) (_pwmValues[device][27] > tickCount)) << 27;
+      pwmBits |= ((uint32_t) (_pwmValues[device][28] > tickCount)) << 28;
+      pwmBits |= ((uint32_t) (_pwmValues[device][29] > tickCount)) << 29;
+      pwmBits |= ((uint32_t) (_pwmValues[device][30] > tickCount)) << 30;
+      pwmBits |= ((uint32_t) (_pwmValues[device][31] > tickCount)) << 31;
 
       _displayBufferOut[device] = pwmBits;
     }
@@ -369,77 +344,47 @@ void tickPWM()
     // the SPI is completely idle (startup or after a period of no display activity).
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    if (_spiMaster->busy() == false)
-    {
+    if (_spiMaster->busy() == false) {
       _spiMaster->processQueue();
     }
   }
 }
 
+void setStatusLedAutoRefreshing(const bool autoRefreshEnabled) { _autoRefreshStatusLed = autoRefreshEnabled; }
 
-void setStatusLedAutoRefreshing(const bool autoRefreshEnabled)
-{
-  _autoRefreshStatusLed = autoRefreshEnabled;
-}
+uint8_t getMasterIntensity() { return _masterIntensity; }
 
+void setMasterIntensity(const uint8_t intensity) { _masterIntensity = intensity; }
 
-uint8_t getMasterIntensity()
-{
-  return _masterIntensity;
-}
+bool getDisplayBlanking() { return _displayBlank; }
 
+bool isBlinkActive() { return _blinkPhasesRemaining > 0; }
 
-void setMasterIntensity(const uint8_t intensity)
-{
-  _masterIntensity = intensity;
-}
-
-
-bool getDisplayBlanking()
-{
-  return _displayBlank;
-}
-
-
-bool isBlinkActive()
-{
-  return _blinkPhasesRemaining > 0;
-}
-
-
-void setDisplayBlanking(const bool blank)
-{
-  if (_displayBlank == blank) return;
+void setDisplayBlanking(const bool blank) {
+  if (_displayBlank == blank) {
+    return;
+  }
 
   _displayBlank = blank;
 
-  if (blank)
-  {
-    if (_autoRefreshStatusLed) Hardware::setStatusLed(RgbLed());
+  if (blank) {
+    if (_autoRefreshStatusLed) {
+      Hardware::setStatusLed(RgbLed());
+    }
     Hardware::setDisplayHardwareBlanking(true);
-  }
-  else
-  {
-    if (_autoRefreshStatusLed) Hardware::setStatusLed(_statusLed);
+  } else {
+    if (_autoRefreshStatusLed) {
+      Hardware::setStatusLed(_statusLed);
+    }
     Hardware::setDisplayHardwareBlanking(false);
   }
 }
 
+uint8_t getDisplayRefreshInterval() { return _driverRefreshInterval; }
 
-uint8_t getDisplayRefreshInterval()
-{
-  return _driverRefreshInterval;
-}
+void setDisplayRefreshInterval(const uint8_t interval) { _driverRefreshInterval = interval; }
 
-
-void setDisplayRefreshInterval(const uint8_t interval)
-{
-  _driverRefreshInterval = interval;
-}
-
-
-void blink(uint8_t count)
-{
+void blink(uint8_t count) {
   // Start the animation: blank immediately, then schedule 2n-1 timed phase transitions.
   // Each blink = one blank phase + one visible phase (two transitions).
   // tick() toggles blanking directly on each transition (no deferred flag), so phases
@@ -449,56 +394,39 @@ void blink(uint8_t count)
   _blinkPhaseTimer = cDoubleBlinkDuration;
 }
 
-
 // Updates all main display LEDs in the crossfade buffers
 //
-void _loadCrossfaders(const Display &display)
-{
-  for (uint8_t tube = 0; tube < Display::cTubeCount; tube++)
-  {
-    for (uint8_t glyph = 0; glyph < NixieTube::cGlyphsPerTube; glyph++)
-    {
-      _crossfader[(tube * NixieTube::cGlyphsPerTube) + glyph].startNewFade(display.getTubeRaw(tube).getGlyphRaw(NixieTube::cGlyphsPerTube - 1 - glyph));
+void _loadCrossfaders(const Display &display) {
+  for (uint8_t tube = 0; tube < Display::cTubeCount; tube++) {
+    for (uint8_t glyph = 0; glyph < NixieTube::cGlyphsPerTube; glyph++) {
+      _crossfader[(tube * NixieTube::cGlyphsPerTube) + glyph].startNewFade(
+          display.getTubeRaw(tube).getGlyphRaw(NixieTube::cGlyphsPerTube - 1 - glyph));
     }
   }
   // ...and here we load the dot crossfaders
-  for (uint8_t dot = 0; dot < Display::cDotCount; dot++)
-  {
+  for (uint8_t dot = 0; dot < Display::cDotCount; dot++) {
     _crossfader[(Display::cGlyphCount) + dot].startNewFade(display.getDotRaw(dot));
   }
 }
 
+void writeDisplay(const Display &display) { _loadCrossfaders(display); }
 
-void writeDisplay(const Display &display)
-{
-  _loadCrossfaders(display);
-}
-
-
-void writeDisplay(const Display &display, const RgbLed &statusLed)
-{
+void writeDisplay(const Display &display, const RgbLed &statusLed) {
   _loadCrossfaders(display);
 
   // _crossfader[Display::cPixelCount].startNewFade(statusLed);
   writeStatusLed(statusLed);
 }
 
-
-void writeStatusLed(const RgbLed &statusLed)
-{
+void writeStatusLed(const RgbLed &statusLed) {
   // _crossfader[Display::cPixelCount].startNewFade(statusLed);
-  if (_statusLed == statusLed) return;
+  if (_statusLed == statusLed) {
+    return;
+  }
   _statusLed = statusLed;
   _refreshStatusLed = true;
 }
 
+RgbLed getStatusLed() { return _statusLed; }
 
-RgbLed getStatusLed()
-{
-  return _statusLed;
-}
-
-
-}
-
-}
+}  // namespace kbxTubeClock::DisplayManager

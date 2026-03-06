@@ -23,25 +23,16 @@
 #include "Settings.h"
 #include "TestDisplayView.h"
 
-
 namespace kbxTubeClock {
-
 
 // maximum value for _displayedColor (2 = Blue)
 //
 const uint8_t TestDisplayView::cMaxColor = 2;
 
-
 TestDisplayView::TestDisplayView()
-  : _displayedColor(0),
-    _intensity(0),
-    _mode(Application::OperatingMode::OperatingModeTestDisplay)
-{
-}
+    : _displayedColor(0), _intensity(0), _mode(Application::OperatingMode::OperatingModeTestDisplay) {}
 
-
-void TestDisplayView::enter(uint8_t /*relatedSetting*/)
-{
+void TestDisplayView::enter(uint8_t /*relatedSetting*/) {
   _mode = Application::getOperatingMode();
 
   DisplayManager::setStatusLedAutoRefreshing(true);
@@ -50,62 +41,50 @@ void TestDisplayView::enter(uint8_t /*relatedSetting*/)
   Application::setIntensity(_intensity);
 }
 
-
-bool TestDisplayView::keyHandler(Keys::Key key)
-{
+bool TestDisplayView::keyHandler(Keys::Key key) {
   bool tick = true;
 
-  if (key == Keys::Key::A)
-  {
+  if (key == Keys::Key::A) {
     _intensity = 0;
     // set the new display intensity
     Application::setIntensity(_intensity);
   }
 
-  if (key == Keys::Key::B)
-  {
+  if (key == Keys::Key::B) {
     _intensity = 10000;
     // set the new display intensity
     Application::setIntensity(_intensity);
   }
 
-  if (key == Keys::Key::C)
-  {
-    if (++_displayedColor > cMaxColor)
-    {
+  if (key == Keys::Key::C) {
+    if (++_displayedColor > cMaxColor) {
       _displayedColor = 0;
     }
   }
 
-  if (key == Keys::Key::D)
-  {
+  if (key == Keys::Key::D) {
     // set the new display intensity
     Application::setIntensity(--_intensity);
   }
 
-  if (key == Keys::Key::U)
-  {
+  if (key == Keys::Key::U) {
     // set the new display intensity
     Application::setIntensity(++_intensity);
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void TestDisplayView::loop()
-{
+void TestDisplayView::loop() {
   const uint16_t displayBitMask = 0;
   const uint16_t testIntensity = 512;
   uint16_t red = 0, green = 0, blue = 0;
 
-  switch (_displayedColor)
-  {
+  switch (_displayedColor) {
     case 2:
       blue = testIntensity;
       break;
@@ -119,12 +98,11 @@ void TestDisplayView::loop()
   }
 
   // now we can create a new display object with the right colors and bitmask
-  RgbLed  testColor(red, green, blue);
+  RgbLed testColor(red, green, blue);
   Display bcDisp(displayBitMask);
 
   DisplayManager::writeDisplay(bcDisp);
   // Hardware::setStatusLed(testColor);
 }
 
-
-}
+}  // namespace kbxTubeClock

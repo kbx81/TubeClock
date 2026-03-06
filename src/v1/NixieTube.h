@@ -22,26 +22,24 @@
 
 #include <cstdint>
 
-
 namespace kbxTubeClock {
 
-class NixieTube
-{
-public:
+class NixieTube {
+ public:
   /// @brief Create a new NixieTube instance; we assume 10 glyphs and 2 points
   ///
   /// @param glyph Initial active glyph (0 - 9)
   /// @param intensity Initial intensity value for active glyph (0-255)
   /// @param duration Initial duration value for glyph transitions
   ///
-  NixieTube(const uint8_t glyph = 0, const uint8_t intensity = NixieGlyph::cGlyphMaximumIntensity, const uint32_t duration = 0);
+  NixieTube(const uint8_t glyph = 0, const uint8_t intensity = NixieGlyph::cGlyphMaximumIntensity,
+            const uint32_t duration = 0);
 
-public:
+ public:
   /// Important constants
   ///
   static const uint8_t cGlyphsPerTube = 10;
   static const uint8_t cPointsPerTube = 2;
-
 
   /// @brief Compare this NixieTube to another
   /// @param LED to compare with
@@ -103,7 +101,8 @@ public:
   void adjustIntensityAll(const uint16_t percentageOfCurrentx100);
 
   /// @brief Merges the nixie tube with another.
-  /// @param percentageOfOriginalTubex100 percentage of original NixieTube. Percentages are times 100 -- e.g.: 8765 = 87.65%
+  /// @param percentageOfOriginalTubex100 percentage of original NixieTube. Percentages are times 100 -- e.g.: 8765
+  /// = 87.65%
   ///
   void mergeWithNixieTube(uint16_t percentageOfOriginalTubex100, const NixieTube &tube);
 
@@ -112,10 +111,10 @@ public:
   ///
   void setFromMergedNixieTubes(uint16_t percentageOfTube0x100, const NixieTube &tube0, const NixieTube &tube1);
 
-private:
-  uint32_t _duration;       ///< Duration over which this tube should transition
-  uint8_t  _intensity[cGlyphsPerTube];
-  uint8_t  _activeGlyph;
+ private:
+  uint32_t _duration;  ///< Duration over which this tube should transition
+  uint8_t _intensity[cGlyphsPerTube];
+  uint8_t _activeGlyph;
 };
 
-}
+}  // namespace kbxTubeClock

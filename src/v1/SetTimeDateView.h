@@ -18,7 +18,6 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
@@ -26,34 +25,31 @@
 #include "View.h"
 #include "DateTime.h"
 
-
 namespace kbxTubeClock {
 
 class SetTimeDateView : public View {
-
-public:
+ public:
   /// @brief The selected item on the display
   ///
-  enum SelectedItem : int8_t
-  {
+  enum SelectedItem : int8_t {
     SecondDay = 0,
     MinuteMonth = 1,
-    HourYear = 2
+    HourYear = 2,
   };
 
   /// @brief Percentage of configured LED color intensities used for lowlight
   ///
   static const uint16_t cLowlightPercentage;
 
-/// @brief The view which displays the UI for setting times and dates
-///
-public: // Implement the SetTimeDateView class
+  /// @brief The view which displays the UI for setting times and dates
+  ///
+ public:  // Implement the SetTimeDateView class
   SetTimeDateView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   /// @brief the selected byte
   ///
   int8_t _selectedItem;
@@ -69,7 +65,6 @@ private:
   /// @brief the setting index passed at enter() time (used for slot save operations)
   ///
   uint8_t _relatedSetting;
-
 };
 
-}
+}  // namespace kbxTubeClock

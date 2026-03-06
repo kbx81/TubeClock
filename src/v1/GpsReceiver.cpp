@@ -22,37 +22,29 @@
 #include "GpsReceiver.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
+namespace kbxTubeClock::GpsReceiver {
 
-namespace kbxTubeClock {
+/// @brief GPS Receiver state machine states
+///
+enum GpsRxState : uint8_t {
+  GpsRxIdle = 0,
+  GpsRxGettingHeader = 1,
+  GpsRxNmeaHeaderValid = 2,
+  GpsRxTimeReceived = 3,
+  GpsRxTimeCompleted = 4,
+  GpsRxWaitForDate = 5,
+  GpsRxDate = 6,
+  GpsRxNumSatellites = 7
+};
 
-namespace GpsReceiver
-{
-
-  /// @brief GPS Receiver state machine states
-  ///
-  enum GpsRxState : uint8_t {
-    GpsRxIdle            = 0,
-    GpsRxGettingHeader   = 1,
-    GpsRxNmeaHeaderValid = 2,
-    GpsRxTimeReceived    = 3,
-    GpsRxTimeCompleted   = 4,
-    GpsRxWaitForDate     = 5,
-    GpsRxDate            = 6,
-    GpsRxNumSatellites   = 7
-  };
-
-  /// @brief GPS Receiver sentence type
-  ///
-  enum GpsRxType : uint8_t {
-    GpsRMC = 0,
-    GpsGSV = 1
-  };
-
+/// @brief GPS Receiver sentence type
+///
+enum GpsRxType : uint8_t { GpsRMC = 0, GpsGSV = 1 };
 
 // the header on the string we expect to parse
 // $GPRMC,000012.800,V,,,,,0.00,0.00,060180,,,N*49
@@ -116,28 +108,23 @@ static uint8_t _numSatellites = 0;
 
 // cached Usart pointer for GPS USART
 //
-static Usart* _gpsUsart = nullptr;
+static Usart *_gpsUsart = nullptr;
 
-
-void initialize()
-{
+void initialize() {
   _gpsUsart = Hardware::getUsart(0);  // USART1
 }
 
-
-
 /// @brief Updates our DateTime object based on the receive buffers
 ///
-void _rxRmcComplete()
-{
+void _rxRmcComplete() {
   uint16_t year = 2000;
   uint8_t month = 0, day = 0, hour = 0, minute = 0, second = 0;
 
-  day   = ((_rxDateChar[0] - '0') * 10) + (_rxDateChar[1] - '0');
+  day = ((_rxDateChar[0] - '0') * 10) + (_rxDateChar[1] - '0');
   month = ((_rxDateChar[2] - '0') * 10) + (_rxDateChar[3] - '0');
   year += ((_rxDateChar[4] - '0') * 10) + (_rxDateChar[5] - '0');
 
-  hour   = ((_rxTimeChar[0] - '0') * 10) + (_rxTimeChar[1] - '0');
+  hour = ((_rxTimeChar[0] - '0') * 10) + (_rxTimeChar[1] - '0');
   minute = ((_rxTimeChar[2] - '0') * 10) + (_rxTimeChar[3] - '0');
   second = ((_rxTimeChar[4] - '0') * 10) + (_rxTimeChar[5] - '0');
 
@@ -145,68 +132,38 @@ void _rxRmcComplete()
   _gpsTime.setTime(hour, minute, second);
 }
 
+bool isConnected() { return ((_rxValidChar == 'A') || (_rxValidChar == 'V')); }
 
-bool isConnected()
-{
-  return ((_rxValidChar == 'A') || (_rxValidChar == 'V'));
-}
+bool isValid() { return (_rxValidChar == 'A'); }
 
-bool isValid()
-{
-  return (_rxValidChar == 'A');
-}
+DateTime getDateTime() { return _gpsTime; }
 
+DateTime getLocalDateTime() { return _gpsTime.addSeconds(_timeZoneOffsetInMinutes * 60); }
 
-DateTime getDateTime()
-{
-  return _gpsTime;
-}
+uint8_t getSatellitesInView() { return _numSatellites; }
 
+void setTimeZone(const int16_t offsetInMinutes) { _timeZoneOffsetInMinutes = offsetInMinutes; }
 
-DateTime getLocalDateTime()
-{
-  return _gpsTime.addSeconds(_timeZoneOffsetInMinutes * 60);
-}
-
-
-uint8_t getSatellitesInView()
-{
-  return _numSatellites;
-}
-
-
-void setTimeZone(const int16_t offsetInMinutes)
-{
-  _timeZoneOffsetInMinutes = offsetInMinutes;
-}
-
-
-void rxIsr()
-{
-  if (_gpsUsart == nullptr || !_gpsUsart->rxReady()) return;
+void rxIsr() {
+  if (_gpsUsart == nullptr || !_gpsUsart->rxReady()) {
+    return;
+  }
 
   uint8_t rxChar = _gpsUsart->readByte();
 
-  switch (_rxState)
-  {
+  switch (_rxState) {
     // at this point, we've seen the "$GPRMC," characters and can expect the time or a sentence count next
     case GpsRxState::GpsRxNmeaHeaderValid:
-      if (_rxType == GpsRxType::GpsRMC)
-      {
+      if (_rxType == GpsRxType::GpsRMC) {
         _rxTimeChar[_rxCharCount] = rxChar;
 
-        if (++_rxCharCount >= cGpsDateTimeLength)
-        {
+        if (++_rxCharCount >= cGpsDateTimeLength) {
           _rxState = GpsRxState::GpsRxTimeReceived;
           _rxCharCount = 0;
         }
-      }
-      else if (_rxType == GpsRxType::GpsGSV)
-      {
-        if (rxChar == ',')
-        {
-          if (++_rxCharCount >= cGpsPreNumSatellitesCommaCount)
-          {
+      } else if (_rxType == GpsRxType::GpsGSV) {
+        if (rxChar == ',') {
+          if (++_rxCharCount >= cGpsPreNumSatellitesCommaCount) {
             _rxState = GpsRxState::GpsRxNumSatellites;
             _rxCharCount = 0;
           }
@@ -216,31 +173,25 @@ void rxIsr()
 
     // the time has been received, here we'll just eat a comma and move along
     case GpsRxState::GpsRxTimeReceived:
-      if (rxChar == ',')
-      {
+      if (rxChar == ',') {
         _rxState = GpsRxState::GpsRxTimeCompleted;
       }
       break;
 
     // now we should see either an 'A' or a 'V' indicating validity
     case GpsRxState::GpsRxTimeCompleted:
-      if ((rxChar == 'A') || (rxChar == 'V'))
-      {
+      if ((rxChar == 'A') || (rxChar == 'V')) {
         _rxValidChar = rxChar;
         _rxState = GpsRxState::GpsRxWaitForDate;
-      }
-      else
-      {
+      } else {
         _rxState = GpsRxState::GpsRxIdle;
       }
       break;
 
     // the validity has been received, now we'll eat more commas
     case GpsRxState::GpsRxWaitForDate:
-      if (rxChar == ',')
-      {
-        if (++_rxCharCount >= cGpsPreDateCommaCount)
-        {
+      if (rxChar == ',') {
+        if (++_rxCharCount >= cGpsPreDateCommaCount) {
           _rxState = GpsRxState::GpsRxDate;
           _rxCharCount = 0;
         }
@@ -251,8 +202,7 @@ void rxIsr()
     case GpsRxState::GpsRxDate:
       _rxDateChar[_rxCharCount] = rxChar;
 
-      if (++_rxCharCount >= cGpsDateTimeLength)
-      {
+      if (++_rxCharCount >= cGpsDateTimeLength) {
         _rxState = GpsRxState::GpsRxIdle;
         _rxCharCount = 0;
         _rxRmcComplete();
@@ -261,13 +211,10 @@ void rxIsr()
 
     // read in the two-digit number of satellites — accumulate directly to avoid buffer
     case GpsRxState::GpsRxNumSatellites:
-      if (_rxCharCount == 0)
-      {
+      if (_rxCharCount == 0) {
         _numSatellites = (rxChar - '0') * 10;
         ++_rxCharCount;
-      }
-      else
-      {
+      } else {
         _numSatellites += rxChar - '0';
         _rxState = GpsRxState::GpsRxIdle;
         _rxCharCount = 0;
@@ -278,21 +225,16 @@ void rxIsr()
     case GpsRxState::GpsRxGettingHeader:
       _rxHeaderChar[_rxCharCount] = rxChar;
       // if we've received enough characters, compare the strings for validity
-      if (++_rxCharCount >= cGpsNmeaHeaderLength)
-      {
-        if (memcmp(cGpsParseStrGSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0)
-        {
+      if (++_rxCharCount >= cGpsNmeaHeaderLength) {
+        if (memcmp(cGpsParseStrGSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsGSV;
           _rxCharCount = 0;
-        }
-        else if (memcmp(cGpsParseStrRMC, _rxHeaderChar, cGpsNmeaHeaderLength) == 0)
-        {
+        } else if (memcmp(cGpsParseStrRMC, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsRMC;
           _rxCharCount = 0;
-        }
-        else  // nothing matched so just start over
+        } else  // nothing matched so just start over
         {
           _rxState = GpsRxState::GpsRxIdle;
           _rxCharCount = 0;
@@ -302,16 +244,11 @@ void rxIsr()
 
     // it starts here...we patiently wait for that money header tag! ('$')
     default:
-      if (rxChar == '$')
-      {
+      if (rxChar == '$') {
         _rxHeaderChar[_rxCharCount++] = rxChar;
-
         _rxState = GpsRxState::GpsRxGettingHeader;
       }
   }
 }
 
-
-}
-
-}
+}  // namespace kbxTubeClock::GpsReceiver

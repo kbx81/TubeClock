@@ -22,32 +22,21 @@
 #include "MainMenuView.h"
 #include "Settings.h"
 
-
 namespace kbxTubeClock {
 
+MainMenuView::MainMenuView() : _selectedMode(0), _previousMode(0) {}
 
-MainMenuView::MainMenuView()
-  : _selectedMode(0),
-    _previousMode(0)
-{
-}
-
-
-void MainMenuView::enter(uint8_t /*relatedSetting*/)
-{
+void MainMenuView::enter(uint8_t /*relatedSetting*/) {
   // correct the mode if it's out of range
-  if ((_selectedMode == 0) || (_selectedMode > Application::OperatingMode::OperatingModeSlot8Time))
-  {
+  if ((_selectedMode == 0) || (_selectedMode > Application::OperatingMode::OperatingModeSlot8Time)) {
     _selectedMode = Application::OperatingMode::OperatingModeFixedDisplay;
   }
   // if the clock is not set, select the SetClock mode automagically
-  if (Hardware::rtcIsSet() == false)
-  {
+  if (Hardware::rtcIsSet() == false) {
     _selectedMode = Application::OperatingMode::OperatingModeSetClock;
   }
   // if the clock is set but not the date, select the SetDate mode automagically
-  else if (Application::dateTime().yearShort(false) == 0)
-  {
+  else if (Application::dateTime().yearShort(false) == 0) {
     _selectedMode = Application::OperatingMode::OperatingModeSetDate;
   }
 
@@ -56,14 +45,11 @@ void MainMenuView::enter(uint8_t /*relatedSetting*/)
   DisplayManager::writeStatusLed(RgbLed());
 }
 
-
-bool MainMenuView::keyHandler(Keys::Key key)
-{
+bool MainMenuView::keyHandler(Keys::Key key) {
   bool tick = true;
 
   if ((key == Keys::Key::A) &&
-      (_selectedMode == static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1))
-  {
+      (_selectedMode == static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1)) {
     DisplayManager::writeStatusLed(Application::red);
 
     Hardware::eraseFlash(Settings::cSettingsFlashAddress);
@@ -73,66 +59,54 @@ bool MainMenuView::keyHandler(Keys::Key key)
     DisplayManager::writeStatusLed(RgbLed());
   }
 
-  if (key == Keys::Key::B)
-  {
+  if (key == Keys::Key::B) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeFixedDisplay);
   }
 
-  if (key == Keys::Key::C)
-  {
+  if (key == Keys::Key::C) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeToggleDisplay);
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (--_selectedMode == 0)
-    {
+  if (key == Keys::Key::D) {
+    if (--_selectedMode == 0) {
       _selectedMode = 1;
 
       tick = false;
     }
   }
 
-  if (key == Keys::Key::U)
-  {
+  if (key == Keys::Key::U) {
     _selectedMode++;
 
-    if (_selectedMode > static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1)
-    {
+    if (_selectedMode > static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1) {
       _selectedMode = static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1;
 
       tick = false;
     }
   }
 
-  if (key == Keys::Key::E)
-  {
-    if (_selectedMode <= static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay))
-    {
-      Application::setOperatingMode((Application::OperatingMode)_selectedMode);
+  if (key == Keys::Key::E) {
+    if (_selectedMode <= static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay)) {
+      Application::setOperatingMode((Application::OperatingMode) _selectedMode);
     }
   }
 
   return tick;
 }
 
-
-void MainMenuView::loop()
-{
+void MainMenuView::loop() {
   Display tcDisp;
   uint8_t modeIndicator = Application::getModeDisplayNumber(_selectedMode);
 
-  if (modeIndicator == 0)
-  {
+  if (modeIndicator == 0) {
     // fix up the last "Erase FLASH" mode value
     modeIndicator = 99;
   }
 
-  tcDisp.setDisplayFromBytes(modeIndicator, 0 , 0, 0b1111);
+  tcDisp.setDisplayFromBytes(modeIndicator, 0, 0, 0b1111);
   tcDisp.setDot(1, NixieGlyph(NixieGlyph::cGlyphMaximumIntensity));
 
   DisplayManager::writeDisplay(tcDisp);
 }
 
-
-}
+}  // namespace kbxTubeClock

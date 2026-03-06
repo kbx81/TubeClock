@@ -18,12 +18,9 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
-
 namespace kbxTubeClock {
-
 
 /// A rock solid date/time class for a Gregorian calendar.
 ///
@@ -52,8 +49,7 @@ namespace kbxTubeClock {
 /// that only these 6 countries out of ~195 write the month before the day.
 ///
 class DateTime {
-
-public:
+ public:
   /// Create the first possible date/time which is 2000-01-01 00:00:00.
   ///
   /// You can check for this special date/time using the isFirst()
@@ -77,7 +73,7 @@ public:
   ///
   // ~DateTime();
 
-public:
+ public:
   /// Compare this date/time to another value
   ///
   bool operator==(const DateTime &other) const;
@@ -102,7 +98,7 @@ public:
   ///
   bool operator>=(const DateTime &other) const;
 
-public:
+ public:
   /// Set the date.
   /// Valid values 2000-9999.
   ///
@@ -190,7 +186,7 @@ public:
   ///
   bool isFirst() const;
 
-public:
+ public:
   /// Create a new date/time object from the given unix time.
   ///
   /// If you convert from a unix timestamp, subtract 0x386D4380 from this value.
@@ -201,22 +197,22 @@ public:
   /// the given values. You have to make sure all values are in the
   /// correct ranges.
   ///
-  static DateTime fromUncheckedValues(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, uint8_t dayOfWeek);
+  static DateTime fromUncheckedValues(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                                      uint8_t second, uint8_t dayOfWeek);
 
-private:
+ private:
   /// Create a new unchecked date/time object.
   ///
   DateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, uint8_t dayOfWeek);
 
-private:
-  uint16_t _year; ///< The year
-  uint8_t _month; ///< The month 1-12
-  uint8_t _day; ///< The day 1-31
-  uint8_t _hour; ///< The hour 0-23
-  uint8_t _minute; ///< The minute 0-59
-  uint8_t _second; ///< The second 0-59
-  uint8_t _dayOfWeek; ///< The day of the week 0-6
+ private:
+  uint16_t _year;      ///< The year
+  uint8_t _month;      ///< The month 1-12
+  uint8_t _day;        ///< The day 1-31
+  uint8_t _hour;       ///< The hour 0-23
+  uint8_t _minute;     ///< The minute 0-59
+  uint8_t _second;     ///< The second 0-59
+  uint8_t _dayOfWeek;  ///< The day of the week 0-6
 };
 
-
-}
+}  // namespace kbxTubeClock

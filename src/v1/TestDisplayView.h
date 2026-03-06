@@ -18,27 +18,24 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class TestDisplayView : public View {
-
-// The view which displays either the date, time, temperature, or a rotation
-//
-public: // Implement the TimeDateTempView class
+  // The view which displays either the date, time, temperature, or a rotation
+  //
+ public:  // Implement the TimeDateTempView class
   TestDisplayView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   static const uint8_t cMaxColor;
 
   // current color displayed. 0 = Red, 1 = Green, 2 = Blue
@@ -52,7 +49,6 @@ private:
   // the main application's mode
   //
   Application::OperatingMode _mode;
-
 };
 
-}
+}  // namespace kbxTubeClock

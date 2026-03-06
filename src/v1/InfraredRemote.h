@@ -18,75 +18,65 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Hardware.h"
 
-
-namespace kbxTubeClock {
-
 /// @brief kbx Tube Clock InfraredRemote
 ///
 
-namespace InfraredRemote
-{
-  // NEC IR code: full 16-bit address and command words
-  //
-  struct IrKeyCode {
-    uint16_t address;
-    uint16_t command;
-  };
+namespace kbxTubeClock::InfraredRemote {
+// NEC IR code: full 16-bit address and command words
+//
+struct IrKeyCode {
+  uint16_t address;
+  uint16_t command;
+};
 
-  // Logical IR key indices — identifies which key was pressed.
-  //  The order here determines the mapping to physical keys in Keys.cpp.
-  //
-  enum IrKey : uint8_t {
-    A     = 0,
-    B     = 1,
-    C     = 2,
-    E     = 3,
-    D     = 4,
-    U     = 5,
-    Power = 6,
-    Count = 7,
-    None  = 0xff
-  };
+// Logical IR key indices — identifies which key was pressed.
+//  The order here determines the mapping to physical keys in Keys.cpp.
+//
+enum IrKey : uint8_t {
+  A = 0,
+  B = 1,
+  C = 2,
+  E = 3,
+  D = 4,
+  U = 5,
+  Power = 6,
+  Count = 7,
+  None = 0xff,
+};
 
-  // timer period - 48 gives us one microsecond ticks on the STM32
-  //
-  static const uint16_t cTimerPeriod = 48;
+// timer period - 48 gives us one microsecond ticks on the STM32
+//
+static const uint16_t cTimerPeriod = 48;
 
+/// @brief Initialize InfraredRemote
+///
+void initialize();
 
-  /// @brief Initialize InfraredRemote
-  ///
-  void initialize();
+/// @brief Check if there is a key press in the queue
+/// @return True if a key press is available
+///
+bool hasKeyPress();
 
-  /// @brief Check if there is a key press in the queue
-  /// @return True if a key press is available
-  ///
-  bool hasKeyPress();
+/// @brief Get the next key from the queue
+/// @return Key pressed
+///
+IrKey getKeyPress();
 
-  /// @brief Get the next key from the queue
-  /// @return Key pressed
-  ///
-  IrKey getKeyPress();
+/// @brief Check if the key pressed is being held down
+/// @return True if the key pressed is being held
+///
+bool keyIsHeld();
 
-  /// @brief Check if the key pressed is being held down
-  /// @return True if the key pressed is being held
-  ///
-  bool keyIsHeld();
+/// @brief Call from GPIO interrupt
+///
+void tick();
 
-  /// @brief Call from GPIO interrupt
-  ///
-  void tick();
+/// @brief Call from Timer interrupt
+///
+void overflow();
 
-  /// @brief Call from Timer interrupt
-  ///
-  void overflow();
-
-
-}
-
-
-}
+}  // namespace kbxTubeClock::InfraredRemote

@@ -18,18 +18,15 @@
 //
 #pragma once
 
-
 #include "NixieGlyph.h"
-
 
 namespace kbxTubeClock {
 
 /// @brief kbx Tube Clock NixieGlyphCrossfader class
 ///
 
-class NixieGlyphCrossfader
-{
-public:
+class NixieGlyphCrossfader {
+ public:
   NixieGlyphCrossfader() : _active(), _start(), _target() {}
 
   /// @brief Gets the fader's active/current value
@@ -51,11 +48,10 @@ public:
   ///
   void tick();
 
-private:
-  NixieGlyph _active;   ///< current values of fader, duration value = tick counter
-  NixieGlyph _start;    ///< values at which fade started, duration value unused
-  NixieGlyph _target;   ///< target values for fader, duration value = duration of crossfade
+ private:
+  NixieGlyph _active;  ///< current values of fader, duration value = tick counter
+  NixieGlyph _start;   ///< values at which fade started, duration value unused
+  NixieGlyph _target;  ///< target values for fader, duration value = duration of crossfade
 };
 
-
-}
+}  // namespace kbxTubeClock

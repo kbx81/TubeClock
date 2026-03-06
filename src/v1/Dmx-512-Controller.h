@@ -20,11 +20,7 @@
 
 #include <cstdint>
 
-
-namespace kbxTubeClock {
-
-namespace Dmx512Controller {
-
+namespace kbxTubeClock::Dmx512Controller {
 
 /// @brief Initialize it all
 ///
@@ -48,7 +44,4 @@ void strobeTimer();
 ///
 void setDmx512Active(const bool active);
 
-
-}
-
-}
+}  // namespace kbxTubeClock::Dmx512Controller

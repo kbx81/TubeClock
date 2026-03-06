@@ -20,166 +20,134 @@
 #include "Keys.h"
 #include "SerialRemote.h"
 
+namespace kbxTubeClock::Keys {
 
-namespace kbxTubeClock {
+// The number of defined keys
+//
+static const uint8_t cKeyCount = 7;
 
-namespace Keys {
+// The key masks for all tested keys
+//
+static const Key cKeyMasks[cKeyCount] = {A, B, C, E, D, U, Power};
 
+// The size of the key queue
+//
+static const uint8_t cKeyQueueSize = 8;
 
-  // The number of defined keys
-  //
-  static const uint8_t cKeyCount = 7;
+// The initial delay until repeat starts
+//
+static const uint16_t cRepeatDelay = 1000;
 
-  // The key masks for all tested keys
-  //
-  static const Key cKeyMasks[cKeyCount] = { A, B, C, E, D, U, Power };
+// The speed of the repeat
+//
+static const uint8_t cRepeatSpeed = 75;
 
-  // The size of the key queue
-  //
-  static const uint8_t cKeyQueueSize = 8;
+// The last bitmask of the key states
+//
+static Key _currentPressedKey = None;
 
-  // The initial delay until repeat starts
-  //
-  static const uint16_t cRepeatDelay = 1000;
+// Full hardware key bitmask from the last scanKeys() call, used to detect
+// any change in multi-key state for serial remote notifications
+//
+static uint8_t _prevSerialKeyMask = 0;
 
-  // The speed of the repeat
-  //
-  static const uint8_t cRepeatSpeed = 75;
+// The number of checks since a key was pressed down
+//
+static uint16_t _keyPressedTimeCount = 0;
 
+// Flag if we are already in repeat mode
+//
+static bool _repeatMode = false;
 
-  // The last bitmask of the key states
-  //
-  static Key _currentPressedKey = None;
+// Key queue for received keys (circular buffer)
+//
+static uint8_t _keyQueue[cKeyQueueSize];
 
-  // Full hardware key bitmask from the last scanKeys() call, used to detect
-  // any change in multi-key state for serial remote notifications
-  //
-  static uint8_t _prevSerialKeyMask = 0;
+// Circular buffer head (read) and tail (write) indices
+//
+static uint8_t _queueHead = 0;
+static uint8_t _queueTail = 0;
 
-  // The number of checks since a key was pressed down
-  //
-  static uint16_t _keyPressedTimeCount = 0;
+// Get the current pressed key
+//
+Key currentlyPressedKey() {
+  Hardware::buttonsRefresh();
+  const uint8_t mask = Hardware::buttons();
+  uint8_t i = 0;
 
-  // Flag if we are already in repeat mode
-  //
-  static bool _repeatMode = false;
-
-  // Key queue for received keys (circular buffer)
-  //
-  static uint8_t _keyQueue[cKeyQueueSize];
-
-  // Circular buffer head (read) and tail (write) indices
-  //
-  static uint8_t _queueHead = 0;
-  static uint8_t _queueTail = 0;
-
-
-  // Get the current pressed key
-  //
-  Key currentlyPressedKey()
-  {
-    Hardware::buttonsRefresh();
-    const uint8_t mask = Hardware::buttons();
-    uint8_t i = 0;
-
-    for (i = 0; i < cKeyCount; ++i)
-    {
-      if ((mask & cKeyMasks[i]) != 0)
-      {
-        return cKeyMasks[i];
-      }
+  for (i = 0; i < cKeyCount; ++i) {
+    if ((mask & cKeyMasks[i]) != 0) {
+      return cKeyMasks[i];
     }
+  }
 
-    if (InfraredRemote::hasKeyPress())
-    {
-      auto irKey = InfraredRemote::getKeyPress();
-      if (irKey < InfraredRemote::IrKey::Count)
-      {
-        return cKeyMasks[irKey];
-      }
+  if (InfraredRemote::hasKeyPress()) {
+    auto irKey = InfraredRemote::getKeyPress();
+    if (irKey < InfraredRemote::IrKey::Count) {
+      return cKeyMasks[irKey];
     }
+  }
 
+  return None;
+}
+
+// Add a key press to the queue.
+//
+void addKeyPress(Key key) {
+  uint8_t nextTail = (_queueTail + 1) & (cKeyQueueSize - 1);
+  if (nextTail != _queueHead) {
+    _keyQueue[_queueTail] = key;
+    _queueTail = nextTail;
+  }
+}
+
+void scanKeys() {
+  auto key = currentlyPressedKey();  // also calls Hardware::buttonsRefresh()
+  if (_currentPressedKey != key) {
+    _currentPressedKey = key;
+    _keyPressedTimeCount = 0;
+    _repeatMode = false;
+    if (key != None) {
+      addKeyPress(key);
+    }
+  }
+  // key repeating could be handled here, but we'll do it seperately (below)
+  //  so that the timing of the repeats is more consistent
+
+  // Notify serial remote whenever the full hardware key state changes.
+  // Hardware::buttons() returns the cached value from the buttonsRefresh()
+  // call above; no re-refresh is needed.
+  const uint8_t fullMask = Hardware::buttons();
+  if (fullMask != _prevSerialKeyMask) {
+    _prevSerialKeyMask = fullMask;
+    SerialRemote::notifyKeyEvent(fullMask);
+  }
+}
+
+void repeatHandler() {
+  if (_currentPressedKey != None) {
+    ++_keyPressedTimeCount;
+    if (_repeatMode && _keyPressedTimeCount > cRepeatSpeed) {
+      _keyPressedTimeCount = 0;
+      addKeyPress(_currentPressedKey);
+    } else if (_keyPressedTimeCount > cRepeatDelay) {
+      _keyPressedTimeCount = 0;
+      addKeyPress(_currentPressedKey);
+      _repeatMode = true;
+    }
+  }
+}
+
+bool hasKeyPress() { return (_queueHead != _queueTail); }
+
+Key getKeyPress() {
+  if (_queueHead == _queueTail) {
     return None;
   }
 
-
-  // Add a key press to the queue.
-  //
-  void addKeyPress(Key key)
-  {
-    uint8_t nextTail = (_queueTail + 1) & (cKeyQueueSize - 1);
-    if (nextTail != _queueHead)
-    {
-      _keyQueue[_queueTail] = key;
-      _queueTail = nextTail;
-    }
-  }
-
-
-  void scanKeys()
-  {
-    auto key = currentlyPressedKey();  // also calls Hardware::buttonsRefresh()
-    if (_currentPressedKey != key)
-    {
-      _currentPressedKey = key;
-      _keyPressedTimeCount = 0;
-      _repeatMode = false;
-      if (key != None)
-      {
-        addKeyPress(key);
-      }
-    }
-    // key repeating could be handled here, but we'll do it seperately (below)
-    //  so that the timing of the repeats is more consistent
-
-    // Notify serial remote whenever the full hardware key state changes.
-    // Hardware::buttons() returns the cached value from the buttonsRefresh()
-    // call above; no re-refresh is needed.
-    const uint8_t fullMask = Hardware::buttons();
-    if (fullMask != _prevSerialKeyMask)
-    {
-      _prevSerialKeyMask = fullMask;
-      SerialRemote::notifyKeyEvent(fullMask);
-    }
-  }
-
-
-  void repeatHandler()
-  {
-    if (_currentPressedKey != None)
-    {
-      ++_keyPressedTimeCount;
-      if (_repeatMode && _keyPressedTimeCount > cRepeatSpeed)
-      {
-        _keyPressedTimeCount = 0;
-        addKeyPress(_currentPressedKey);
-      }
-      else if (_keyPressedTimeCount > cRepeatDelay)
-      {
-        _keyPressedTimeCount = 0;
-        addKeyPress(_currentPressedKey);
-        _repeatMode = true;
-      }
-    }
-  }
-
-
-  bool hasKeyPress()
-  {
-    return (_queueHead != _queueTail);
-  }
-
-
-  Key getKeyPress()
-  {
-    if (_queueHead == _queueTail) return None;
-
-    auto key = _keyQueue[_queueHead];
-    _queueHead = (_queueHead + 1) & (cKeyQueueSize - 1);
-    return (Key)key;
-  }
-
-
+  auto key = _keyQueue[_queueHead];
+  _queueHead = (_queueHead + 1) & (cKeyQueueSize - 1);
+  return (Key) key;
 }
 
-}
+}  // namespace kbxTubeClock::Keys

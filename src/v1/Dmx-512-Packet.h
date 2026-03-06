@@ -18,24 +18,21 @@
 //
 #pragma once
 
-
 #include <cstdint>
-
 
 namespace kbxTubeClock {
 
 class Dmx512Packet {
-
-public: // Implement the Dmx512Packet class
+ public:  // Implement the Dmx512Packet class
   // DMX-512 buffer states
   //
   enum DmxBufferState : uint8_t {
     DmxBufferInvalid,
     DmxBufferBeingWritten,
-    DmxBufferValid
+    DmxBufferValid,
   };
 
-public:
+ public:
   // Constructor
   //
   Dmx512Packet();
@@ -50,7 +47,7 @@ public:
 
   // Returns a pointer to the DMX-512 packet
   //
-  uint8_t* getBufferPtr();
+  uint8_t *getBufferPtr();
 
   // Returns the state of the buffer
   //
@@ -60,12 +57,11 @@ public:
   //
   void setBufferState(DmxBufferState newState);
 
-private:
+ private:
   // DMX-512 data buffer
   //
   uint8_t _dmxPacket[513];
   DmxBufferState _bufferState;
-
 };
 
-}
+}  // namespace kbxTubeClock

@@ -24,41 +24,28 @@
 #include "SpiMaster.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
-
 
 namespace kbxTubeClock {
 
-
-SpiMaster::SpiMaster()
-: _transferInProgress(false),
-  _selectedSlave(cNoSlave),
-  _nextSlave(0),
-  _params{0, 0, 0, 0}
-{
-  for (uint8_t i = 0; i < cMaxSlaves; i++)
-  {
+SpiMaster::SpiMaster() : _transferInProgress(false), _selectedSlave(cNoSlave), _nextSlave(0), _params{0, 0, 0, 0} {
+  for (uint8_t i = 0; i < cMaxSlaves; i++) {
     _transferRequest[i].state = SpiReqAck::SpiReqAckOk;
   }
 }
 
-
-void SpiMaster::initialize(const SpiMasterParams* spiInit)
-{
-  _params.spi             = spiInit->spi;
-  _params.dmaController   = spiInit->dmaController;
-  _params.channelRx       = spiInit->channelRx;
-  _params.channelTx       = spiInit->channelTx;
+void SpiMaster::initialize(const SpiMasterParams *spiInit) {
+  _params.spi = spiInit->spi;
+  _params.dmaController = spiInit->dmaController;
+  _params.channelRx = spiInit->channelRx;
+  _params.channelTx = spiInit->channelTx;
 }
 
-
-uint8_t SpiMaster::registerSlave(SpiSlave* slave)
-{
-  if (_nextSlave < cMaxSlaves)
-  {
+uint8_t SpiMaster::registerSlave(SpiSlave *slave) {
+  if (_nextSlave < cMaxSlaves) {
     _slave[_nextSlave] = *slave;
 
     return _nextSlave++;
@@ -67,22 +54,18 @@ uint8_t SpiMaster::registerSlave(SpiSlave* slave)
   return cNoSlave;
 }
 
-
-SpiMaster::SpiReqAck SpiMaster::_configureMaster(const uint8_t slave)
-{
+SpiMaster::SpiReqAck SpiMaster::_configureMaster(const uint8_t slave) {
   SpiReqAck result = SpiReqAck::SpiReqAckError;
 
-  if (slave < _nextSlave)
-  {
+  if (slave < _nextSlave) {
     // Reset SPI, SPI_CR1 register cleared, SPI is disabled
     spi_reset(_params.spi);
 
     // Set up SPI in Master mode as requested
     if (spi_init_master(_params.spi, _slave[slave].br,
-      _slave[slave].cpol ? SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE : SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
-      _slave[slave].cpha ? SPI_CR1_CPHA_CLK_TRANSITION_2 : SPI_CR1_CPHA_CLK_TRANSITION_1,
-      _slave[slave].lsbFirst ? SPI_CR1_LSBFIRST : SPI_CR1_MSBFIRST) == 0)
-    {
+                        _slave[slave].cpol ? SPI_CR1_CPOL_CLK_TO_1_WHEN_IDLE : SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
+                        _slave[slave].cpha ? SPI_CR1_CPHA_CLK_TRANSITION_2 : SPI_CR1_CPHA_CLK_TRANSITION_1,
+                        _slave[slave].lsbFirst ? SPI_CR1_LSBFIRST : SPI_CR1_MSBFIRST) == 0) {
       result = SpiReqAck::SpiReqAckOk;
     }
 
@@ -103,73 +86,51 @@ SpiMaster::SpiReqAck SpiMaster::_configureMaster(const uint8_t slave)
   return result;
 }
 
-
-void SpiMaster::_activateCsCe(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
-    if (_slave[slave].polarity == true)
-    {
+void SpiMaster::_activateCsCe(const uint8_t slave) {
+  if (slave < _nextSlave) {
+    if (_slave[slave].polarity == true) {
       gpio_set(_slave[slave].gpioPort, _slave[slave].gpioPin);
-    }
-    else
-    {
+    } else {
       gpio_clear(_slave[slave].gpioPort, _slave[slave].gpioPin);
     }
   }
 }
 
-
-void SpiMaster::_deactivateCsCe(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
-    if (_slave[slave].polarity == true)
-    {
+void SpiMaster::_deactivateCsCe(const uint8_t slave) {
+  if (slave < _nextSlave) {
+    if (_slave[slave].polarity == true) {
       gpio_clear(_slave[slave].gpioPort, _slave[slave].gpioPin);
-    }
-    else
-    {
+    } else {
       gpio_set(_slave[slave].gpioPort, _slave[slave].gpioPin);
     }
   }
 }
 
-
-void SpiMaster::_configureMiso(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
+void SpiMaster::_configureMiso(const uint8_t slave) {
+  if (slave < _nextSlave) {
     // Configure peripheral MISO pin as alternate function
     gpio_mode_setup(_slave[slave].misoPort, GPIO_MODE_AF, GPIO_PUPD_NONE, _slave[slave].misoPin);
   }
 }
 
-
-void SpiMaster::_deconfigureMiso(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
+void SpiMaster::_deconfigureMiso(const uint8_t slave) {
+  if (slave < _nextSlave) {
     // Configure peripheral MISO pin as input
     gpio_mode_setup(_slave[slave].misoPort, GPIO_MODE_INPUT, GPIO_PUPD_NONE, _slave[slave].misoPin);
   }
 }
 
-
 // Selects the active peripheral and configures the SPI for it
 //  Activates the appropriate CS/CE line based on slave's registration
 // ***** Make sure SPI is not busy/in use before switching things around! *****
-SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave)
-{
+SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave) {
   SpiReqAck result = SpiReqAck::SpiReqAckOk;
 
   // We won't waste time switching things around if we don't need to
-  if (_selectedSlave != slave)
-  {
+  if (_selectedSlave != slave) {
     _deconfigureMiso(_selectedSlave);
     // if we are selecting a slave...and not just deactivating CS/CE lines...
-    if (slave != cNoSlave)
-    {
+    if (slave != cNoSlave) {
       _configureMiso(slave);
 
       _deactivateCsCe(_selectedSlave);
@@ -180,19 +141,14 @@ SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave)
       // (Re)Enable SPI1 peripheral
       spi_enable(_params.spi);
 
-      if (_slave[slave].strobeCs == false)
-      {
+      if (_slave[slave].strobeCs == false) {
         _activateCsCe(slave);
       }
-    }
-    else
-    {
+    } else {
       _deactivateCsCe(_selectedSlave);
     }
-    _selectedSlave = slave;    // save for later!
-  }
-  else if (slave != cNoSlave && _slave[slave].strobeCs == false)
-  {
+    _selectedSlave = slave;  // save for later!
+  } else if (slave != cNoSlave && _slave[slave].strobeCs == false) {
     // Same slave, cached — SPI is already configured, just re-assert CS
     // to start the new transaction (dmaComplete deactivated it)
     _activateCsCe(slave);
@@ -201,51 +157,39 @@ SpiMaster::SpiReqAck SpiMaster::_selectPeripheral(const uint8_t slave)
   return result;
 }
 
-
-SpiMaster::SpiTransferReq* SpiMaster::getTransferRequestBuffer(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
+SpiMaster::SpiTransferReq *SpiMaster::getTransferRequestBuffer(const uint8_t slave) {
+  if (slave < _nextSlave) {
     _transferRequest[slave].slave = slave;
     return &_transferRequest[slave];
   }
   return nullptr;
 }
 
-
-SpiMaster::SpiReqAck SpiMaster::queueTransfer(SpiTransferReq* request)
-{
+SpiMaster::SpiReqAck SpiMaster::queueTransfer(SpiTransferReq *request) {
   SpiReqAck status = SpiReqAck::SpiReqAckBusy;
   const uint8_t slave = request->slave;
 
-  if (slave < _nextSlave)
-  {
-    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckOk)
-    {
+  if (slave < _nextSlave) {
+    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckOk) {
       _transferRequest[slave] = *request;
 
       _transferRequest[slave].state = SpiReqAck::SpiReqAckQueued;
 
       status = SpiReqAck::SpiReqAckOk;
     }
-  }
-  else
-  {
+  } else {
     status = SpiReqAck::SpiReqAckError;
   }
 
   return status;
 }
 
-
-SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq* request)
-{
+SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq *request) {
   uint32_t dmaEnable = 0;
-  volatile uint8_t temp_data __attribute__ ((unused));
+  volatile uint8_t temp_data __attribute__((unused));
   const uint8_t slave = request->slave;
 
-  if (_transferInProgress)
-  {
+  if (_transferInProgress) {
     // Let the caller know it was busy if so
     return SpiReqAck::SpiReqAckBusy;
   }
@@ -255,33 +199,30 @@ SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq* request)
   // the DMA ISR's processQueue() -> transfer() chain and starts a second transfer.
   _transferInProgress = true;
 
-	// Reset SPI data and status registers
-	// First, ensure the SPI is not busy...
-  while (SPI_SR(_params.spi) & (SPI_SR_BSY)) {}
+  // Reset SPI data and status registers
+  // First, ensure the SPI is not busy...
+  while (SPI_SR(_params.spi) & (SPI_SR_BSY)) {
+  }
   // ...now we purge the FIFO to ensure it's empty for the new inbound bits.
-	while (SPI_SR(_params.spi) & (SPI_SR_RXNE | SPI_SR_OVR))
-  {
-		temp_data = SPI_DR(_params.spi);
-	}
+  while (SPI_SR(_params.spi) & (SPI_SR_RXNE | SPI_SR_OVR)) {
+    temp_data = SPI_DR(_params.spi);
+  }
 
   // Configure SPI1 for use with the appropriate peripheral
-  if (_selectPeripheral(slave) != SpiReqAck::SpiReqAckOk)
-  {
+  if (_selectPeripheral(slave) != SpiReqAck::SpiReqAckOk) {
     _transferInProgress = false;
     return SpiReqAck::SpiReqAckError;
   }
   // indicate busy
   request->state = SpiReqAck::SpiReqAckBusy;
 
-  if (_params.dmaController != 0)
-  {
-    if (_params.channelRx != 0)
-    {
+  if (_params.dmaController != 0) {
+    if (_params.channelRx != 0) {
       // Reset DMA channel
       dma_channel_reset(_params.dmaController, _params.channelRx);
       // Set up Rx DMA, note it has higher priority to avoid overrun
-      dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t)&SPI1_DR);
-      dma_set_memory_address(_params.dmaController, _params.channelRx, (uint32_t)request->bufferIn);
+      dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t) &SPI1_DR);
+      dma_set_memory_address(_params.dmaController, _params.channelRx, (uint32_t) request->bufferIn);
       dma_set_number_of_data(_params.dmaController, _params.channelRx, request->length);
       dma_set_read_from_peripheral(_params.dmaController, _params.channelRx);
       dma_enable_memory_increment_mode(_params.dmaController, _params.channelRx);
@@ -289,19 +230,18 @@ SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq* request)
       dma_set_memory_size(_params.dmaController, _params.channelRx, _slave[slave].memorySize);
       dma_set_priority(_params.dmaController, _params.channelRx, DMA_CCR_PL_VERY_HIGH);
       // Enable DMA transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelRx);
+      dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelRx);
       // Activate DMA channel
-    	dma_enable_channel(_params.dmaController, _params.channelRx);
+      dma_enable_channel(_params.dmaController, _params.channelRx);
       dmaEnable |= SPI_CR2_RXDMAEN;
     }
 
-    if (_params.channelTx != 0)
-    {
+    if (_params.channelTx != 0) {
       // Reset DMA channel
       dma_channel_reset(_params.dmaController, _params.channelTx);
       // Set up tx DMA
-      dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t)&SPI1_DR);
-      dma_set_memory_address(_params.dmaController, _params.channelTx, (uint32_t)request->bufferOut);
+      dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t) &SPI1_DR);
+      dma_set_memory_address(_params.dmaController, _params.channelTx, (uint32_t) request->bufferOut);
       dma_set_number_of_data(_params.dmaController, _params.channelTx, request->length);
       dma_set_read_from_memory(_params.dmaController, _params.channelTx);
       dma_enable_memory_increment_mode(_params.dmaController, _params.channelTx);
@@ -309,41 +249,34 @@ SpiMaster::SpiReqAck SpiMaster::transfer(SpiTransferReq* request)
       dma_set_memory_size(_params.dmaController, _params.channelTx, _slave[slave].memorySize);
       dma_set_priority(_params.dmaController, _params.channelTx, DMA_CCR_PL_HIGH);
       // Enable DMA transfer complete interrupt
-    	dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelTx);
+      dma_enable_transfer_complete_interrupt(_params.dmaController, _params.channelTx);
       // Activate DMA channel
-    	dma_enable_channel(_params.dmaController, _params.channelTx);
+      dma_enable_channel(_params.dmaController, _params.channelTx);
       dmaEnable |= SPI_CR2_TXDMAEN;
     }
   }
 
-	/* Enable the SPI transfer via DMA
-	 * This will immediately start the transmission, after which when the receive
+  /* Enable the SPI transfer via DMA
+   * This will immediately start the transmission, after which when the receive
    * is complete, the receive DMA will activate
-	 */
-	// spi_enable_rx_dma(spiParams.spi);
-	// spi_enable_tx_dma(spiParams.spi);
+   */
+  // spi_enable_rx_dma(spiParams.spi);
+  // spi_enable_tx_dma(spiParams.spi);
   SPI_CR2(_params.spi) |= dmaEnable;
 
   return SpiReqAck::SpiReqAckOk;
 }
 
-
-bool SpiMaster::transferComplete(const uint8_t slave)
-{
-  if (slave < _nextSlave)
-  {
+bool SpiMaster::transferComplete(const uint8_t slave) {
+  if (slave < _nextSlave) {
     return (_transferRequest[slave].state == SpiReqAck::SpiReqAckOk);
   }
   return false;
 }
 
-
-bool SpiMaster::processQueue()
-{
-  for (uint8_t slave = 0; slave < _nextSlave; slave++)
-  {
-    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued)
-    {
+bool SpiMaster::processQueue() {
+  for (uint8_t slave = 0; slave < _nextSlave; slave++) {
+    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued) {
       transfer(&_transferRequest[slave]);
       // return indicating a transfer was initiated
       return true;
@@ -353,16 +286,13 @@ bool SpiMaster::processQueue()
   return false;
 }
 
-
-void SpiMaster::dmaComplete()
-{
-  if (_selectedSlave < _nextSlave)
-  {
+void SpiMaster::dmaComplete() {
+  if (_selectedSlave < _nextSlave) {
     // tx & rx should always finish at the same time; wait for any remaining bits to roll out
-    while ((SPI_SR(SPI1) & SPI_SR_BSY) != 0);
+    while ((SPI_SR(SPI1) & SPI_SR_BSY) != 0)
+      ;
     // strobe the CS/CE pin if slave is configured for it
-    if (_slave[_selectedSlave].strobeCs == true)
-    {
+    if (_slave[_selectedSlave].strobeCs == true) {
       _activateCsCe(_selectedSlave);
     }
     // indicate completion
@@ -381,24 +311,15 @@ void SpiMaster::dmaComplete()
   }
 }
 
+bool SpiMaster::busy() { return _transferInProgress; }
 
-bool SpiMaster::busy()
-{
-  return _transferInProgress;
-}
-
-
-bool SpiMaster::queuesEmpty()
-{
-  for (uint8_t slave = 0; slave < _nextSlave; slave++)
-  {
-    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued)
-    {
+bool SpiMaster::queuesEmpty() {
+  for (uint8_t slave = 0; slave < _nextSlave; slave++) {
+    if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued) {
       return false;
     }
   }
   return true;
 }
 
-
-}
+}  // namespace kbxTubeClock

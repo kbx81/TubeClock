@@ -18,27 +18,19 @@
 //
 #include "View.h"
 
-
-void View::enter(uint8_t /*relatedSetting*/)
-{
+void View::enter(uint8_t /*relatedSetting*/) {
   // do nothing by default
 }
 
-
-bool View::keyHandler(kbxTubeClock::Keys::Key key)
-{
+bool View::keyHandler(kbxTubeClock::Keys::Key key) {
   // do nothing by default
   return key;
 }
 
-
-void View::loop()
-{
+void View::loop() {
   // do nothing by default
 }
 
-
-View::~View()
-{
+View::~View() {
   // do nothing by default
 }

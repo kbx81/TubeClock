@@ -18,29 +18,25 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class TimerCounterView : public View {
+  enum TimerMode : uint8_t {
+    TimerStop = ViewMode::ViewMode0,
+    TimerRunUp = ViewMode::ViewMode1,
+    TimerRunDown = ViewMode::ViewMode2,
+    TimerReset = ViewMode::ViewMode3
+  };
 
-enum TimerMode : uint8_t
-{
-  TimerStop = ViewMode::ViewMode0,
-  TimerRunUp = ViewMode::ViewMode1,
-  TimerRunDown = ViewMode::ViewMode2,
-  TimerReset = ViewMode::ViewMode3
-};
-
-// The view which displays the timer/counter
-//
-public: // Implement the TimerCounterView class
+  // The view which displays the timer/counter
+  //
+ public:  // Implement the TimerCounterView class
   static const uint32_t cMaxBcdValue;
 
   TimerCounterView();
@@ -53,7 +49,7 @@ public: // Implement the TimerCounterView class
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // the last time (in seconds) that we saw
   //
   uint32_t _lastTime;
@@ -73,7 +69,6 @@ private:
   // true if the alarm is ready to be activated
   //
   bool _alarmReady;
-
 };
 
-}
+}  // namespace kbxTubeClock

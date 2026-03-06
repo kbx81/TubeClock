@@ -36,25 +36,20 @@
 #include <string.h>
 #include "Hardware.h"
 
-
-namespace kbxTubeClock {
-
-namespace Keys {
-
+namespace kbxTubeClock::Keys {
 
 // key scan codes
 //
 enum Key : uint8_t {
-  None  = 0,
-  A     = (1 << 5),
-  B     = (1 << 4),
-  C     = (1 << 3),
-  E     = (1 << 2),
-  D     = (1 << 1),
-  U     = (1 << 0),
+  None = 0,
+  A = (1 << 5),
+  B = (1 << 4),
+  C = (1 << 3),
+  E = (1 << 2),
+  D = (1 << 1),
+  U = (1 << 0),
   Power = (1 << 6)  // IR-only: toggles HV power supply
 };
-
 
 // Check the keys
 //
@@ -72,7 +67,4 @@ bool hasKeyPress();
 //
 Key getKeyPress();
 
-
-}
-
-}
+}  // namespace kbxTubeClock::Keys

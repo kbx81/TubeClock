@@ -22,11 +22,7 @@
 #include "Hardware.h"
 #include "SpiMaster.h"
 
-
-namespace kbxTubeClock {
-
-namespace LM74 {
-
+namespace kbxTubeClock::LM74 {
 
 /// @brief Initialize the LM74 module
 ///
@@ -61,6 +57,4 @@ SpiMaster::SpiReqAck refresh(const bool block = false);
 ///
 bool transferComplete();
 
-}
-
-}
+}  // namespace kbxTubeClock::LM74

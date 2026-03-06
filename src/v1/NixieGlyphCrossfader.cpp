@@ -21,25 +21,16 @@
 #include "NixieGlyph.h"
 #include "NixieGlyphCrossfader.h"
 
-
 namespace kbxTubeClock {
 
+NixieGlyph NixieGlyphCrossfader::getActive() const { return _active; }
 
-NixieGlyph NixieGlyphCrossfader::getActive() const
-{
-  return _active;
-}
-
-
-void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget)
-{
-  if (newTarget.getIntensity() == _target.getIntensity())
-  {
+void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget) {
+  if (newTarget.getIntensity() == _target.getIntensity()) {
     // Intensity unchanged. If duration=0 is requested and a fade is still in
     // progress, snap to target immediately — this allows a mode switch to
     // interrupt an in-progress fade even when the intensity already matches.
-    if (newTarget.getDuration() == 0 && _active.getDuration() < _target.getDuration())
-    {
+    if (newTarget.getDuration() == 0 && _active.getDuration() < _target.getDuration()) {
       _active = _target;
       _active.setDuration(_target.getDuration() + 1);
     }
@@ -58,28 +49,22 @@ void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget)
 
   // Duration 0 means instant transition — snap immediately to avoid
   // stale _active values being read by refresh() before the next tick()
-  if (_target.getDuration() == 0)
-  {
+  if (_target.getDuration() == 0) {
     _active = _target;
     _start = _target;
   }
 }
 
-
-void NixieGlyphCrossfader::tick()
-{
+void NixieGlyphCrossfader::tick() {
   // the _active NixieGlyph object's duration value is the current number of ticks into the fade
   uint32_t currentTick = _active.getDuration();
-  uint32_t totalTicks  = _target.getDuration();
+  uint32_t totalTicks = _target.getDuration();
 
-  if (currentTick < totalTicks)
-  {
+  if (currentTick < totalTicks) {
     // set _active to the interpolated value between _start and _target
     _active.setFromLinearInterpolation(currentTick, totalTicks, _start, _target);
     _active.setDuration(currentTick + 1);
-  }
-  else if (currentTick == totalTicks)
-  {
+  } else if (currentTick == totalTicks) {
     // Snap to target exactly once; push duration past totalTicks so subsequent
     // ticks fall through to the implicit else (do nothing), avoiding repeated
     // writes to _active and the concurrent-update hazard with main-loop callers
@@ -89,5 +74,4 @@ void NixieGlyphCrossfader::tick()
   // else: currentTick > totalTicks — fade already complete, nothing to do
 }
 
-
-};
+};  // namespace kbxTubeClock

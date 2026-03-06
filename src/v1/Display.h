@@ -18,27 +18,22 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "DateTime.h"
 #include "NixieGlyph.h"
 #include "NixieTube.h"
 
-
 namespace kbxTubeClock {
 
 /// @brief kbx Tube Clock Display class
 ///
 
-class Display
-{
-
-public:
+class Display {
+ public:
   /// @brief Selection of time or date (and date format) for setDisplayFromDateTime()
   ///
-  enum dateTimeDisplaySelection : uint8_t
-  {
+  enum dateTimeDisplaySelection : uint8_t {
     dateDisplayYYMMDD = 0,
     dateDisplayDDMMYY = 1,
     dateDisplayMMDDYY = 2,
@@ -46,7 +41,7 @@ public:
     timeDisplay24Hour = 4
   };
 
-public:
+ public:
   /// @brief Default constructor
   ///
   Display();
@@ -65,12 +60,12 @@ public:
   ///
   Display(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0);
 
-public:
+ public:
   /// Important constants
   ///
   static const uint8_t cTubeCount = 6;
   static const uint8_t cGlyphCount = (cTubeCount * NixieTube::cGlyphsPerTube);
-  static const uint8_t cDotCount   = (cTubeCount * NixieTube::cPointsPerTube) + 4;  // + 4 for colons
+  static const uint8_t cDotCount = (cTubeCount * NixieTube::cPointsPerTube) + 4;  // + 4 for colons
 
   /// Compare this Display to another
   ///
@@ -109,7 +104,8 @@ public:
   /// @param byte5 MSn to be displayed
   /// @param bitmap Bitmap of tubes to be turned off via setTubesOff() (optional)
   ///
-  void setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, const uint8_t byte3, const uint8_t byte2, const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap = 0);
+  void setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, const uint8_t byte3, const uint8_t byte2,
+                             const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap = 0);
 
   /// @brief Set a display instance from a DateTime object
   ///
@@ -238,17 +234,15 @@ public:
   ///
   NixieGlyph getDotRaw(const uint8_t dotNumber) const;
 
-
-private:
+ private:
   /// @brief Converts from uint32 to BCD for tube display; beware of values > 99999999
   /// @param uint32Value Value to BCD encode
   /// @return encoded value
   ///
   uint32_t uint32ToBcd(uint32_t uint32Value);
 
-  NixieTube _tube[cTubeCount];    ///< values currently active on display
-  NixieGlyph _dot[cDotCount];     ///< values currently active on display
+  NixieTube _tube[cTubeCount];  ///< values currently active on display
+  NixieGlyph _dot[cDotCount];   ///< values currently active on display
 };
 
-
-}
+}  // namespace kbxTubeClock

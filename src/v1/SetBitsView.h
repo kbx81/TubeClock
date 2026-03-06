@@ -18,31 +18,28 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class SetBitsView : public View {
+ public:
+  // Percentage of configured LED color intensities used for lowlight
+  //
+  static const uint16_t cLowlightPercentage;
 
-public:
-// Percentage of configured LED color intensities used for lowlight
-//
-static const uint16_t cLowlightPercentage;
-
-// The view which displays the UI for setting times and dates
-//
-public: // Implement the SetValue class
+  // The view which displays the UI for setting times and dates
+  //
+ public:  // Implement the SetValue class
   SetBitsView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // values the user will set
   //
   uint16_t _setBits;
@@ -58,8 +55,6 @@ private:
   // the setting index this view is editing
   //
   uint8_t _relatedSetting;
-
 };
 
-
-}
+}  // namespace kbxTubeClock

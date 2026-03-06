@@ -18,7 +18,6 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "DateTime.h"
@@ -26,219 +25,206 @@
 #include "Settings.h"
 #include "View.h"
 
+namespace kbxTubeClock::Application {
 
-namespace kbxTubeClock {
+/// @brief Application operating modes
+///
+enum OperatingMode : uint8_t {
+  OperatingModeMainMenu,                   ///< Main Menu mode
+  OperatingModeFixedDisplay,               ///< Fixed display mode
+  OperatingModeToggleDisplay,              ///< Toggling display mode
+  OperatingModeTimerCounter,               ///< Timer/counter mode
+  OperatingModeDmx512Display,              ///< DMX-512 display mode
+  OperatingModeSetClock,                   ///< Set timeclock mode
+  OperatingModeSetDate,                    ///< Set date mode
+  OperatingModeSetTimerResetValue,         ///< Set timer/counter reset value
+  OperatingModeSystemStatusView,           ///< System status view mode
+  OperatingModeSetSystemOptions,           ///< Set Binary/BCD and 24 hour bits mode
+  OperatingModeSlotBeepConfig,             ///< Enable/Disable beeping (alarm) per-slot
+  OperatingModeSlotBlinkConfig,            ///< Enable/Disable display blinking per-slot
+  OperatingModeSlotOnOffConfig,            ///< Enable/Disable color change per-slot
+  OperatingModeSetDurationClock,           ///< Set duration of clock display mode
+  OperatingModeSetDurationDate,            ///< Set duration of date display mode
+  OperatingModeSetDurationTemp,            ///< Set duration of temperature display mode
+  OperatingModeSetDurationFade,            ///< Set duration of fading for digits
+  OperatingModeDstBeginMonth,              ///< Set first month of DST
+  OperatingModeDstBeginDowOrdinal,         ///< Set which given day DST begins
+  OperatingModeDstEndMonth,                ///< Set last month of DST
+  OperatingModeDstEndDowOrdinal,           ///< Set which given day DST ends
+  OperatingModeDstSwitchDayOfWeek,         ///< Set which day of week DST begins/ends
+  OperatingModeDstSwitchHour,              ///< Set hour at which DST begins/ends
+  OperatingModeSetEffectDuration,          ///< Set duration of display effects
+  OperatingModeSetEffectFrequency,         ///< Set frequency of display effects
+  OperatingModeSetMinimumIntensity,        ///< Set minimum display intensity
+  OperatingModeSetBeeperVolume,            ///< Set Beeper Volume
+  OperatingModeSetTempCalibration,         ///< Set temperature calibration
+  OperatingModeSetDisplayRefreshInterval,  ///< Set display refresh interval
+  OperatingModeSetDateFormat,              ///< Set Date Format
+  OperatingModeSetTimeZone,                ///< Set Time Zone
+  OperatingModeSetColonBehavior,           ///< Set Colon/Seperator behavior (time display)
+  OperatingModeSetDMX512Address,           ///< Set DMX-512 address mode
+  OperatingModeSlot1Time,                  ///< Set slot 1 time mode
+  OperatingModeSlot2Time,                  ///< Set slot 2 time mode
+  OperatingModeSlot3Time,                  ///< Set slot 3 time mode
+  OperatingModeSlot4Time,                  ///< Set slot 4 time mode
+  OperatingModeSlot5Time,                  ///< Set slot 5 time mode
+  OperatingModeSlot6Time,                  ///< Set slot 6 time mode
+  OperatingModeSlot7Time,                  ///< Set slot 7 time mode
+  OperatingModeSlot8Time,                  ///< Set slot 8 time mode
+  OperatingModeTestDisplay                 ///< Test display mode
+};
 
-namespace Application {
+/// @brief Enums for views
+///
+enum ViewEnum : uint8_t {
+  MainMenuViewEnum = 0,
+  TimeDateTempViewEnum = 1,
+  TimerCounterViewEnum = 2,
+  Dmx512ViewEnum = 3,
+  SetTimeDateViewEnum = 4,
+  SetBitsViewEnum = 5,
+  SetValueViewEnum = 6,
+  SetTempCalibrationViewEnum = 7,
+  SystemStatusViewEnum = 8,
+  TestDisplayEnum = 9
+};
 
-  /// @brief Application operating modes
-  ///
-  enum OperatingMode : uint8_t
-  {
-    OperatingModeMainMenu,            ///< Main Menu mode
-    OperatingModeFixedDisplay,        ///< Fixed display mode
-    OperatingModeToggleDisplay,       ///< Toggling display mode
-    OperatingModeTimerCounter,        ///< Timer/counter mode
-    OperatingModeDmx512Display,       ///< DMX-512 display mode
-    OperatingModeSetClock,            ///< Set timeclock mode
-    OperatingModeSetDate,             ///< Set date mode
-    OperatingModeSetTimerResetValue,  ///< Set timer/counter reset value
-    OperatingModeSystemStatusView,    ///< System status view mode
-    OperatingModeSetSystemOptions,    ///< Set Binary/BCD and 24 hour bits mode
-    OperatingModeSlotBeepConfig,      ///< Enable/Disable beeping (alarm) per-slot
-    OperatingModeSlotBlinkConfig,     ///< Enable/Disable display blinking per-slot
-    OperatingModeSlotOnOffConfig,     ///< Enable/Disable color change per-slot
-    OperatingModeSetDurationClock,    ///< Set duration of clock display mode
-    OperatingModeSetDurationDate,     ///< Set duration of date display mode
-    OperatingModeSetDurationTemp,     ///< Set duration of temperature display mode
-    OperatingModeSetDurationFade,     ///< Set duration of fading for digits
-    OperatingModeDstBeginMonth,       ///< Set first month of DST
-    OperatingModeDstBeginDowOrdinal,  ///< Set which given day DST begins
-    OperatingModeDstEndMonth,         ///< Set last month of DST
-    OperatingModeDstEndDowOrdinal,    ///< Set which given day DST ends
-    OperatingModeDstSwitchDayOfWeek,  ///< Set which day of week DST begins/ends
-    OperatingModeDstSwitchHour,       ///< Set hour at which DST begins/ends
-    OperatingModeSetEffectDuration,   ///< Set duration of display effects
-    OperatingModeSetEffectFrequency,  ///< Set frequency of display effects
-    OperatingModeSetMinimumIntensity, ///< Set minimum display intensity
-    OperatingModeSetBeeperVolume,     ///< Set Beeper Volume
-    OperatingModeSetTempCalibration,  ///< Set temperature calibration
-    OperatingModeSetDisplayRefreshInterval, ///< Set display refresh interval
-    OperatingModeSetDateFormat,       ///< Set Date Format
-    OperatingModeSetTimeZone,         ///< Set Time Zone
-    OperatingModeSetColonBehavior,    ///< Set Colon/Seperator behavior (time display)
-    OperatingModeSetDMX512Address,    ///< Set DMX-512 address mode
-    OperatingModeSlot1Time,           ///< Set slot 1 time mode
-    OperatingModeSlot2Time,           ///< Set slot 2 time mode
-    OperatingModeSlot3Time,           ///< Set slot 3 time mode
-    OperatingModeSlot4Time,           ///< Set slot 4 time mode
-    OperatingModeSlot5Time,           ///< Set slot 5 time mode
-    OperatingModeSlot6Time,           ///< Set slot 6 time mode
-    OperatingModeSlot7Time,           ///< Set slot 7 time mode
-    OperatingModeSlot8Time,           ///< Set slot 8 time mode
-    OperatingModeTestDisplay          ///< Test display mode
-  };
+/// @brief Enums for views
+///
+enum ExternalControl : uint8_t { NoActiveExtControlEnum, SerialExtControlEnum, Dmx512ExtControlEnum };
 
-  /// @brief Enums for views
-  ///
-  enum ViewEnum : uint8_t
-  {
-      MainMenuViewEnum = 0,
-      TimeDateTempViewEnum = 1,
-      TimerCounterViewEnum = 2,
-      Dmx512ViewEnum = 3,
-      SetTimeDateViewEnum = 4,
-      SetBitsViewEnum = 5,
-      SetValueViewEnum = 6,
-      SetTempCalibrationViewEnum = 7,
-      SystemStatusViewEnum = 8,
-      TestDisplayEnum = 9
-  };
+/// @brief Number of seconds in a day
+///
+const uint16_t cSecondsInAnHour = 60 * 60;
+const uint32_t cSecondsInADay = cSecondsInAnHour * 24;
 
-  /// @brief Enums for views
-  ///
-  enum ExternalControl : uint8_t
-  {
-      NoActiveExtControlEnum,
-      SerialExtControlEnum,
-      Dmx512ExtControlEnum
-  };
+// DST offset in seconds
+//
+static const int16_t cDstOffsetSeconds = 60 * 60;
 
-  /// @brief Number of seconds in a day
-  ///
-  const uint16_t cSecondsInAnHour = 60 * 60;
-  const uint32_t cSecondsInADay = cSecondsInAnHour * 24;
+/// @brief Common colors used throughout
+///
+extern const RgbLed red, orange, yellow, green, cyan, blue, violet, magenta, white, gray, darkGray, nixieOrange;
 
-  // DST offset in seconds
-  //
-  static const int16_t cDstOffsetSeconds = 60 * 60;
+/// @brief Initialize the application
+///
+void initialize();
 
-  /// @brief Common colors used throughout
-  ///
-  extern const RgbLed red, orange, yellow, green, cyan, blue,
-    violet, magenta, white, gray, darkGray, nixieOrange;
+/// @brief Gets the application's date & time, adjusted for time zone and DST
+///
+DateTime dateTime();
 
-  /// @brief Initialize the application
-  ///
-  void initialize();
+/// @brief Set the date/time
+///
+void setDateTime(const DateTime &now);
 
-  /// @brief Gets the application's date & time, adjusted for time zone and DST
-  ///
-  DateTime dateTime();
+/// @brief Returns the temperature based on hardware
+///  (in fahrenheit if fahrenheit == true; in BCD if bcd == true)
+int32_t temperature(const bool fahrenheit, const bool bcd = false);
 
-  /// @brief Set the date/time
-  ///
-  void setDateTime(const DateTime &now);
+/// @brief Returns the active sensor's temperature in tenths of degrees Celsius
+///
+int32_t temperatureCx10();
 
-  /// @brief Returns the temperature based on hardware
-  ///  (in fahrenheit if fahrenheit == true; in BCD if bcd == true)
-  int32_t  temperature(const bool fahrenheit, const bool bcd = false);
+/// @brief Returns the temperature for a specific sensor type in tenths of degrees Celsius
+///
+int32_t temperatureCx10(Hardware::TempSensorType type);
 
-  /// @brief Returns the active sensor's temperature in tenths of degrees Celsius
-  ///
-  int32_t  temperatureCx10();
+/// @brief Returns true if any temperature reading has been updated since last call
+///
+bool temperatureUpdated();
 
-  /// @brief Returns the temperature for a specific sensor type in tenths of degrees Celsius
-  ///
-  int32_t  temperatureCx10(Hardware::TempSensorType type);
+/// @brief Get a mode's display number
+/// @param mode Desired mode to get the display number for
+///
+uint8_t getModeDisplayNumber(OperatingMode mode);
+uint8_t getModeDisplayNumber(uint8_t mode);
 
-  /// @brief Returns true if any temperature reading has been updated since last call
-  ///
-  bool     temperatureUpdated();
+/// @brief Get application mode
+///
+OperatingMode getOperatingMode();
 
-  /// @brief Get a mode's display number
-  /// @param mode Desired mode to get the display number for
-  ///
-  uint8_t getModeDisplayNumber(OperatingMode mode);
-  uint8_t getModeDisplayNumber(uint8_t mode);
+/// @brief Set new application mode
+/// @param mode New application mode
+///
+void setOperatingMode(OperatingMode mode);
 
-  /// @brief Get application mode
-  ///
-  OperatingMode getOperatingMode();
+/// @brief Get view mode
+///
+ViewMode getViewMode();
 
-  /// @brief Set new application mode
-  /// @param mode New application mode
-  ///
-  void setOperatingMode(OperatingMode mode);
+/// @brief Set new view mode
+/// @param mode New view mode
+///
+void setViewMode(ViewMode mode);
 
-  /// @brief Get view mode
-  ///
-  ViewMode getViewMode();
+/// @brief Get view's related setting
+/// @param mode Desired mode to get the related setting for
+///
+uint8_t getOperatingModeRelatedSetting(OperatingMode mode);
 
-  /// @brief Set new view mode
-  /// @param mode New view mode
-  ///
-  void setViewMode(ViewMode mode);
+/// @brief Get external control status
+///
+ExternalControl getExternalControlState();
 
-  /// @brief Get view's related setting
-  /// @param mode Desired mode to get the related setting for
-  ///
-  uint8_t getOperatingModeRelatedSetting(OperatingMode mode);
+/// @brief Get a pointer to the application settings
+///
+Settings *getSettingsPtr();
 
-  /// @brief Get external control status
-  ///
-  ExternalControl getExternalControlState();
+/// @brief Refreshes hardware from current application settings
+///
+void refreshSettings();
 
-  /// @brief Get a pointer to the application settings
-  ///
-  Settings* getSettingsPtr();
+/// @brief Notify the application that settings have been modified in-place via getSettingsPtr()
+///
+void notifySettingsChanged();
 
-  /// @brief Refreshes hardware from current application settings
-  ///
-  void refreshSettings();
+/// @brief Queue a serial notification that a numbered setting was changed via the local UI
+/// @param settingNum The setting index that changed
+///
+void notifySettingChanged(uint8_t settingNum);
 
-  /// @brief Notify the application that settings have been modified in-place via getSettingsPtr()
-  ///
-  void notifySettingsChanged();
+/// @brief Saves current settings to flash, skipping write if unchanged
+/// @return true on success (saved or already up to date), false on write error
+///
+bool saveSettingsToFlash();
 
-  /// @brief Queue a serial notification that a numbered setting was changed via the local UI
-  /// @param settingNum The setting index that changed
-  ///
-  void notifySettingChanged(uint8_t settingNum);
+/// @brief Handles DST date/time computation; maintains clock's DST state machine.
+///  Intended for tracking DST clock adjustments, not for arbitrary use!
+///  To reset state machine, call with year != year provided when last called.
+/// @param currentTime DateTime object to compute DST state for
+/// @return true if DST is active based on passed DateTime object
+bool isDst(const DateTime &currentTime);
 
-  /// @brief Saves current settings to flash, skipping write if unchanged
-  /// @return true on success (saved or already up to date), false on write error
-  ///
-  bool saveSettingsToFlash();
+/// @brief Returns state of automatic display intensity adjustments
+/// @return True if automatic intensity adjustment is enabled
+bool getIntensityAutoAdjust();
 
-  /// @brief Handles DST date/time computation; maintains clock's DST state machine.
-  ///  Intended for tracking DST clock adjustments, not for arbitrary use!
-  ///  To reset state machine, call with year != year provided when last called.
-  /// @param currentTime DateTime object to compute DST state for
-  /// @return true if DST is active based on passed DateTime object
-  bool isDst(const DateTime &currentTime);
+/// @brief Enables/disables automagic adjusting of the display intensity based
+///  on ambient light seen by the phototransistor
+/// @param enable Enables automatic adjustments if true
+/// @param quickAdjust Perform an immediate update of the intensity
+void setIntensityAutoAdjust(const bool enable, const bool quickAdjust = false);
 
-  /// @brief Returns state of automatic display intensity adjustments
-  /// @return True if automatic intensity adjustment is enabled
-  bool getIntensityAutoAdjust();
+/// @brief Returns the application's current display intensity
+/// @return current display intensity (0-255)
+uint8_t getIntensity();
 
-  /// @brief Enables/disables automagic adjusting of the display intensity based
-  ///  on ambient light seen by the phototransistor
-  /// @param enable Enables automatic adjustments if true
-  /// @param quickAdjust Perform an immediate update of the intensity
-  void setIntensityAutoAdjust(const bool enable, const bool quickAdjust = false);
+/// @brief Returns the application's startup settings load result
+/// @return true if settings were loaded successfully, false if failure & defaults were set
+bool getStartupSettingsLoadResult();
 
-  /// @brief Returns the application's current display intensity
-  /// @return current display intensity (0-255)
-  uint8_t getIntensity();
+/// @brief Set the application's display intensity and disables automagic adjusting of the display intensity
+/// @param intensity New display intensity (0-255)
+///
+void setIntensity(const uint8_t intensity);
 
-  /// @brief Returns the application's startup settings load result
-  /// @return true if settings were loaded successfully, false if failure & defaults were set
-  bool getStartupSettingsLoadResult();
+/// @brief Refreshs master display intensity. Call at fixed intervals.
+///
+void tick();
 
-  /// @brief Set the application's display intensity and disables automagic adjusting of the display intensity
-  /// @param intensity New display intensity (0-255)
-  ///
-  void setIntensity(const uint8_t intensity);
+/// @brief The main loop of the application.
+///
+__attribute__((noreturn)) void loop();
 
-  /// @brief Refreshs master display intensity. Call at fixed intervals.
-  ///
-  void tick();
-
-  /// @brief The main loop of the application.
-  ///
-  __attribute__((noreturn))
-  void loop();
-}
-
-}
+}  // namespace kbxTubeClock::Application

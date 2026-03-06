@@ -23,10 +23,7 @@
 #include "Hardware.h"
 #include "SpiMaster.h"
 
-
-namespace kbxTubeClock {
-
-namespace DS3234 {
+namespace kbxTubeClock::DS3234 {
 
 // Library usage:
 // 0. Call initialize() to trigger slave registration with SpiMaster.
@@ -96,22 +93,25 @@ void setDateTime(const DateTime &dateTime);
 /// @brief Get a register's raw value
 /// @return SpiMaster::SpiReqAck status indicating the state of the request
 ///
-SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes);
+SpiMaster::SpiReqAck getRegister(const uint8_t registerAddress, uint8_t *const registerDataBuffer,
+                                 const uint8_t numberOfBytes);
 
 /// @brief Set a register's raw value
 /// @return SpiMaster::SpiReqAck status indicating the state of the request
 ///
-SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t* const registerDataBuffer, const uint8_t numberOfBytes, const bool block);
+SpiMaster::SpiReqAck setRegister(const uint8_t registerAddress, uint8_t *const registerDataBuffer,
+                                 const uint8_t numberOfBytes, const bool block);
 
 /// @brief Read one or more bytes from the DS3234's SRAM
 /// @return SpiMaster::SpiReqAck status indicating the state of the request
 ///
-SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes);
+SpiMaster::SpiReqAck readSram(const uint8_t sramStartAddress, uint8_t *const data, const uint8_t numberOfBytes);
 
 /// @brief Write one or more bytes to the DS3234's SRAM
 /// @return SpiMaster::SpiReqAck status indicating the state of the request
 ///
-SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t* const data, const uint8_t numberOfBytes, const bool block);
+SpiMaster::SpiReqAck writeSram(const uint8_t sramStartAddress, uint8_t *const data, const uint8_t numberOfBytes,
+                               const bool block);
 
 /// @brief Read all registers from the DS3234
 /// @param block wait for SPI cycle to complete if true
@@ -124,6 +124,4 @@ SpiMaster::SpiReqAck refresh(const bool block = false);
 ///
 bool transferComplete();
 
-}
-
-}
+}  // namespace kbxTubeClock::DS3234

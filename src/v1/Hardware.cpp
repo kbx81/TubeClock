@@ -60,16 +60,12 @@
 #include "UsbSerial.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
-
-namespace kbxTubeClock {
-
-namespace Hardware {
-
+namespace kbxTubeClock::Hardware {
 
 // Bootloader flag -- placed in .noinit so it survives a system reset
 // but is NOT preserved across power-on resets.
@@ -77,93 +73,93 @@ namespace Hardware {
 static __attribute__((section(".noinit"))) uint32_t _bootloaderMagic;
 static constexpr uint32_t cBootloaderMagic = 0xDEADB007u;
 
-
 // I2C1 state
 //
-enum I2cState : uint8_t {
-  I2cIdle,
-  I2cBusy
-};
-
+enum I2cState : uint8_t { I2cIdle, I2cBusy };
 
 // SPI interface initialization objects
 //
 static const SpiMaster::SpiMasterParams _spi1MasterParams = {
-  SPI1,                     // spi
-  DMA1,                     // dmaController
-  cSpi1RxDmaChannel,        // channelRx
-  cSpi1TxDmaChannel         // channelTx
+    SPI1,               // spi
+    DMA1,               // dmaController
+    cSpi1RxDmaChannel,  // channelRx
+    cSpi1TxDmaChannel   // channelTx
 };
 
 // USART interface initialization objects
 //
-static const Usart::UsartParams _usartParams[cNumberOfUsarts] = {
-  {   cGpsUsart,            // USART
-      DMA1,                 // dmaController
-      cUsart1RxDmaChannel,  // channelRx
-      cUsart1TxDmaChannel   // channelTx
-  },
-  {   cDmxUsart,            // USART
-      DMA1,                 // dmaController
-      cUsart2RxDmaChannel,  // channelRx
-      cUsart2TxDmaChannel   // channelTx
-  },
-  {   cSerialRemoteUsartRx, // USART
-      0,                    // dmaController (no DMA)
-      0,                    // channelRx (no DMA)
-      0                     // channelTx (no DMA)
-  },
-  {   cSerialRemoteUsartTx, // USART
-      0,                    // dmaController (no DMA)
-      0,                    // channelRx (no DMA)
-      0                     // channelTx (no DMA)
-  }
-};
+static const Usart::UsartParams _usartParams[cNumberOfUsarts] = {{
+                                                                     cGpsUsart,            // USART
+                                                                     DMA1,                 // dmaController
+                                                                     cUsart1RxDmaChannel,  // channelRx
+                                                                     cUsart1TxDmaChannel   // channelTx
+                                                                 },
+                                                                 {
+                                                                     cDmxUsart,            // USART
+                                                                     DMA1,                 // dmaController
+                                                                     cUsart2RxDmaChannel,  // channelRx
+                                                                     cUsart2TxDmaChannel   // channelTx
+                                                                 },
+                                                                 {
+                                                                     cSerialRemoteUsartRx,  // USART
+                                                                     0,                     // dmaController (no DMA)
+                                                                     0,                     // channelRx (no DMA)
+                                                                     0                      // channelTx (no DMA)
+                                                                 },
+                                                                 {
+                                                                     cSerialRemoteUsartTx,  // USART
+                                                                     0,                     // dmaController (no DMA)
+                                                                     0,                     // channelRx (no DMA)
+                                                                     0                      // channelTx (no DMA)
+                                                                 }};
 
 // USART interface initialization objects
 //
 static const Usart::UsartTransferParams _usartTransferParams[cNumberOfUsarts] = {
-  {   cUsart1BaudRate,      // Baud rate
-      cUsart1StopBits,      // Number of stop bits
-      cUsart1Parity,        // Parity
-      cUsart1Mode,          // Mode (Tx, Rx, Tx+Rx)
-      cUsart1FlowControl,   // Flow control
-      cUsart1AutoBaud,      // Enable auto-baud rate detection
-      cUsart1DataBits,      // Number of data bits
-      cUsart1DriverEnable,  // Enable hardware DE output (for RS-485)
-      cUsart1SwapTxRx       // TX/RX pin swap
-  },
-  {   cUsart2BaudRate,      // Baud rate
-      cUsart2StopBits,      // Number of stop bits
-      cUsart2Parity,        // Parity
-      cUsart2Mode,          // Mode (Tx, Rx, Tx+Rx)
-      cUsart2FlowControl,   // Flow control
-      cUsart2AutoBaud,      // Enable auto-baud rate detection
-      cUsart2DataBits,      // Number of data bits
-      cUsart2DriverEnable,  // Enable hardware DE output (for RS-485)
-      cUsart2SwapTxRx       // TX/RX pin swap
-  },
-  {   cUsart3BaudRate,      // Baud rate
-      cUsart3StopBits,      // Number of stop bits
-      cUsart3Parity,        // Parity
-      cUsart3Mode,          // Mode (Rx only)
-      cUsart3FlowControl,   // Flow control
-      cUsart3AutoBaud,      // Auto-baud (disabled)
-      cUsart3DataBits,      // Number of data bits
-      cUsart3DriverEnable,  // DE output (disabled)
-      cUsart3SwapTxRx       // TX/RX pin swap (PB10 is normally TX, swapped to RX)
-  },
-  {   cUsart4BaudRate,      // Baud rate
-      cUsart4StopBits,      // Number of stop bits
-      cUsart4Parity,        // Parity
-      cUsart4Mode,          // Mode (Tx only)
-      cUsart4FlowControl,   // Flow control
-      cUsart4AutoBaud,      // Auto-baud (disabled)
-      cUsart4DataBits,      // Number of data bits
-      cUsart4DriverEnable,  // DE output (disabled)
-      cUsart4SwapTxRx       // TX/RX pin swap (disabled)
-  }
-};
+    {
+        cUsart1BaudRate,      // Baud rate
+        cUsart1StopBits,      // Number of stop bits
+        cUsart1Parity,        // Parity
+        cUsart1Mode,          // Mode (Tx, Rx, Tx+Rx)
+        cUsart1FlowControl,   // Flow control
+        cUsart1AutoBaud,      // Enable auto-baud rate detection
+        cUsart1DataBits,      // Number of data bits
+        cUsart1DriverEnable,  // Enable hardware DE output (for RS-485)
+        cUsart1SwapTxRx       // TX/RX pin swap
+    },
+    {
+        cUsart2BaudRate,      // Baud rate
+        cUsart2StopBits,      // Number of stop bits
+        cUsart2Parity,        // Parity
+        cUsart2Mode,          // Mode (Tx, Rx, Tx+Rx)
+        cUsart2FlowControl,   // Flow control
+        cUsart2AutoBaud,      // Enable auto-baud rate detection
+        cUsart2DataBits,      // Number of data bits
+        cUsart2DriverEnable,  // Enable hardware DE output (for RS-485)
+        cUsart2SwapTxRx       // TX/RX pin swap
+    },
+    {
+        cUsart3BaudRate,      // Baud rate
+        cUsart3StopBits,      // Number of stop bits
+        cUsart3Parity,        // Parity
+        cUsart3Mode,          // Mode (Rx only)
+        cUsart3FlowControl,   // Flow control
+        cUsart3AutoBaud,      // Auto-baud (disabled)
+        cUsart3DataBits,      // Number of data bits
+        cUsart3DriverEnable,  // DE output (disabled)
+        cUsart3SwapTxRx       // TX/RX pin swap (PB10 is normally TX, swapped to RX)
+    },
+    {
+        cUsart4BaudRate,      // Baud rate
+        cUsart4StopBits,      // Number of stop bits
+        cUsart4Parity,        // Parity
+        cUsart4Mode,          // Mode (Tx only)
+        cUsart4FlowControl,   // Flow control
+        cUsart4AutoBaud,      // Auto-baud (disabled)
+        cUsart4DataBits,      // Number of data bits
+        cUsart4DriverEnable,  // DE output (disabled)
+        cUsart4SwapTxRx       // TX/RX pin swap (disabled)
+    }};
 
 // number of ADC channels we're using
 //
@@ -178,16 +174,16 @@ static const uint8_t cAdcVbat = 3;
 
 // how frequently we will sample things (in milliseconds)
 //
-static const uint16_t cAdcSampleIntervalLight = 500;   // Light sensor sampling (500ms = 2 Hz)
-static const uint16_t cAdcSampleIntervalSlow = 2000;   // Temp/voltage sampling (2000ms = 0.5 Hz)
+static const uint16_t cAdcSampleIntervalLight = 500;  // Light sensor sampling (500ms = 2 Hz)
+static const uint16_t cAdcSampleIntervalSlow = 2000;  // Temp/voltage sampling (2000ms = 0.5 Hz)
 
 // IIR filter coefficients (shift amounts for division by power of 2)
 // Lower shift = faster response but more noise; Higher shift = slower but smoother
 // We use upscaling to maintain precision in integer math
 //
-static const uint8_t cAdcLightFilterShift = 5;       // 1/32 weight (~16s time constant @ 500ms sample rate)
+static const uint8_t cAdcLightFilterShift = 5;        // 1/32 weight (~16s time constant @ 500ms sample rate)
 static const uint8_t cAdcTempVoltageFilterShift = 3;  // 1/8 weight (~16s time constant @ 2000ms sample rate)
-static const uint8_t cAdcFilterUpscale = 8;          // Scale factor for precision (multiply by 256)
+static const uint8_t cAdcFilterUpscale = 8;           // Scale factor for precision (multiply by 256)
 
 // value used to increase precision in our maths
 //
@@ -227,8 +223,8 @@ static const uint8_t cToneVolumeMaximum = 7;
 
 // Touch detection thresholds
 //
-static const int16_t cTscTouchThreshold = 150;     // Delta value to trigger touch detection
-static const int16_t cTscReleaseThreshold = 100;   // Delta value to release touch (hysteresis)
+static const int16_t cTscTouchThreshold = 150;    // Delta value to trigger touch detection
+static const int16_t cTscReleaseThreshold = 100;  // Delta value to release touch (hysteresis)
 
 // Adaptive baseline tracking speed (shift amount for division)
 //  Higher value = slower tracking (more stable but slower to adapt)
@@ -243,7 +239,6 @@ static const uint8_t cTscFilterShift = 3;
 // calibration voltage used (3.3 volts)
 //
 static const int32_t cVddCalibrationVoltage = 3300;
-
 
 // SpiMaster object for SPI
 //
@@ -382,9 +377,8 @@ static DateTime _currentDateTime;
 
 // per-sensor temperature cache in tenths of degrees Celsius (Cx10)
 //  sentinel value (cTempSentinel) indicates sensor not detected/available
-static int32_t _temperatureCx10Cached[cTempSensorCount] = {
-  cTempSentinel, cTempSentinel, cTempSentinel, cTempSentinel, cTempSentinel
-};
+static int32_t _temperatureCx10Cached[cTempSensorCount] = {cTempSentinel, cTempSentinel, cTempSentinel, cTempSentinel,
+                                                           cTempSentinel};
 
 // flag set when any temperature reading is updated; cleared by temperatureUpdated()
 static volatile bool _temperatureUpdated = false;
@@ -455,48 +449,46 @@ static TempSensorType _externalTemperatureSensor = TempSensorType::STM32ADC;
 // request.buffer = (uint8_t*)_buffer;
 // _usart[0].transmitDma(&request);
 
-
 // set up the ADC
 //
-void _adcSetup()
-{
+void _adcSetup() {
   uint8_t channelArray[] = {cPhototransistorChannel, ADC_CHANNEL_TEMP, ADC_CHANNEL_VREF, ADC_CHANNEL_VBAT};
 
-	adc_power_off(ADC1);
+  adc_power_off(ADC1);
 
-	adc_calibrate(ADC1);
-  while ((ADC_CR(ADC1) & ADC_CR_ADCAL) != 0);
+  adc_calibrate(ADC1);
+  while ((ADC_CR(ADC1) & ADC_CR_ADCAL) != 0)
+    ;
 
   adc_power_on(ADC1);
-  while ((ADC_ISR(ADC1) & ADC_ISR_ADRDY) == 0);
+  while ((ADC_ISR(ADC1) & ADC_ISR_ADRDY) == 0)
+    ;
 
   adc_set_clk_source(ADC1, ADC_CLKSOURCE_ADC);
-	adc_set_operation_mode(ADC1, ADC_MODE_SCAN);
-	adc_disable_external_trigger_regular(ADC1);
-	adc_set_right_aligned(ADC1);
-	adc_enable_temperature_sensor();
+  adc_set_operation_mode(ADC1, ADC_MODE_SCAN);
+  adc_disable_external_trigger_regular(ADC1);
+  adc_set_right_aligned(ADC1);
+  adc_enable_temperature_sensor();
   adc_enable_vrefint();
   // adc_enable_vbat_sensor();  // don't do this here!
   adc_set_sample_time_on_all_channels(ADC1, ADC_SMPTIME_239DOT5);
-	adc_set_regular_sequence(ADC1, cAdcChannelCount, channelArray);
-	adc_set_resolution(ADC1, ADC_RESOLUTION_12BIT);
-	adc_disable_analog_watchdog(ADC1);
+  adc_set_regular_sequence(ADC1, cAdcChannelCount, channelArray);
+  adc_set_resolution(ADC1, ADC_RESOLUTION_12BIT);
+  adc_disable_analog_watchdog(ADC1);
   adc_set_continuous_conversion_mode(ADC1);
   ADC_CFGR1(ADC1) |= ADC_CFGR1_DMACFG;
   adc_enable_dma(ADC1);
 
-  ADC_CR(ADC1) |= ADC_CR_ADSTART;   // adc_start_conversion_regular blocks :(
+  ADC_CR(ADC1) |= ADC_CR_ADSTART;  // adc_start_conversion_regular blocks :(
 }
-
 
 // Set STM32's clock to 48 MHz from 8 MHz HSE oscillator
 //
-void _clockSetup()
-{
+void _clockSetup() {
   rcc_clock_setup_in_hse_8mhz_out_48mhz();
 
   // Enable clocks to various subsystems we'll need
-	// PWR must be enabled first as we can't disable the backup domain protection
+  // PWR must be enabled first as we can't disable the backup domain protection
   //  without it online
   rcc_periph_clock_enable(RCC_PWR);
 
@@ -517,13 +509,13 @@ void _clockSetup()
   rcc_periph_clock_enable(RCC_ADC);
 
   rcc_periph_clock_enable(RCC_GPIOA);
-	rcc_periph_clock_enable(RCC_GPIOB);
-	rcc_periph_clock_enable(RCC_GPIOC);
+  rcc_periph_clock_enable(RCC_GPIOB);
+  rcc_periph_clock_enable(RCC_GPIOC);
   rcc_periph_clock_enable(RCC_GPIOD);
 
   // Set SYSCLK (not the default HSI) as I2C1's clock source
   // rcc_set_i2c_clock_hsi(I2C1);
-	// RCC_CFGR3 |= RCC_CFGR3_I2C1SW;
+  // RCC_CFGR3 |= RCC_CFGR3_I2C1SW;
   // rcc_periph_clock_enable(RCC_I2C1);
 
   rcc_periph_clock_enable(RCC_SPI1);
@@ -536,11 +528,9 @@ void _clockSetup()
   rcc_periph_clock_enable(RCC_TSC);
 }
 
-
 // Configure DMA
 //
-void _dmaSetup()
-{
+void _dmaSetup() {
   // Remap DMA channels as necessary
   SYSCFG_CFGR1 |= cDmaChannelRemaps;
 
@@ -554,8 +544,8 @@ void _dmaSetup()
   dma_channel_reset(DMA1, DMA_CHANNEL7);
 
   // Set up ADC DMA -- it has higher priority to avoid overrun
-  dma_set_peripheral_address(DMA1, cAdcDmaChannel, (uint32_t)&ADC1_DR);
-  dma_set_memory_address(DMA1, cAdcDmaChannel, (uint32_t)_bufferADC);
+  dma_set_peripheral_address(DMA1, cAdcDmaChannel, (uint32_t) &ADC1_DR);
+  dma_set_memory_address(DMA1, cAdcDmaChannel, (uint32_t) _bufferADC);
   dma_set_number_of_data(DMA1, cAdcDmaChannel, cAdcChannelCount);
   dma_set_read_from_peripheral(DMA1, cAdcDmaChannel);
   dma_enable_memory_increment_mode(DMA1, cAdcDmaChannel);
@@ -566,11 +556,9 @@ void _dmaSetup()
   dma_enable_channel(DMA1, cAdcDmaChannel);
 }
 
-
 // Configure GPIOs
 //
-void _gpioSetup()
-{
+void _gpioSetup() {
 #ifdef ENABLE_PROFILING
   // Configure profiling pin as output for ISR profiling (scope probe)
   gpio_mode_setup(cProfilingPort, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, cProfilingPin);
@@ -592,8 +580,7 @@ void _gpioSetup()
   gpio_clear(cBlankDisplayPort, cBlankDisplayPin);
 
   // Next, configure the external alarm input pins
-  for (uint8_t i = 0; i < cAlarmInputPinCount; i++)
-  {
+  for (uint8_t i = 0; i < cAlarmInputPinCount; i++) {
     gpio_mode_setup(cAlarmInputPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cAlarmInputPins[i]);
   }
 
@@ -611,18 +598,14 @@ void _gpioSetup()
   exti_enable_request(EXTI15);
 }
 
-
 // Configure the Independent Watchdog Timer
 //
-void _iwdgSetup()
-{
+void _iwdgSetup() {
   iwdg_set_period_ms(5000);
   iwdg_start();
 }
 
-
-void _i2cSetup()
-{
+void _i2cSetup() {
   // Configure GPIOs SCL=PB8 and SDA=PB9 so we can reset the bus nicely
   gpio_mode_setup(cI2c1Port, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, cI2c1SlcPin | cI2c1SdaPin);
   gpio_set_output_options(cI2c1Port, GPIO_OTYPE_OD, GPIO_OSPEED_100MHZ, cI2c1SlcPin | cI2c1SdaPin);
@@ -640,8 +623,7 @@ void _i2cSetup()
 
   gpio_mode_setup(cI2c1Port, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cI2c1SdaPin);
   // Clock out any remaining bits any slave is trying to send
-  while (gpio_get(cI2c1Port, cI2c1SdaPin) == false)
-  {
+  while (gpio_get(cI2c1Port, cI2c1SdaPin) == false) {
     gpio_clear(cI2c1Port, cI2c1SlcPin);
     delay(1);
     gpio_set(cI2c1Port, cI2c1SlcPin);
@@ -649,43 +631,41 @@ void _i2cSetup()
   }
 
   // Now configure GPIOs for I2C use
-	gpio_mode_setup(cI2c1Port, GPIO_MODE_AF, GPIO_PUPD_PULLUP, cI2c1SlcPin | cI2c1SdaPin);
+  gpio_mode_setup(cI2c1Port, GPIO_MODE_AF, GPIO_PUPD_PULLUP, cI2c1SlcPin | cI2c1SdaPin);
 
-	// Setup I2C1 pins as alternate function one
-	gpio_set_af(cI2c1Port, GPIO_AF1, cI2c1SlcPin | cI2c1SdaPin);
+  // Setup I2C1 pins as alternate function one
+  gpio_set_af(cI2c1Port, GPIO_AF1, cI2c1SlcPin | cI2c1SdaPin);
 
-	// Set alternate functions for the SCL and SDA pins of I2C1
+  // Set alternate functions for the SCL and SDA pins of I2C1
   gpio_set_output_options(cI2c1Port, GPIO_OTYPE_OD, GPIO_OSPEED_100MHZ, cI2c1SlcPin | cI2c1SdaPin);
 
   // Enable heftier drivers for I2C pins...maybe helpful?
   // SYSCFG_CFGR1 |= (SYSCFG_CFGR1_I2C_PB8_FMP | SYSCFG_CFGR1_I2C_PB9_FMP);
 
-	// Reset/Disable the I2C before changing any configuration
+  // Reset/Disable the I2C before changing any configuration
   i2c_reset(I2C1);
 
   // 400KHz - I2C Fast Mode - SYSCLK is 48 MHz
   i2c_set_speed(I2C1, i2c_speed_fm_400k, 48);
 
   // Set our slave address in case we should want to receive from other masters
-	i2c_set_own_7bit_slave_address(I2C1, 0x11);
+  i2c_set_own_7bit_slave_address(I2C1, 0x11);
 
   // Configure ANFOFF DNF[3:0] in CR1
-	// i2c_enable_analog_filter(I2C1);
-	// i2c_set_digital_filter(I2C1, I2C_CR1_DNF_DISABLED);
+  // i2c_enable_analog_filter(I2C1);
+  // i2c_set_digital_filter(I2C1, I2C_CR1_DNF_DISABLED);
 
-	// Configure No-Stretch CR1
+  // Configure No-Stretch CR1
   //  (only relevant in slave mode, must be disabled in master mode)
-	// i2c_disable_stretching(I2C1);
+  // i2c_disable_stretching(I2C1);
 
-	// Once everything is configured, enable the peripheral
-	i2c_peripheral_enable(I2C1);
+  // Once everything is configured, enable the peripheral
+  i2c_peripheral_enable(I2C1);
 
   _i2cState = I2cState::I2cIdle;
 }
 
-
-void _i2cRecover()
-{
+void _i2cRecover() {
   // Ensure status is busy -- it'll be reset to Idle by _i2cSetup()
   _i2cState = I2cState::I2cBusy;
 
@@ -694,62 +674,57 @@ void _i2cRecover()
   dma_channel_reset(DMA1, cI2c1RxDmaChannel);
 
   // Disable the I2C before all this
-	i2c_peripheral_disable(I2C1);
+  i2c_peripheral_disable(I2C1);
 
   _i2cSetup();
 
   _i2cBusyFailCount = 0;
 }
 
-
-void _nvicSetup()
-{
+void _nvicSetup() {
   // DMA interrupts
   // nvic_set_priority(NVIC_ADC_COMP_IRQ, 0);
-	// nvic_enable_irq(NVIC_ADC_COMP_IRQ);
+  // nvic_enable_irq(NVIC_ADC_COMP_IRQ);
   // nvic_set_priority(NVIC_DMA1_CHANNEL1_IRQ, 0);
-	// nvic_enable_irq(NVIC_DMA1_CHANNEL1_IRQ);
+  // nvic_enable_irq(NVIC_DMA1_CHANNEL1_IRQ);
   // DMA interrupts set to priority 64 to ensure they don't preempt the critical PWM timer
   nvic_set_priority(cDmaIrqSpi1, 64);
-	nvic_enable_irq(cDmaIrqSpi1);
+  nvic_enable_irq(cDmaIrqSpi1);
   nvic_set_priority(cDmaIrqUsarts, 64);
-	nvic_enable_irq(cDmaIrqUsarts);
+  nvic_enable_irq(cDmaIrqUsarts);
   // EXTI interrupts -- PPS and IR sensor inputs
   nvic_set_priority(cPpsIrq, 64);
-	nvic_enable_irq(cPpsIrq);
+  nvic_enable_irq(cPpsIrq);
   // PWM timer interrupt (triggers refresh of tubes) - HIGHEST priority (0) for deterministic timing
   nvic_set_priority(cTubePwmTimerIrq, 0);
-	nvic_enable_irq(cTubePwmTimerIrq);
+  nvic_enable_irq(cTubePwmTimerIrq);
   // IR interrupt (overflow = timeout)
   nvic_set_priority(cIrTimerIrq, 64);
-	nvic_enable_irq(cIrTimerIrq);
+  nvic_enable_irq(cIrTimerIrq);
   // TSC interrupt
   nvic_set_priority(cTscIrq, 128);
   nvic_enable_irq(cTscIrq);
   // USART1 interrupts
   nvic_set_priority(cUsart1Irq, 64);
-	nvic_enable_irq(cUsart1Irq);
+  nvic_enable_irq(cUsart1Irq);
   // USART2 interrupts
   nvic_set_priority(cUsart2Irq, 64);
-	nvic_enable_irq(cUsart2Irq);
+  nvic_enable_irq(cUsart2Irq);
   // USART3/4 shared interrupt (serial remote control)
   nvic_set_priority(cUsart3_4Irq, 64);
   nvic_enable_irq(cUsart3_4Irq);
 }
 
-
 // Configure RTC and ensure it's running
 //
-void _rtcSetup()
-{
+void _rtcSetup() {
   // these values are the power-on defaults for the prescaler.
   // we'll set them anyway to be sure they're there
-	const uint32_t async = 127;
+  const uint32_t async = 127;
   uint32_t sync = 255;
   uint16_t timeout = 474;
 
-  if (rcc_is_osc_ready(RCC_LSE) == false)
-  {
+  if (rcc_is_osc_ready(RCC_LSE) == false) {
     _rtcStartupResult = RtcStartResult::OscStopped;
 
     pwr_disable_backup_domain_write_protect();
@@ -758,8 +733,7 @@ void _rtcSetup()
     RCC_BDCR |= RCC_BDCR_BDRST;
     RCC_BDCR &= ~RCC_BDCR_BDRST;
 
-    if (_externalRtcConnected == true)
-    {
+    if (_externalRtcConnected == true) {
       rcc_osc_bypass_enable(RCC_LSE);
     }
 
@@ -768,17 +742,17 @@ void _rtcSetup()
 
     rcc_set_rtc_clock_source(RCC_LSE);
 
-  	rcc_enable_rtc_clock();
+    rcc_enable_rtc_clock();
 
-  	rtc_unlock();
+    rtc_unlock();
 
-  	// enter init mode -- this lets us test that everything is working as expected
-  	RTC_ISR |= RTC_ISR_INIT;
-    while (((RTC_ISR & RTC_ISR_INITF) == 0) && (--timeout > 0));
+    // enter init mode -- this lets us test that everything is working as expected
+    RTC_ISR |= RTC_ISR_INIT;
+    while (((RTC_ISR & RTC_ISR_INITF) == 0) && (--timeout > 0))
+      ;
 
     // do a blinky thing to indicate the problem if we had to wait too long :(
-    if (timeout == 0)
-    {
+    if (timeout == 0) {
       // reset the RTC to undo anything that might've been done above
       RCC_BDCR |= RCC_BDCR_BDRST;
       RCC_BDCR &= ~RCC_BDCR_BDRST;
@@ -786,29 +760,25 @@ void _rtcSetup()
       _rtcStartupResult = RtcStartResult::OscTimeout;
     }
 
-  	// set synch prescaler, using defaults for 1Hz out
-  	rtc_set_prescaler(sync, async);
+    // set synch prescaler, using defaults for 1Hz out
+    rtc_set_prescaler(sync, async);
 
-  	// exit init mode
-  	RTC_ISR &= ~(RTC_ISR_INIT);
+    // exit init mode
+    RTC_ISR &= ~(RTC_ISR_INIT);
 
     rtc_lock();
 
-  	// And wait for synchro...
-  	rtc_wait_for_synchro();
+    // And wait for synchro...
+    rtc_wait_for_synchro();
     pwr_enable_backup_domain_write_protect();
-  }
-  else
-  {
+  } else {
     _rtcStartupResult = RtcStartResult::Ok;
   }
 }
 
-
 // Configure SPI
 //
-void _spiSetup()
-{
+void _spiSetup() {
   // Configure SPI instance with SPI hardware and DMA channels
   _spi1Master.initialize(&_spi1MasterParams);
 
@@ -820,39 +790,35 @@ void _spiSetup()
   gpio_mode_setup(cSpi1Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cSpi1SckPin | cSpi1MosiPin);
 }
 
-
 // Set up timer to fire every x milliseconds
 // This is a unusual usage of systick, be very careful with the 24bit range
 // of the systick counter!  You can range from 1 to 2796ms with this.
 //
-void _systickSetup(const uint16_t xms)
-{
-	// div8 per ST, stays compatible with M3/M4 parts, well done ST
-	systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
+void _systickSetup(const uint16_t xms) {
+  // div8 per ST, stays compatible with M3/M4 parts, well done ST
+  systick_set_clocksource(STK_CSR_CLKSOURCE_EXT);
   // Lower SysTick priority to 128 so both TIM2 PWM ISR (priority 0) and the
   // SPI DMA complete ISR (priority 64) can preempt it. This ensures the HV5622
   // latch strobe happens promptly after each DMA transfer completes, giving
   // consistent output timing critical for flicker-free low-intensity PWM.
   // On Cortex-M0, SHPR3[31:30] controls SysTick priority (2 bits = 4 levels: 0, 64, 128, 192)
   SCB_SHPR3 |= (128 << 24);
-	// clear counter so it starts right away
-	STK_CVR = 0;
+  // clear counter so it starts right away
+  STK_CVR = 0;
 
-	systick_set_reload(rcc_ahb_frequency / 8 / 1000 * xms);
-	systick_counter_enable();
-	systick_interrupt_enable();
+  systick_set_reload(rcc_ahb_frequency / 8 / 1000 * xms);
+  systick_counter_enable();
+  systick_interrupt_enable();
 }
-
 
 // Set up the timer for the beeper/buzzer
 //
-void _timerSetupBeeper()
-{
+void _timerSetupBeeper() {
   // Set the timer's global mode to:
   // - use no divider
   // - alignment edge
   // - count direction up
-  timer_set_mode(cBuzzerTimer,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  timer_set_mode(cBuzzerTimer, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
   timer_set_prescaler(cBuzzerTimer, 8);
   timer_set_repetition_counter(cBuzzerTimer, 0);
   timer_continuous_mode(cBuzzerTimer);
@@ -875,16 +841,14 @@ void _timerSetupBeeper()
   gpio_set_output_options(cBuzzerPort, GPIO_OTYPE_PP, GPIO_OSPEED_HIGH, cBuzzerPin);
 }
 
-
 // Set up the timer for the status LEDs
 //
-void _timerSetupStatusLED()
-{
+void _timerSetupStatusLED() {
   // Set the timer's global mode to:
   // - use no divider
   // - alignment edge
   // - count direction up
-  timer_set_mode(cLedPwmTimer,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  timer_set_mode(cLedPwmTimer, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
   timer_set_prescaler(cLedPwmTimer, 0);
   timer_set_repetition_counter(cLedPwmTimer, 0);
   timer_continuous_mode(cLedPwmTimer);
@@ -913,16 +877,14 @@ void _timerSetupStatusLED()
   gpio_set_output_options(cLedPort, GPIO_OTYPE_PP, GPIO_OSPEED_HIGH, cLed0Pin | cLed1Pin | cLed2Pin);
 }
 
-
 // Set up the timer for measuring pulses on the IR remote sensor input
 //
-void _timerSetupIR()
-{
+void _timerSetupIR() {
   // Set the timer's global mode to:
   // - use no divider
   // - alignment edge
   // - count direction up
-  timer_set_mode(cIrTimer,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  timer_set_mode(cIrTimer, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
   timer_set_prescaler(cIrTimer, InfraredRemote::cTimerPeriod);
   timer_set_repetition_counter(cIrTimer, 0);
@@ -936,16 +898,14 @@ void _timerSetupIR()
   timer_enable_counter(cIrTimer);
 }
 
-
 // Set up the timer for the display PWM generation
 //
-void _timerSetupPWM()
-{
+void _timerSetupPWM() {
   // Set the timer's global mode to:
   // - use no divider
   // - alignment edge
   // - count direction up
-  timer_set_mode(cTubePwmTimer,  TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+  timer_set_mode(cTubePwmTimer, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
 
   timer_set_prescaler(cTubePwmTimer, 0);
   timer_set_repetition_counter(cTubePwmTimer, 0);
@@ -961,26 +921,22 @@ void _timerSetupPWM()
   timer_enable_counter(cTubePwmTimer);
 }
 
-
 // Set up the Timers
 //
-void _timerSetup()
-{
+void _timerSetup() {
   _timerSetupStatusLED();
   _timerSetupBeeper();
   _timerSetupIR();
   _timerSetupPWM();
 }
 
-
 // Set up the Touch Sensing Controller
 //
-void _tscSetup()
-{
+void _tscSetup() {
   gpio_mode_setup(cTscPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cTscTouchKeyPins | cTscSamplingCapPins);
   gpio_set_output_options(cTscPort, GPIO_OTYPE_OD, GPIO_OSPEED_MED, cTscSamplingCapPins);
   gpio_set_output_options(cTscPort, GPIO_OTYPE_PP, GPIO_OSPEED_MED, cTscTouchKeyPins);
-	gpio_set_af(cTscPort, GPIO_AF3, cTscTouchKeyPins | cTscSamplingCapPins);
+  gpio_set_af(cTscPort, GPIO_AF3, cTscTouchKeyPins | cTscSamplingCapPins);
 
   gpio_mode_setup(cTscPortC, GPIO_MODE_AF, GPIO_PUPD_NONE, cTscTouchKeyPinsC);
   gpio_set_output_options(cTscPortC, GPIO_OTYPE_PP, GPIO_OSPEED_MED, cTscTouchKeyPinsC);
@@ -990,7 +946,7 @@ void _tscSetup()
   //  the corresponding GPIO must be first set to alternate output open drain
   //  mode and then the corresponding Gx_IOy bit in the TSC_IOSCR register must
   //  be set.
-	TSC_IOSCR = cTscSamplingControlBits;
+  TSC_IOSCR = cTscSamplingControlBits;
 
   _tscChannelCounter = 0;
 
@@ -1030,11 +986,9 @@ void _tscSetup()
   TSC_CR |= TSC_CR_START;
 }
 
-
 // Set up USARTs
 //
-void _usartSetup()
-{
+void _usartSetup() {
   // Setup USART1 TX & RX pins as alternate function
   gpio_set_af(cUsart1TxPort, cUsart1TxAF, cUsart1TxPin);
   gpio_set_af(cUsart1RxPort, cUsart1RxAF, cUsart1RxPin);
@@ -1051,30 +1005,28 @@ void _usartSetup()
   gpio_mode_setup(cUsart4TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart4TxPin);
 
   // Configure all Usart instances
-  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
-  {
+  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++) {
     _usart[usart].initialize(&_usartParams[usart]);
     _usart[usart].configure(&_usartTransferParams[usart]);
   }
 
   // Enable relevant interrupts
-  _usart[0].enableRxInterrupt();          // USART1 GPS RX
+  _usart[0].enableRxInterrupt();  // USART1 GPS RX
   usart_enable_error_interrupt(cGpsUsart);
   usart_enable_error_interrupt(cDmxUsart);
   // NOTE: USART3 RX interrupt is enabled later by SerialRemote::initialize()
   // to avoid unhandled RXNE interrupts before the ISR handler is ready.
 
   // Enable all USARTs
-  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++)
-  {
+  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++) {
     _usart[usart].enable();
   }
 }
 
-
-void _incrementOnTimeSecondsCounter()
-{
-  if (_onTimeLastSecond == _currentDateTime.second() || !_hvState) return;
+void _incrementOnTimeSecondsCounter() {
+  if (_onTimeLastSecond == _currentDateTime.second() || !_hvState) {
+    return;
+  }
 
   bool dbpState = (PWR_CR & PWR_CR_DBP);
 
@@ -1084,8 +1036,7 @@ void _incrementOnTimeSecondsCounter()
 
   RTC_BKPXR(0) = ++_onTimeSecondsCounter;
 
-  if (dbpState == false)
-  {
+  if (dbpState == false) {
     pwr_enable_backup_domain_write_protect();
   }
 
@@ -1096,17 +1047,14 @@ void _incrementOnTimeSecondsCounter()
   // }
 }
 
-
-void _refreshTemp()
-{
+void _refreshTemp() {
   // Read ALL detected temperature sensors (not just the active one) so the
   // serial remote can report every sensor's value.  Phase 1 handles immediate
   // reads (internal ADC, DS3234 cached registers) and queues SPI reads.
   // Phase 2 harvests SPI results on subsequent calls.
 
   // --- Phase 1: immediate reads + queue SPI ---
-  if ((_refreshTempNow == true) && (_tempReadPending == false))
-  {
+  if ((_refreshTempNow == true) && (_tempReadPending == false)) {
     // Internal ADC temperature (always available)
     {
       int32_t averageTemp = _adcFilteredTemp >> cAdcFilterUpscale;
@@ -1121,85 +1069,64 @@ void _refreshTemp()
     // register snapshot is guaranteed fresh.
 
     // SPI temperature sensor -- LM74 and DS1722 are mutually exclusive
-    if (LM74::isConnected())
-    {
+    if (LM74::isConnected()) {
       SpiMaster::SpiReqAck status = LM74::refresh();
-      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
-          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
-      {
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk) || (status == SpiMaster::SpiReqAck::SpiReqAckQueued)) {
         _tempReadPending = true;
       }
-    }
-    else if (DS1722::isConnected())
-    {
+    } else if (DS1722::isConnected()) {
       SpiMaster::SpiReqAck status = DS1722::refresh();
-      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
-          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
-      {
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk) || (status == SpiMaster::SpiReqAck::SpiReqAckQueued)) {
         _tempReadPending = true;
       }
     }
 
     _refreshTempNow = false;
 
-    if (!_tempReadPending)
-    {
+    if (!_tempReadPending) {
       // No SPI read queued -- all readings are complete this cycle
       _temperatureUpdated = true;
     }
   }
 
   // --- Phase 2: harvest SPI result ---
-  if (_tempReadPending == true)
-  {
+  if (_tempReadPending == true) {
     bool harvested = false;
 
-    if (LM74::isConnected() && (LM74::transferComplete() == true))
-    {
+    if (LM74::isConnected() && (LM74::transferComplete() == true)) {
       _temperatureCx10Cached[TempSensorType::LM74] = LM74::getTemperatureCx10();
       harvested = true;
-    }
-    else if (DS1722::isConnected() && (DS1722::transferComplete() == true))
-    {
+    } else if (DS1722::isConnected() && (DS1722::transferComplete() == true)) {
       _temperatureCx10Cached[TempSensorType::DS1722] = DS1722::getTemperatureCx10();
       harvested = true;
     }
 
-    if (harvested)
-    {
+    if (harvested) {
       _tempReadPending = false;
       _temperatureUpdated = true;
     }
   }
 }
 
-
-void _refreshRTC()
-{
-  if (_externalRtcConnected)
-  {
+void _refreshRTC() {
+  if (_externalRtcConnected) {
     // Phase 1: queue the SPI refresh (non-blocking)
-    if (_refreshRTCNow)
-    {
+    if (_refreshRTCNow) {
       SpiMaster::SpiReqAck status = DS3234::refresh();  // non-blocking
-      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk)
-          || (status == SpiMaster::SpiReqAck::SpiReqAckQueued))
-      {
+      if ((status == SpiMaster::SpiReqAck::SpiReqAckOk) || (status == SpiMaster::SpiReqAck::SpiReqAckQueued)) {
         _rtcReadPending = true;
         _refreshRTCNow = false;
       }
     }
 
     // Phase 2: harvest the result once DMA completes
-    if (_rtcReadPending && DS3234::transferComplete())
-    {
+    if (_rtcReadPending && DS3234::transferComplete()) {
       _currentDateTime = DS3234::getDateTime();
       // Also update cached temperature -- the DS3234 register snapshot already
       // contains the temperature bytes, and _refreshTemp() cannot read them
       // while _rtcReadPending is true (which it always is when _refreshTempNow
       // fires, because both flags are set simultaneously).
-      if (DS3234::isConnected())
-      {
+      if (DS3234::isConnected()) {
         _temperatureCx10Cached[TempSensorType::DS3234] = DS3234::getTemperatureCx10();
       }
       _rtcReadPending = false;
@@ -1207,7 +1134,9 @@ void _refreshRTC()
     return;
   }
 
-  if (!_refreshRTCNow) return;
+  if (!_refreshRTCNow) {
+    return;
+  }
 
   // Read TR first per STM32 RM: reading TR latches the shadow registers so DR
   // is consistent.  Also use TR as a change-detection sentinel: when the GPS
@@ -1217,10 +1146,12 @@ void _refreshRTC()
   // 1 ms until the boundary fires.  This prevents display skips caused by the
   // phase drifting across the cPpsRtcReadDelay threshold.
   uint32_t tr = RTC_TR;
-  uint32_t dr = RTC_DR;   // MUST always read DR after TR to release the shadow-register
-                           // latch (STM32 RM §25.4.8): reading TR locks shadow regs until
-                           // DR is read; skipping this read prevents any future updates.
-  if (tr == _lastRtcTR) return;   // RTC hasn't ticked yet; retry next SysTick
+  uint32_t dr = RTC_DR;  // MUST always read DR after TR to release the shadow-register
+                         // latch (STM32 RM §25.4.8): reading TR locks shadow regs until
+                         // DR is read; skipping this read prevents any future updates.
+  if (tr == _lastRtcTR) {
+    return;  // RTC hasn't ticked yet; retry next SysTick
+  }
   _lastRtcTR = tr;
 
   uint16_t year = 2000;
@@ -1250,81 +1181,63 @@ void _refreshRTC()
   _refreshRTCNow = false;
 }
 
-
-void _refreshPeripherals()
-{
+void _refreshPeripherals() {
   _refreshRTC();
   _refreshTemp();
 }
 
-
-void _syncRtcWithGps()
-{
+void _syncRtcWithGps() {
   // Only read GPS time when we might actually sync (avoids reading GPS data every loop)
   // Only sync when not waiting for PPS refresh to avoid race with _currentDateTime update
-  if (!GpsReceiver::isConnected() || !GpsReceiver::isValid() || _ppsDelayCounter != 0) return;
+  if (!GpsReceiver::isConnected() || !GpsReceiver::isValid() || _ppsDelayCounter != 0) {
+    return;
+  }
 
   DateTime gpsTime = GpsReceiver::getLocalDateTime();
 
   // Reject implausible GPS time (e.g., cold-start default epoch year)
-  if (gpsTime.year() < cGpsMinValidYear) return;
+  if (gpsTime.year() < cGpsMinValidYear) {
+    return;
+  }
 
   // Sync RTCs when the hour changes OR when GPS time has drifted significantly from system
   // time -- the drift check recovers from a bad time accepted at the first GPS fix
   int32_t drift = _currentDateTime.secondsTo(gpsTime);
-  if (drift < 0) drift = -drift;
+  if (drift < 0) {
+    drift = -drift;
+  }
 
-  if (gpsTime.hour() != _lastRtcGpsSyncHour || (uint32_t)drift > cGpsMaxDriftSeconds)
-  {
+  if (gpsTime.hour() != _lastRtcGpsSyncHour || (uint32_t) drift > cGpsMaxDriftSeconds) {
     setDateTime(gpsTime);
     _lastRtcGpsSyncHour = gpsTime.hour();
   }
 }
 
+bool isBootloaderFlagSet() { return (_bootloaderMagic == cBootloaderMagic); }
 
-bool isBootloaderFlagSet()
-{
-  return (_bootloaderMagic == cBootloaderMagic);
-}
-
-
-void enterBootloader()
-{
+void enterBootloader() {
   _bootloaderMagic = 0;
   asm volatile("cpsid i" ::: "memory");  // disable all interrupts (set PRIMASK)
   // STM32F072 system bootloader is at system memory base 0x1FFFC800.
   // Word 0 is the initial stack pointer; word 1 is the reset handler address.
-  const volatile uint32_t* sysboot = reinterpret_cast<const volatile uint32_t*>(0x1FFFC800u);
+  const volatile uint32_t *sysboot = reinterpret_cast<const volatile uint32_t *>(0x1FFFC800u);
   uint32_t sp = sysboot[0];
   uint32_t pc = sysboot[1];
-  asm volatile("msr msp, %0" :: "r"(sp) : "memory");
-  reinterpret_cast<void(*)()>(pc)();
-  while (true) {}  // unreachable; satisfies [[noreturn]]
+  asm volatile("msr msp, %0" ::"r"(sp) : "memory");
+  reinterpret_cast<void (*)()>(pc)();
+  while (true) {
+  }  // unreachable; satisfies [[noreturn]]
 }
 
+void setBootloaderFlag() { _bootloaderMagic = cBootloaderMagic; }
 
-void setBootloaderFlag()
-{
-  _bootloaderMagic = cBootloaderMagic;
-}
+void clearBootloaderFlag() { _bootloaderMagic = 0; }
 
-
-void clearBootloaderFlag()
-{
-  _bootloaderMagic = 0;
-}
-
-
-void systemReset()
-{
-  scb_reset_system();
-}
-
+void systemReset() { scb_reset_system(); }
 
 // Starts it all up
 //
-void initialize()
-{
+void initialize() {
   // First, set up all the hardware things
   _clockSetup();
   _iwdgSetup();
@@ -1343,7 +1256,7 @@ void initialize()
   LM74::initialize();
   DS1722::initialize();
 
-  _systickSetup(1);   // tick every 1 mS
+  _systickSetup(1);  // tick every 1 mS
   _nvicSetup();
 
   UsbSerial::initialize();
@@ -1351,59 +1264,50 @@ void initialize()
   Dmx512Rx::initialize();
 
   // Initialize IIR filters with current ADC readings (upscaled for precision)
-  _adcFilteredLight = (uint32_t)_bufferADC[cAdcPhototransistor] << cAdcFilterUpscale;
-  _adcFilteredTemp = (uint32_t)_bufferADC[cAdcTemperature] << cAdcFilterUpscale;
-  _adcFilteredVoltageVddA = (uint32_t)_bufferADC[cAdcVref] << cAdcFilterUpscale;
-  _adcFilteredVoltageBatt = (uint32_t)_bufferADC[cAdcVbat] << cAdcFilterUpscale;
+  _adcFilteredLight = (uint32_t) _bufferADC[cAdcPhototransistor] << cAdcFilterUpscale;
+  _adcFilteredTemp = (uint32_t) _bufferADC[cAdcTemperature] << cAdcFilterUpscale;
+  _adcFilteredVoltageVddA = (uint32_t) _bufferADC[cAdcVref] << cAdcFilterUpscale;
+  _adcFilteredVoltageBatt = (uint32_t) _bufferADC[cAdcVbat] << cAdcFilterUpscale;
   _cachedLightLevel = _bufferADC[cAdcPhototransistor];
 
   // Initialize TSC baseline and filter values
   // Start with mid-range baseline; will adapt quickly during first acquisitions
-  for (_tscChannelCounter = 0; _tscChannelCounter < cTscChannelCount; _tscChannelCounter++)
-  {
+  for (_tscChannelCounter = 0; _tscChannelCounter < cTscChannelCount; _tscChannelCounter++) {
     _tscBaseline[_tscChannelCounter] = 2048;  // Mid-range initial baseline
     _tscFiltered[_tscChannelCounter] = 2048;  // Mid-range initial filter
   }
   _tscTouchState = 0;  // All buttons released initially
 
   // Here we check for other temperature sensors
-  if (LM74::checkConnection() == true)
-  {
+  if (LM74::checkConnection() == true) {
     _externalTemperatureSensor = TempSensorType::LM74;
-  }
-  else
-  {
+  } else {
     gpio_clear(cNssPort, cNssTemperaturePin);
 
-    if (DS1722::checkConnection() == true)
-    {
+    if (DS1722::checkConnection() == true) {
       _externalTemperatureSensor = TempSensorType::DS1722;
     }
   }
 
   _externalRtcConnected = DS3234::checkConnection();
 
-  if (_externalRtcConnected == true)
-  {
-    uint8_t buffer[] = { 0, 0x08 };
+  if (_externalRtcConnected == true) {
+    uint8_t buffer[] = {0, 0x08};
 
     // checkConnection() does a blocking refresh() so _ds3234Registers are valid here;
     // populate _currentDateTime now so Application::dateTime() returns real data immediately
     // instead of zeros, which would persist until the first PPS-triggered DMA refresh.
     _rtcIsSet = DS3234::isValid();
-    if (_rtcIsSet)
-    {
+    if (_rtcIsSet) {
       _currentDateTime = DS3234::getDateTime();
     }
     // enable PPS and 32 kHz outputs
-    while (DS3234::setRegister(0x0e, buffer, 2, true) != SpiMaster::SpiReqAck::SpiReqAckOk);
-    if (_externalTemperatureSensor == TempSensorType::STM32ADC)
-    {
+    while (DS3234::setRegister(0x0e, buffer, 2, true) != SpiMaster::SpiReqAck::SpiReqAckOk)
+      ;
+    if (_externalTemperatureSensor == TempSensorType::STM32ADC) {
       _externalTemperatureSensor = TempSensorType::DS3234;
     }
-  }
-  else
-  {
+  } else {
     _rtcIsSet = RTC_ISR & RTC_ISR_INITS;
   }
 
@@ -1412,11 +1316,9 @@ void initialize()
   _onTimeSecondsCounter = RTC_BKPXR(0);
 }
 
-
 // Should be called frequently from the main loop
 //
-void refresh()
-{
+void refresh() {
   iwdg_reset();
 
   // _refreshPeripherals();
@@ -1425,29 +1327,18 @@ void refresh()
   DisplayManager::refresh();
 }
 
+HwReqAck tick() { return tone(cToneFrequencyMinimum * 8, 2); }
 
-HwReqAck tick()
-{
-  return tone(cToneFrequencyMinimum * 8, 2);
-}
-
-
-HwReqAck tone(const uint16_t frequency, const uint16_t duration)
-{
+HwReqAck tone(const uint16_t frequency, const uint16_t duration) {
   // period = (48000000 / 8 (prescaler)) / frequency
   // oc_value = period / 2
-  if (_toneTimer == 0)
-  {
-    if ((frequency >= cToneFrequencyMinimum) && (_toneVolume < cToneVolumeMaximum))
-    {
+  if (_toneTimer == 0) {
+    if ((frequency >= cToneFrequencyMinimum) && (_toneVolume < cToneVolumeMaximum)) {
       // processor speed divided by prescaler...
-      uint32_t period = (48000000 / 8) / frequency,
-               ocValue = period / (2 << _toneVolume);
+      uint32_t period = (48000000 / 8) / frequency, ocValue = period / (2 << _toneVolume);
       timer_set_period(cBuzzerTimer, period);
       timer_set_oc_value(cBuzzerTimer, cBuzzerTimerOC, ocValue);
-    }
-    else
-    {
+    } else {
       // timer_set_period(cBuzzerTimer, 1);
       timer_set_oc_value(cBuzzerTimer, cBuzzerTimerOC, 0);
     }
@@ -1455,112 +1346,77 @@ HwReqAck tone(const uint16_t frequency, const uint16_t duration)
     _toneTimer = duration;
 
     return HwReqAck::HwReqAckOk;
-  }
-  else if (_toneTimerNext == 0)
-  {
+  } else if (_toneTimerNext == 0) {
     _toneTimerNext = duration;
     _toneFrequencyNext = frequency;
 
     return HwReqAck::HwReqAckBusy;
-  }
-  else
-  {
+  } else {
     return HwReqAck::HwReqAckError;
   }
 }
 
-
-bool alarmInput(const uint8_t alarmInputNumber)
-{
-  if (alarmInputNumber >= cAlarmInputPinCount) return false;
+bool alarmInput(const uint8_t alarmInputNumber) {
+  if (alarmInputNumber >= cAlarmInputPinCount) {
+    return false;
+  }
 
   // if the pin is low, return true (alarm is active if pin is pulled down)
   return (gpio_get(cAlarmInputPort, cAlarmInputPins[alarmInputNumber]) == 0);
 }
 
+bool button(const uint8_t button) { return (_buttonStates & (1 << button)) != 0; }
 
-bool button(const uint8_t button)
-{
-  return (_buttonStates & (1 << button)) != 0;
-}
+uint8_t buttons() { return _buttonStates; }
 
+uint8_t buttonsPressed() { return _buttonStates & _buttonsChanged; }
 
-uint8_t buttons()
-{
-  return _buttonStates;
-}
+uint8_t buttonsReleased() { return ~_buttonStates & _buttonsChanged; }
 
-
-uint8_t buttonsPressed()
-{
-  return _buttonStates & _buttonsChanged;
-}
-
-
-uint8_t buttonsReleased()
-{
-  return ~_buttonStates & _buttonsChanged;
-}
-
-
-void buttonsRefresh()
-{
+void buttonsRefresh() {
   // Touch detection is performed entirely in the ISR (tscIsr)
   // Here we simply copy the ISR-computed state and track changes
   _buttonsChanged = _buttonStates ^ _buttonStatesPrevious;
   _buttonStatesPrevious = _buttonStates;
 }
 
-
-void setHvState(const bool hvEnabled)
-{
-  if (_hvState == hvEnabled) return;
+void setHvState(const bool hvEnabled) {
+  if (_hvState == hvEnabled) {
+    return;
+  }
 
   _hvState = hvEnabled;
 
-  if (hvEnabled == false)
-  {
+  if (hvEnabled == false) {
     gpio_set(cHvShutdownPort, cHvShutdownPin);
-  }
-  else
-  {
+  } else {
     gpio_clear(cHvShutdownPort, cHvShutdownPin);
   }
 }
 
+bool getHvState() { return _hvState; }
 
-bool getHvState()
-{
-  return _hvState;
-}
-
-
-void setDisplayHardwareBlanking(const bool blankingState)
-{
-  if (_displayBlankingState == blankingState) return;
+void setDisplayHardwareBlanking(const bool blankingState) {
+  if (_displayBlankingState == blankingState) {
+    return;
+  }
 
   _displayBlankingState = blankingState;
 
-  if (blankingState == false)
-  {
+  if (blankingState == false) {
     // blank the display
     gpio_set(cBlankDisplayPort, cBlankDisplayPin);
-  }
-  else
-  {
+  } else {
     gpio_clear(cBlankDisplayPort, cBlankDisplayPin);
   }
 }
-
 
 // bool dstState()
 // {
 //   return RTC_CR & RTC_CR_BKP;
 // }
 
-
-DateTime dateTime()
-{
+DateTime dateTime() {
   // if ((GpsReceiver::isConnected() == true) && (GpsReceiver::isValid() == true))
   // {
   //   return GpsReceiver::getLocalDateTime();
@@ -1568,29 +1424,24 @@ DateTime dateTime()
   return _currentDateTime;
 }
 
-
-void setDateTime(const DateTime &dateTime)
-{
+void setDateTime(const DateTime &dateTime) {
   _currentDateTime = dateTime;
   _rtcIsSet = true;
 
-  if (_externalRtcConnected == true)
-  {
+  if (_externalRtcConnected == true) {
     DS3234::setDateTime(_currentDateTime);
   }
   // set the internal RTC regardless
   uint8_t dayOfWeek = _currentDateTime.dayOfWeek();
 
   // STM32 RTC does not accept 0; it uses 7 for Sunday, instead
-  if (dayOfWeek == 0)
-  {
+  if (dayOfWeek == 0) {
     dayOfWeek = 7;
   }
 
   uint32_t dr = ((_currentDateTime.yearShort(true) & 0xff) << RTC_DR_YU_SHIFT) |
                 ((_currentDateTime.month(true) & 0x1f) << RTC_DR_MU_SHIFT) |
-                ((_currentDateTime.day(true) & 0x3f) << RTC_DR_DU_SHIFT) |
-                ((dayOfWeek) << RTC_DR_WDU_SHIFT);
+                ((_currentDateTime.day(true) & 0x3f) << RTC_DR_DU_SHIFT) | ((dayOfWeek) << RTC_DR_WDU_SHIFT);
 
   uint32_t tr = ((_currentDateTime.hour(true, false) & 0x3f) << RTC_TR_HU_SHIFT) |
                 ((_currentDateTime.minute(true) & 0x7f) << RTC_TR_MNU_SHIFT) |
@@ -1601,7 +1452,8 @@ void setDateTime(const DateTime &dateTime)
 
   // enter init mode
   RTC_ISR |= RTC_ISR_INIT;
-  while ((RTC_ISR & RTC_ISR_INITF) == 0);
+  while ((RTC_ISR & RTC_ISR_INITF) == 0)
+    ;
 
   RTC_DR = dr;
   RTC_TR = tr;
@@ -1620,174 +1472,81 @@ void setDateTime(const DateTime &dateTime)
   return;
 }
 
+bool rtcIsSet() { return _rtcIsSet; }
 
-bool rtcIsSet()
-{
-  return _rtcIsSet;
-}
-
-
-int32_t temperature(const bool fahrenheit, const bool bcd)
-{
+int32_t temperature(const bool fahrenheit, const bool bcd) {
   int32_t tempCx10 = _temperatureCx10Cached[_externalTemperatureSensor];
 
-  if (fahrenheit == true)
-  {
+  if (fahrenheit == true) {
     int32_t tempF = (tempCx10 * 18) / 100 + 32;
-    if (bcd == true)
-    {
-      return uint32ToBcd((uint16_t)tempF);
+    if (bcd == true) {
+      return uint32ToBcd((uint16_t) tempF);
     }
     return tempF;
-  }
-  else
-  {
+  } else {
     int32_t tempC = tempCx10 / 10;
-    if (bcd == true)
-    {
-      return uint32ToBcd((uint16_t)tempC);
+    if (bcd == true) {
+      return uint32ToBcd((uint16_t) tempC);
     }
     return tempC;
   }
 }
 
+int32_t temperatureCx10() { return _temperatureCx10Cached[_externalTemperatureSensor]; }
 
-int32_t temperatureCx10()
-{
-  return _temperatureCx10Cached[_externalTemperatureSensor];
-}
-
-
-int32_t temperatureCx10(TempSensorType type)
-{
-  if (type < cTempSensorCount)
-  {
+int32_t temperatureCx10(TempSensorType type) {
+  if (type < cTempSensorCount) {
     return _temperatureCx10Cached[type];
   }
   return cTempSentinel;
 }
 
-
-bool temperatureUpdated()
-{
-  if (_temperatureUpdated)
-  {
+bool temperatureUpdated() {
+  if (_temperatureUpdated) {
     _temperatureUpdated = false;
     return true;
   }
   return false;
 }
 
-
-uint16_t lightLevel()
-{
+uint16_t lightLevel() {
   // Return cached IIR-filtered light level (updated in systickIsr)
   // No computation needed - saves ~200 cycles per call!
   return _cachedLightLevel;
 }
 
+uint32_t onTimeSeconds() { return _onTimeSecondsCounter; }
 
-uint32_t onTimeSeconds()
-{
-  return _onTimeSecondsCounter;
-}
+void onTimeSecondsReset() { _onTimeSecondsCounter = 0; }
 
-
-void onTimeSecondsReset()
-{
-  _onTimeSecondsCounter = 0;
-}
-
-
-uint16_t voltageBatt()
-{
+uint16_t voltageBatt() {
   _batteryMeasuringCounter = 0;
   adc_enable_vbat_sensor();
 
   // Use IIR filtered battery voltage (downscale to actual ADC range)
   int32_t adcSampleAverage = _adcFilteredVoltageBatt >> cAdcFilterUpscale;
   // Determine the voltage
-  return cVddCalibrationVoltage * (int32_t)ST_VREFINT_CAL / adcSampleAverage;
+  return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / adcSampleAverage;
 }
 
-
-uint16_t voltageVddA()
-{
+uint16_t voltageVddA() {
   // Use IIR filtered VddA voltage (downscale to actual ADC range)
   int32_t adcSampleAverage = _adcFilteredVoltageVddA >> cAdcFilterUpscale;
   // Determine the voltage as it affects the temperature calculation
-  return cVddCalibrationVoltage * (int32_t)ST_VREFINT_CAL / adcSampleAverage;
+  return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / adcSampleAverage;
 }
 
-
-bool adcValuesUpdated()
-{
-  if (_adcValuesUpdated)
-  {
+bool adcValuesUpdated() {
+  if (_adcValuesUpdated) {
     _adcValuesUpdated = false;
     return true;
   }
   return false;
 }
 
+void setFlickerReduction(const uint16_t value) { _blankingThreshold = value; }
 
-// void setDstState(const bool enableDst, const bool adjustRtcHardware)
-// {
-//   // number of seconds in an hour
-//   int16_t rtcAdjustment = 3600;
-//   // bit to set in RTC_CR to adjust the STM32's internal RTC
-//   uint32_t rtcDstAdjustBit = 0;
-//   // get the current state of the hardware into dstHwState
-//   bool dstHwState = RTC_CR & RTC_CR_BKP;
-//   // if the new state and the hardware state are not the same...
-//   if (enableDst != dstHwState)
-//   {
-//     // get ready to toggle the BKP bit...
-//     pwr_disable_backup_domain_write_protect();
-//     rtc_unlock();
-//
-//     if (enableDst == true)
-//     {
-//       RTC_CR |= RTC_CR_BKP;
-//
-//       rtcDstAdjustBit = RTC_CR_ADD1H;
-//     }
-//     else
-//     {
-//       RTC_CR &= ~RTC_CR_BKP;
-//
-//       rtcDstAdjustBit = RTC_CR_SUB1H;
-//
-//       rtcAdjustment *= -1;
-//     }
-//
-//     if (adjustRtcHardware == true)
-//     {
-//       RTC_CR |= rtcDstAdjustBit;
-//
-//       if (_externalRtcConnected == true)
-//       {
-//         DS3234::setDateTime(_currentDateTime.addSeconds(rtcAdjustment));
-//       }
-//
-//       DisplayManager::doubleBlink();
-//     }
-//
-//     rtc_lock();
-//     rtc_wait_for_synchro();
-//     pwr_enable_backup_domain_write_protect();
-//   }
-// }
-
-
-void setFlickerReduction(const uint16_t value)
-{
-  _blankingThreshold = value;
-}
-
-
-void setTemperatureCalibration(TempSensorType type, int16_t offsetCx10)
-{
+void setTemperatureCalibration(TempSensorType type, int16_t offsetCx10) {
   switch (type) {
     case TempSensorType::STM32ADC:
       _temperatureAdjustmentADCCx10 = offsetCx10;
@@ -1806,90 +1565,64 @@ void setTemperatureCalibration(TempSensorType type, int16_t offsetCx10)
   }
 }
 
-
-void setTemperature(const int32_t temperatureCx10)
-{
+void setTemperature(const int32_t temperatureCx10) {
   _temperatureCx10Cached[TempSensorType::ExternalSerial] = temperatureCx10;
   _externalTemperatureSensor = TempSensorType::ExternalSerial;
   _temperatureUpdated = true;
 }
 
-
-void setVolume(const uint8_t volumeLevel)
-{
-  if (volumeLevel > cToneVolumeMaximum)
-  {
+void setVolume(const uint8_t volumeLevel) {
+  if (volumeLevel > cToneVolumeMaximum) {
     _toneVolume = 0;
-  }
-  else
-  {
+  } else {
     _toneVolume = cToneVolumeMaximum - volumeLevel;
   }
 }
 
-
-uint32_t getCRC(uint32_t *inputData, uint32_t numElements)
-{
+uint32_t getCRC(uint32_t *inputData, uint32_t numElements) {
   crc_reset();
 
   return crc_calculate_block(inputData, numElements);
 }
 
+PeripheralRefreshTrigger getPeripheralRefreshTrigger() { return _peripheralRefreshTrigger; }
 
-PeripheralRefreshTrigger getPeripheralRefreshTrigger()
-{
-  return _peripheralRefreshTrigger;
-}
+bool getPpsInputState() { return gpio_get(Hardware::cPpsPort, Hardware::cPpsPin) != 0; }
 
+RtcStartResult getRTCStartupResult() { return _rtcStartupResult; }
 
-bool getPpsInputState()
-{
-  return gpio_get(Hardware::cPpsPort, Hardware::cPpsPin) != 0;
-}
-
-
-RtcStartResult getRTCStartupResult()
-{
-  return _rtcStartupResult;
-}
-
-
-RtcType getRTCType()
-{
-  if (_externalRtcConnected == true)
-  {
+RtcType getRTCType() {
+  if (_externalRtcConnected == true) {
     return RtcType::DS323x;
   }
   return RtcType::Stm32;
 }
 
+TempSensorType getTempSensorType() { return _externalTemperatureSensor; }
 
-TempSensorType getTempSensorType()
-{
-  return _externalTemperatureSensor;
-}
-
-
-bool setTempSensorType(TempSensorType type)
-{
+bool setTempSensorType(TempSensorType type) {
   switch (type) {
     case TempSensorType::STM32ADC:
       break;
     case TempSensorType::ExternalSerial:
-      if (_temperatureCx10Cached[TempSensorType::ExternalSerial] == cTempSentinel)
+      if (_temperatureCx10Cached[TempSensorType::ExternalSerial] == cTempSentinel) {
         return false;
+      }
       break;
     case TempSensorType::DS3234:
-      if (!DS3234::isConnected())
+      if (!DS3234::isConnected()) {
         return false;
+      }
       break;
     case TempSensorType::DS1722:
-      if (!DS1722::isConnected())
+      if (!DS1722::isConnected()) {
         return false;
+      }
       break;
     case TempSensorType::LM74:
-      if (!LM74::isConnected())
+      if (!LM74::isConnected()) {
         return false;
+      }
       break;
     default:
       return false;
@@ -1898,9 +1631,7 @@ bool setTempSensorType(TempSensorType type)
   return true;
 }
 
-
-bool isTempSensorDetected(TempSensorType type)
-{
+bool isTempSensorDetected(TempSensorType type) {
   switch (type) {
     case TempSensorType::STM32ADC:
       return true;
@@ -1917,164 +1648,129 @@ bool isTempSensorDetected(TempSensorType type)
   }
 }
 
+uint32_t eraseFlash(uint32_t startAddress) {
+  uint32_t pageAddress = startAddress, flashStatus = 0;
 
-uint32_t eraseFlash(uint32_t startAddress)
-{
-	uint32_t pageAddress = startAddress,
-	         flashStatus = 0;
-
-	// check if startAddress is in proper range
-	if ((startAddress - FLASH_BASE) >= (cFlashPageSize * (cFlashPageNumberMaximum + 1)))
-  {
+  // check if startAddress is in proper range
+  if ((startAddress - FLASH_BASE) >= (cFlashPageSize * (cFlashPageNumberMaximum + 1))) {
     return 0xff;
   }
 
-	// calculate current page address
-  if ((startAddress % cFlashPageSize) != 0)
-  {
+  // calculate current page address
+  if ((startAddress % cFlashPageSize) != 0) {
     pageAddress -= (startAddress % cFlashPageSize);
   }
 
-	flash_unlock();
+  flash_unlock();
 
-	// Erase page(s)
-	flash_erase_page(pageAddress);
-	flashStatus = flash_get_status_flags();
-	if (flashStatus == FLASH_SR_EOP)
-  {
+  // Erase page(s)
+  flash_erase_page(pageAddress);
+  flashStatus = flash_get_status_flags();
+  if (flashStatus == FLASH_SR_EOP) {
     flashStatus = 0;
   }
 
   flash_lock();
 
-	return flashStatus;
+  return flashStatus;
 }
 
+void readFlash(uint32_t startAddress, uint16_t numElements, uint8_t *outputData) {
+  uint16_t i;
+  uint32_t *memoryPtr = (uint32_t *) startAddress;
 
-void readFlash(uint32_t startAddress, uint16_t numElements, uint8_t *outputData)
-{
-	uint16_t i;
-	uint32_t *memoryPtr = (uint32_t*)startAddress;
-
-	for (i = 0; i < numElements / 4; i++)
-	{
-		*(uint32_t*)outputData = *(memoryPtr + i);
-		outputData += 4;
-	}
+  for (i = 0; i < numElements / 4; i++) {
+    *(uint32_t *) outputData = *(memoryPtr + i);
+    outputData += 4;
+  }
 }
 
-
-uint32_t writeFlash(uint32_t startAddress, uint8_t *inputData, uint16_t numElements)
-{
-	uint16_t i;
+uint32_t writeFlash(uint32_t startAddress, uint8_t *inputData, uint16_t numElements) {
+  uint16_t i;
   const uint32_t erasedValue = 0xffffffff;
-	uint32_t currentAddress = startAddress,
-	         pageAddress = startAddress,
-	         flashStatus = 0,
-           returnStatus = 0;
+  uint32_t currentAddress = startAddress, pageAddress = startAddress, flashStatus = 0, returnStatus = 0;
 
-	// check if startAddress is in proper range
-	if ((startAddress - FLASH_BASE) >= (cFlashPageSize * (cFlashPageNumberMaximum + 1)))
-  {
+  // check if startAddress is in proper range
+  if ((startAddress - FLASH_BASE) >= (cFlashPageSize * (cFlashPageNumberMaximum + 1))) {
     return 0xff;
   }
 
-	// calculate current page address
-	if ((startAddress % cFlashPageSize) != 0)
-  {
+  // calculate current page address
+  if ((startAddress % cFlashPageSize) != 0) {
     pageAddress -= (startAddress % cFlashPageSize);
   }
 
-	flash_unlock();
+  flash_unlock();
 
-	// Erasing page
-	flash_erase_page(pageAddress);
-	flashStatus = flash_get_status_flags();
-	if (flashStatus != FLASH_SR_EOP)
-  {
+  // Erasing page
+  flash_erase_page(pageAddress);
+  flashStatus = flash_get_status_flags();
+  if (flashStatus != FLASH_SR_EOP) {
     returnStatus = flashStatus;
-  }
-  else
-  {
+  } else {
     // verify flash memory was completely erased
-  	for (i = 0; i < numElements; i += 4)
-  	{
+    for (i = 0; i < numElements; i += 4) {
       // verify if address was erased properly
-  		if (*((uint32_t*)(currentAddress + i)) != erasedValue)
-      {
+      if (*((uint32_t *) (currentAddress + i)) != erasedValue) {
         returnStatus = 0x40;
         break;
       }
     }
 
-    if (returnStatus == 0)
-    {
+    if (returnStatus == 0) {
       // programming flash memory
-    	for (i = 0; i < numElements; i += 4)
-    	{
-    		// programming word data
-    		flash_program_word(currentAddress + i, *((uint32_t*)(inputData + i)));
-    		flashStatus = flash_get_status_flags();
-    		if (flashStatus != FLASH_SR_EOP)
-        {
+      for (i = 0; i < numElements; i += 4) {
+        // programming word data
+        flash_program_word(currentAddress + i, *((uint32_t *) (inputData + i)));
+        flashStatus = flash_get_status_flags();
+        if (flashStatus != FLASH_SR_EOP) {
           returnStatus = 0x80 | flashStatus;
           break;
         }
 
-    		// verify if correct data is programmed
-    		if (*((uint32_t*)(currentAddress + i)) != *((uint32_t*)(inputData + i)))
-        {
+        // verify if correct data is programmed
+        if (*((uint32_t *) (currentAddress + i)) != *((uint32_t *) (inputData + i))) {
           returnStatus = 0x80 | FLASH_SR_PGERR;
           break;
         }
-    	}
+      }
     }
   }
 
   flash_lock();
 
-	return returnStatus;
+  return returnStatus;
 }
 
-
-HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx, size_t numberRx)
-{
+HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx, size_t numberRx) {
   // this could be arranged a little better but this way prevents the DMA
   //  complete interrupt from being called before the receive data is populated
-  if (_i2cState != I2cState::I2cIdle)
-  {
-    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount)
-    {
+  if (_i2cState != I2cState::I2cIdle) {
+    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount) {
       _i2cRecover();
     }
     // Let the caller know it was busy if so
     return HwReqAck::HwReqAckBusy;
   }
 
-  if (numberTx > 0)
-  {
+  if (numberTx > 0) {
     _i2cAddr = addr;
     _i2cBufferRx = bufferRx;
     _i2cNumberRx = numberRx;
 
     return i2cTransmit(addr, bufferTx, numberTx, (numberRx == 0));
   }
-  if (numberRx > 0)
-  {
+  if (numberRx > 0) {
     return i2cReceive(addr, bufferRx, numberRx, true);
   }
-  return HwReqAck::HwReqAckError;   // catchall
+  return HwReqAck::HwReqAckError;  // catchall
 }
-
 
 // Transfers the given buffers to/from the given peripheral through the SPI via DMA
 //
-HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx, const bool autoEndXfer)
-{
-  if (_i2cState != I2cState::I2cIdle)
-  {
-    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount)
-    {
+HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx, const bool autoEndXfer) {
+  if (_i2cState != I2cState::I2cIdle) {
+    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount) {
       _i2cRecover();
     }
     // Let the caller know it was busy if so
@@ -2083,8 +1779,7 @@ HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx
 
   _i2cBusyFailCount = 0;
 
-  if (numberRx > 0)
-  {
+  if (numberRx > 0) {
     _i2cState = I2cState::I2cBusy;
     i2c_set_7bit_address(I2C1, addr);
     i2c_set_read_transfer_dir(I2C1);
@@ -2094,8 +1789,8 @@ HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx
     dma_channel_reset(DMA1, cI2c1RxDmaChannel);
 
     // Set up rx dma, note it has higher priority to avoid overrun
-    dma_set_peripheral_address(DMA1, cI2c1RxDmaChannel, (uint32_t)&I2C1_RXDR);
-    dma_set_memory_address(DMA1, cI2c1RxDmaChannel, (uint32_t)bufferRx);
+    dma_set_peripheral_address(DMA1, cI2c1RxDmaChannel, (uint32_t) &I2C1_RXDR);
+    dma_set_memory_address(DMA1, cI2c1RxDmaChannel, (uint32_t) bufferRx);
     dma_set_number_of_data(DMA1, cI2c1RxDmaChannel, numberRx);
     dma_set_read_from_peripheral(DMA1, cI2c1RxDmaChannel);
     dma_enable_memory_increment_mode(DMA1, cI2c1RxDmaChannel);
@@ -2104,42 +1799,35 @@ HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx
     dma_set_priority(DMA1, cI2c1RxDmaChannel, DMA_CCR_PL_VERY_HIGH);
 
     // Enable dma transfer complete interrupt
-  	dma_enable_transfer_complete_interrupt(DMA1, cI2c1RxDmaChannel);
+    dma_enable_transfer_complete_interrupt(DMA1, cI2c1RxDmaChannel);
 
-  	// Activate dma channel
-  	dma_enable_channel(DMA1, cI2c1RxDmaChannel);
+    // Activate dma channel
+    dma_enable_channel(DMA1, cI2c1RxDmaChannel);
 
     i2c_send_start(I2C1);
 
-    if (autoEndXfer == true)
-    {
+    if (autoEndXfer == true) {
       /* important to do it afterwards to do a proper repeated start! */
       i2c_enable_autoend(I2C1);
-    }
-    else
-    {
+    } else {
       i2c_disable_autoend(I2C1);
     }
 
-  	/* Enable the I2C transfer via DMA
-  	 * This will immediately start the transmission, after which when the receive
+    /* Enable the I2C transfer via DMA
+     * This will immediately start the transmission, after which when the receive
      * is complete, the receive DMA will activate
-  	 */
-  	i2c_enable_rxdma(I2C1);
+     */
+    i2c_enable_rxdma(I2C1);
   }
 
   return HwReqAck::HwReqAckOk;
 }
 
-
 // Transfers the given buffers to/from the given peripheral through the SPI via DMA
 //
-HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx, const bool autoEndXfer)
-{
-  if (_i2cState != I2cState::I2cIdle)
-  {
-    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount)
-    {
+HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx, const bool autoEndXfer) {
+  if (_i2cState != I2cState::I2cIdle) {
+    if (_i2cBusyFailCount++ > cI2cMaxFailBusyCount) {
       _i2cRecover();
     }
     // Let the caller know it was busy if so
@@ -2148,8 +1836,7 @@ HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t n
 
   _i2cBusyFailCount = 0;
 
-  if (numberTx > 0)
-  {
+  if (numberTx > 0) {
     _i2cState = I2cState::I2cBusy;
     /* Setting transfer properties */
     i2c_set_7bit_address(I2C1, addr);
@@ -2160,8 +1847,8 @@ HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t n
     dma_channel_reset(DMA1, cI2c1TxDmaChannel);
 
     // Set up tx dma
-    dma_set_peripheral_address(DMA1, cI2c1TxDmaChannel, (uint32_t)&I2C1_TXDR);
-    dma_set_memory_address(DMA1, cI2c1TxDmaChannel, (uint32_t)bufferTx);
+    dma_set_peripheral_address(DMA1, cI2c1TxDmaChannel, (uint32_t) &I2C1_TXDR);
+    dma_set_memory_address(DMA1, cI2c1TxDmaChannel, (uint32_t) bufferTx);
     dma_set_number_of_data(DMA1, cI2c1TxDmaChannel, numberTx);
     dma_set_read_from_memory(DMA1, cI2c1TxDmaChannel);
     dma_enable_memory_increment_mode(DMA1, cI2c1TxDmaChannel);
@@ -2170,122 +1857,83 @@ HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t n
     dma_set_priority(DMA1, cI2c1TxDmaChannel, DMA_CCR_PL_HIGH);
 
     // Enable dma transfer complete interrupt
-  	dma_enable_transfer_complete_interrupt(DMA1, cI2c1TxDmaChannel);
+    dma_enable_transfer_complete_interrupt(DMA1, cI2c1TxDmaChannel);
 
-  	// Activate dma channel
-  	dma_enable_channel(DMA1, cI2c1TxDmaChannel);
+    // Activate dma channel
+    dma_enable_channel(DMA1, cI2c1TxDmaChannel);
 
-    if (autoEndXfer == true)
-    {
+    if (autoEndXfer == true) {
       i2c_enable_autoend(I2C1);
-    }
-    else
-    {
+    } else {
       i2c_disable_autoend(I2C1);
     }
 
     /* start transfer */
     i2c_send_start(I2C1);
 
-  	/* Enable the I2C transfer via DMA
-  	 * This will immediately start the transmission, after which when the receive
+    /* Enable the I2C transfer via DMA
+     * This will immediately start the transmission, after which when the receive
      * is complete, the receive DMA will activate
-  	 */
-  	i2c_enable_txdma(I2C1);
+     */
+    i2c_enable_txdma(I2C1);
   }
 
   return HwReqAck::HwReqAckOk;
 }
 
+void i2cAbort() { _i2cRecover(); }
 
-void i2cAbort()
-{
-  _i2cRecover();
-}
+bool i2cIsBusy() { return (_i2cState != I2cState::I2cIdle); }
 
+SpiMaster *getSpiMaster() { return &_spi1Master; }
 
-bool i2cIsBusy()
-{
-  return (_i2cState != I2cState::I2cIdle);
-}
-
-
-SpiMaster* getSpiMaster()
-{
-  return &_spi1Master;
-}
-
-
-Usart* getUsart(const uint8_t usart)
-{
-  if (usart < cNumberOfUsarts)
-  {
+Usart *getUsart(const uint8_t usart) {
+  if (usart < cNumberOfUsarts) {
     return &_usart[usart];
   }
   return nullptr;
 }
 
-
-void setBlueLed(const uint32_t intensity)
-{
-  if (intensity <= RgbLed::cLedMaxIntensity)
-  {
+void setBlueLed(const uint32_t intensity) {
+  if (intensity <= RgbLed::cLedMaxIntensity) {
     timer_set_oc_value(cLedPwmTimer, cLed2PwmOc, intensity);
-  }
-  else
-  {
+  } else {
     timer_set_oc_value(cLedPwmTimer, cLed2PwmOc, RgbLed::cLedMaxIntensity);
   }
 }
 
-
-void setGreenLed(const uint32_t intensity)
-{
-  if (intensity <= RgbLed::cLedMaxIntensity)
-  {
+void setGreenLed(const uint32_t intensity) {
+  if (intensity <= RgbLed::cLedMaxIntensity) {
     timer_set_oc_value(cLedPwmTimer, cLed1PwmOc, intensity);
-  }
-  else
-  {
+  } else {
     timer_set_oc_value(cLedPwmTimer, cLed1PwmOc, RgbLed::cLedMaxIntensity);
   }
 }
 
-
-void setRedLed(const uint32_t intensity)
-{
-  if (intensity <= RgbLed::cLedMaxIntensity)
-  {
+void setRedLed(const uint32_t intensity) {
+  if (intensity <= RgbLed::cLedMaxIntensity) {
     timer_set_oc_value(cLedPwmTimer, cLed0PwmOc, intensity);
-  }
-  else
-  {
+  } else {
     timer_set_oc_value(cLedPwmTimer, cLed0PwmOc, RgbLed::cLedMaxIntensity);
   }
 }
 
-
-void setStatusLed(const RgbLed &led)
-{
+void setStatusLed(const RgbLed &led) {
   setBlueLed(led.getBlue());
   setGreenLed(led.getGreen());
   setRedLed(led.getRed());
 }
 
-
-void delay(const uint32_t length)
-{
+void delay(const uint32_t length) {
   _delayCounter = 0;
-  while (_delayCounter < length) {}
+  while (_delayCounter < length) {
+  }
 }
 
-
-uint32_t bcdToUint32(uint32_t bcdValue)
-{
+uint32_t bcdToUint32(uint32_t bcdValue) {
   uint32_t multiplier = 1, result = 0;
 
-  while (bcdValue != 0)
-  {
+  while (bcdValue != 0) {
     result += multiplier * (bcdValue & 0xf);
     multiplier *= 10;
     bcdValue = bcdValue >> 4;
@@ -2293,38 +1941,27 @@ uint32_t bcdToUint32(uint32_t bcdValue)
   return result;
 }
 
+uint32_t uint32ToBcd(uint32_t uint32Value) {
+  uint32_t result = 0;
+  uint8_t shift = 0;
 
-uint32_t uint32ToBcd(uint32_t uint32Value)
-{
-    uint32_t result = 0;
-    uint8_t shift = 0;
+  if (uint32Value > 99999999) {
+    uint32Value = 0;
+  }
 
-    if (uint32Value > 99999999)
-    {
-      uint32Value = 0;
-    }
-
-    while (uint32Value != 0)
-    {
-        result +=  (uint32Value % 10) << shift;
-        uint32Value = uint32Value / 10;
-        shift += 4;
-    }
-    return result;
+  while (uint32Value != 0) {
+    result += (uint32Value % 10) << shift;
+    uint32Value = uint32Value / 10;
+    shift += 4;
+  }
+  return result;
 }
 
+void dmaCh1Isr() {}
 
-void dmaCh1Isr()
-{
-
-}
-
-
-void dmaCh2to3Isr()
-{
+void dmaCh2to3Isr() {
   // Handle each SPI DMA channel individually as its transfer completes
-  if (DMA1_ISR & DMA_ISR_TCIF2)
-  {
+  if (DMA1_ISR & DMA_ISR_TCIF2) {
     DMA1_IFCR |= DMA_IFCR_CTCIF2;
 
     dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL2);
@@ -2334,8 +1971,7 @@ void dmaCh2to3Isr()
     dma_disable_channel(DMA1, DMA_CHANNEL2);
   }
 
-  if (DMA1_ISR & DMA_ISR_TCIF3)
-  {
+  if (DMA1_ISR & DMA_ISR_TCIF3) {
     DMA1_IFCR |= DMA_IFCR_CTCIF3;
 
     dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL3);
@@ -2350,100 +1986,84 @@ void dmaCh2to3Isr()
   // ISR invocations. Without this guard, dmaComplete() would run when
   // only one channel has finished, potentially processing the transfer
   // prematurely and corrupting a subsequent chained transfer.
-  if (!(DMA_CCR(DMA1, DMA_CHANNEL2) & DMA_CCR_EN) &&
-      !(DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN))
-  {
+  if (!(DMA_CCR(DMA1, DMA_CHANNEL2) & DMA_CCR_EN) && !(DMA_CCR(DMA1, DMA_CHANNEL3) & DMA_CCR_EN)) {
     _spi1Master.dmaComplete();
   }
 }
 
-
-void dmaCh4to7Isr()
-{
-  if (DMA1_ISR & DMA_ISR_TCIF4)
-	{
-		DMA1_IFCR |= DMA_IFCR_CTCIF4;
+void dmaCh4to7Isr() {
+  if (DMA1_ISR & DMA_ISR_TCIF4) {
+    DMA1_IFCR |= DMA_IFCR_CTCIF4;
 
     dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL4);
 
     // Use compile-time dispatch based on DMA channel assignment
-    if constexpr (cUsart1TxDmaChannel == DMA_CHANNEL4)
+    if constexpr (cUsart1TxDmaChannel == DMA_CHANNEL4) {
       usart_disable_tx_dma(USART1);
-    else if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL4)
+    } else if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL4) {
       usart_disable_tx_dma(USART2);
+    }
 
-		dma_disable_channel(DMA1, DMA_CHANNEL4);
-	}
+    dma_disable_channel(DMA1, DMA_CHANNEL4);
+  }
 
-  if (DMA1_ISR & DMA_ISR_TCIF5)
-	{
-		DMA1_IFCR |= DMA_IFCR_CTCIF5;
+  if (DMA1_ISR & DMA_ISR_TCIF5) {
+    DMA1_IFCR |= DMA_IFCR_CTCIF5;
 
-		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL5);
+    dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL5);
 
     // Use compile-time dispatch based on DMA channel assignment
-    if constexpr (cUsart1RxDmaChannel == DMA_CHANNEL5)
+    if constexpr (cUsart1RxDmaChannel == DMA_CHANNEL5) {
       usart_disable_rx_dma(USART1);
-    else if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL5)
-    {
+    } else if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL5) {
       usart_disable_rx_dma(USART2);
       Dmx512Rx::rxCompleteIsr();
     }
 
-		dma_disable_channel(DMA1, DMA_CHANNEL5);
-	}
+    dma_disable_channel(DMA1, DMA_CHANNEL5);
+  }
 
-  if (DMA1_ISR & DMA_ISR_TCIF6)
-	{
-		DMA1_IFCR |= DMA_IFCR_CTCIF6;
+  if (DMA1_ISR & DMA_ISR_TCIF6) {
+    DMA1_IFCR |= DMA_IFCR_CTCIF6;
 
-		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL6);
+    dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL6);
 
     // Use compile-time dispatch based on DMA channel assignment
-    if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL6)
-    {
+    if constexpr (cUsart2RxDmaChannel == DMA_CHANNEL6) {
       usart_disable_rx_dma(USART2);
       Dmx512Rx::rxCompleteIsr();
-    }
-    else if constexpr (cI2c1TxDmaChannel == DMA_CHANNEL6)
-    {
+    } else if constexpr (cI2c1TxDmaChannel == DMA_CHANNEL6) {
       i2c_disable_txdma(I2C1);
       _i2cState = I2cState::I2cIdle;
-      if (_i2cNumberRx > 0)
-      {
+      if (_i2cNumberRx > 0) {
         i2cReceive(_i2cAddr, _i2cBufferRx, _i2cNumberRx, true);
       }
     }
 
-		dma_disable_channel(DMA1, DMA_CHANNEL6);
-	}
+    dma_disable_channel(DMA1, DMA_CHANNEL6);
+  }
 
-  if (DMA1_ISR & DMA_ISR_TCIF7)
-	{
-		DMA1_IFCR |= DMA_IFCR_CTCIF7;
+  if (DMA1_ISR & DMA_ISR_TCIF7) {
+    DMA1_IFCR |= DMA_IFCR_CTCIF7;
 
-		dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL7);
+    dma_disable_transfer_complete_interrupt(DMA1, DMA_CHANNEL7);
 
     // Use compile-time dispatch based on DMA channel assignment
-    if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL7)
+    if constexpr (cUsart2TxDmaChannel == DMA_CHANNEL7) {
       usart_disable_tx_dma(USART2);
-    else if constexpr (cI2c1RxDmaChannel == DMA_CHANNEL7)
-    {
+    } else if constexpr (cI2c1RxDmaChannel == DMA_CHANNEL7) {
       i2c_disable_rxdma(I2C1);
       _i2cState = I2cState::I2cIdle;
       _i2cBufferRx = nullptr;
       _i2cNumberRx = 0;
     }
 
-		dma_disable_channel(DMA1, DMA_CHANNEL7);
-	}
+    dma_disable_channel(DMA1, DMA_CHANNEL7);
+  }
 }
 
-
-void exti415Isr()
-{
-  if (exti_get_flag_status(EXTI13) != false)
-  {
+void exti415Isr() {
+  if (exti_get_flag_status(EXTI13) != false) {
     // Delay RTC read to allow external RTC to update its registers after PPS edge
     // This prevents reading stale values when PPS fires
     _ppsDelayCounter = cPpsRtcReadDelay;
@@ -2455,53 +2075,43 @@ void exti415Isr()
     exti_reset_request(EXTI13);
   }
 
-  if (exti_get_flag_status(EXTI15) != false)
-  {
+  if (exti_get_flag_status(EXTI15) != false) {
     InfraredRemote::tick();
 
     exti_reset_request(EXTI15);
   }
-
 }
 
-
-void systickIsr()
-{
+void systickIsr() {
   _delayCounter++;  // used by delay()
 
   // Handle PPS delay countdown - when it reaches 1, trigger the RTC refresh
-  if (_ppsDelayCounter > 0)
-  {
+  if (_ppsDelayCounter > 0) {
     _ppsDelayCounter--;
-    if (_ppsDelayCounter == 0)
-    {
+    if (_ppsDelayCounter == 0) {
       _refreshRTCNow = true;
       _refreshTempNow = true;
     }
   }
   // we'll do this if PPS isn't working
-  else if (_peripheralRefreshTrigger == PeripheralRefreshTrigger::SysTick)
-  {
+  else if (_peripheralRefreshTrigger == PeripheralRefreshTrigger::SysTick) {
     _refreshRTCNow = true;
     _refreshTempNow = true;
 
     _incrementOnTimeSecondsCounter();
   }
-  if (_refreshRTCNow || _rtcReadPending || _refreshTempNow || _tempReadPending)
-  {
+  if (_refreshRTCNow || _rtcReadPending || _refreshTempNow || _tempReadPending) {
     _refreshPeripherals();
   }
 
   // Light sensor sampling (500ms interval = 2 Hz)
-  if (_adcSampleTimerLight++ >= cAdcSampleIntervalLight)
-  {
+  if (_adcSampleTimerLight++ >= cAdcSampleIntervalLight) {
     _adcSampleTimerLight = 0;
 
-    // IIR filter with upscaling for precision: filtered = filtered - (filtered >> shift) + (sample << (upscale - shift))
-    // The upscaling maintains precision in integer math (avoids losing LSBs)
-    _adcFilteredLight = _adcFilteredLight
-                        - (_adcFilteredLight >> cAdcLightFilterShift)
-                        + (((uint32_t)_bufferADC[cAdcPhototransistor] << cAdcFilterUpscale) >> cAdcLightFilterShift);
+    // IIR filter with upscaling for precision: filtered = filtered - (filtered >> shift) + (sample << (upscale -
+    // shift)) The upscaling maintains precision in integer math (avoids losing LSBs)
+    _adcFilteredLight = _adcFilteredLight - (_adcFilteredLight >> cAdcLightFilterShift) +
+                        (((uint32_t) _bufferADC[cAdcPhototransistor] << cAdcFilterUpscale) >> cAdcLightFilterShift);
 
     // Update cached light level (downscale back to actual ADC range)
     _cachedLightLevel = _adcFilteredLight >> cAdcFilterUpscale;
@@ -2510,121 +2120,92 @@ void systickIsr()
   }
 
   // Temperature and voltage sampling (2000ms interval = 0.5 Hz - they change very slowly)
-  if (_adcSampleTimerSlow++ >= cAdcSampleIntervalSlow)
-  {
+  if (_adcSampleTimerSlow++ >= cAdcSampleIntervalSlow) {
     _adcSampleTimerSlow = 0;
 
     // IIR filter for temperature (with upscaling)
-    _adcFilteredTemp = _adcFilteredTemp
-                       - (_adcFilteredTemp >> cAdcTempVoltageFilterShift)
-                       + (((uint32_t)_bufferADC[cAdcTemperature] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+    _adcFilteredTemp = _adcFilteredTemp - (_adcFilteredTemp >> cAdcTempVoltageFilterShift) +
+                       (((uint32_t) _bufferADC[cAdcTemperature] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
 
     // IIR filter for VddA voltage (with upscaling)
-    _adcFilteredVoltageVddA = _adcFilteredVoltageVddA
-                              - (_adcFilteredVoltageVddA >> cAdcTempVoltageFilterShift)
-                              + (((uint32_t)_bufferADC[cAdcVref] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+    _adcFilteredVoltageVddA = _adcFilteredVoltageVddA - (_adcFilteredVoltageVddA >> cAdcTempVoltageFilterShift) +
+                              (((uint32_t) _bufferADC[cAdcVref] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
 
     // IIR filter for battery voltage (with upscaling)
-    _adcFilteredVoltageBatt = _adcFilteredVoltageBatt
-                              - (_adcFilteredVoltageBatt >> cAdcTempVoltageFilterShift)
-                              + (((uint32_t)_bufferADC[cAdcVbat] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
+    _adcFilteredVoltageBatt = _adcFilteredVoltageBatt - (_adcFilteredVoltageBatt >> cAdcTempVoltageFilterShift) +
+                              (((uint32_t) _bufferADC[cAdcVbat] << cAdcFilterUpscale) >> cAdcTempVoltageFilterShift);
 
     _adcValuesUpdated = true;
   }
 
   // update the tone timer and turn off the tone if the timer has expired
-  if (_toneTimer > 0)
-  {
-    if (--_toneTimer == 0)
-    {
-      if (_toneTimerNext > 0)
-      {
+  if (_toneTimer > 0) {
+    if (--_toneTimer == 0) {
+      if (_toneTimerNext > 0) {
         tone(_toneFrequencyNext, _toneTimerNext);
         _toneFrequencyNext = 0;
         _toneTimerNext = 0;
-      }
-      else
-      {
+      } else {
         timer_set_oc_value(cBuzzerTimer, cBuzzerTimerOC, 0);
       }
     }
   }
 
-  if (++_batteryMeasuringCounter >= cBatteryMeasuringTimeout)
-  {
+  if (++_batteryMeasuringCounter >= cBatteryMeasuringTimeout) {
     _batteryMeasuringCounter = 0;
     adc_disable_vbat_sensor();
   }
 }
 
-
-void tim2Isr()
-{
-	TIM2_SR &= ~TIM_SR_UIF;   // Always clear flag; we shouldn't be here if the flag isn't set
+void tim2Isr() {
+  TIM2_SR &= ~TIM_SR_UIF;  // Always clear flag; we shouldn't be here if the flag isn't set
 }
 
-
-void tim7Isr()
-{
-	TIM7_SR &= ~TIM_SR_UIF;   // Always clear flag; we shouldn't be here if the flag isn't set
+void tim7Isr() {
+  TIM7_SR &= ~TIM_SR_UIF;  // Always clear flag; we shouldn't be here if the flag isn't set
 }
 
+void tim15Isr() {}
 
-void tim15Isr()
-{
+void tim16Isr() {}
 
-}
-
-
-void tim16Isr()
-{
-
-}
-
-
-void tscIsr()
-{
+void tscIsr() {
   // process acquisition, advance to next channels, and trigger another acquisition
-  if (TSC_ISR & TSC_ISR_EOAF)
-  {
+  if (TSC_ISR & TSC_ISR_EOAF) {
     // Read hardware counter values from both groups
     uint16_t rawValue[2];
     rawValue[1] = TSC_IOGxCR(6);  // Group 6
     rawValue[0] = TSC_IOGxCR(3);  // Group 3
 
     // Process both channels acquired in this cycle (one from each group)
-    for (uint8_t groupIdx = 0; groupIdx < 2; groupIdx++)
-    {
+    for (uint8_t groupIdx = 0; groupIdx < 2; groupIdx++) {
       uint8_t channelIdx = _tscChannelCounter + (groupIdx * cTscChannelsPerGroup);
 
-      if (channelIdx >= cTscChannelCount)
+      if (channelIdx >= cTscChannelCount) {
         continue;
+      }
 
       uint16_t raw = rawValue[groupIdx];
 
       // Step 1: IIR Low-Pass Filter (exponentially weighted moving average)
       // filtered = filtered - (filtered >> shift) + (raw >> shift)
       // This implements: filtered = (filtered * (N-1) + raw) / N where N = 2^shift
-      _tscFiltered[channelIdx] = _tscFiltered[channelIdx]
-                                  - (_tscFiltered[channelIdx] >> cTscFilterShift)
-                                  + (raw >> cTscFilterShift);
+      _tscFiltered[channelIdx] =
+          _tscFiltered[channelIdx] - (_tscFiltered[channelIdx] >> cTscFilterShift) + (raw >> cTscFilterShift);
 
       // Step 2: Calculate delta from baseline
       // Touch causes capacitance increase which decreases the counter value
       // So: delta = baseline - filtered (positive delta = touch detected)
-      int16_t delta = (int16_t)_tscBaseline[channelIdx] - (int16_t)_tscFiltered[channelIdx];
+      int16_t delta = (int16_t) _tscBaseline[channelIdx] - (int16_t) _tscFiltered[channelIdx];
 
       // Step 3: Touch detection with hysteresis
       bool isTouched = (_tscTouchState & (1 << channelIdx)) != 0;
 
-      if (!isTouched && delta > cTscTouchThreshold)
-      {
+      if (!isTouched && delta > cTscTouchThreshold) {
         // Touch detected - set the touch state bit
         _tscTouchState |= (1 << channelIdx);
         _buttonStates |= (1 << channelIdx);
-      }
-      else if (isTouched && delta < cTscReleaseThreshold)
-      {
+      } else if (isTouched && delta < cTscReleaseThreshold) {
         // Touch released - clear the touch state bit
         _tscTouchState &= ~(1 << channelIdx);
         _buttonStates &= ~(1 << channelIdx);
@@ -2633,17 +2214,13 @@ void tscIsr()
       // Step 4: Adaptive baseline tracking (only update when not touched)
       // This allows the baseline to track environmental changes (temperature, humidity)
       // but prevents it from tracking sustained touches
-      if (!isTouched)
-      {
+      if (!isTouched) {
         // Asymmetric tracking: slow rise, faster fall
-        if (_tscFiltered[channelIdx] > _tscBaseline[channelIdx])
-        {
+        if (_tscFiltered[channelIdx] > _tscBaseline[channelIdx]) {
           // Baseline rises slowly (tracks long-term drift upward)
           uint16_t rise = (_tscFiltered[channelIdx] - _tscBaseline[channelIdx]) >> cTscBaselineShift;
           _tscBaseline[channelIdx] += rise;
-        }
-        else
-        {
+        } else {
           // Baseline falls faster (quick recovery after finger lift)
           uint16_t fall = (_tscBaseline[channelIdx] - _tscFiltered[channelIdx]) >> (cTscBaselineShift - 2);
           _tscBaseline[channelIdx] -= fall;
@@ -2652,8 +2229,7 @@ void tscIsr()
     }
 
     // Advance to next channel pair
-    if (++_tscChannelCounter >= cTscChannelsPerGroup)
-    {
+    if (++_tscChannelCounter >= cTscChannelsPerGroup) {
       _tscChannelCounter = 0;
     }
 
@@ -2668,54 +2244,39 @@ void tscIsr()
   }
 
   // Deal with max count error if it happened
-  if (TSC_ISR & TSC_ISR_MCEF)
-  {
+  if (TSC_ISR & TSC_ISR_MCEF) {
     TSC_ICR = TSC_ICR_MCEIC;
   }
 }
 
-
-void usart1Isr()
-{
+void usart1Isr() {
   // brute-force approace to USART errors here... :/
-  if (_usart[0].hasErrors() || _usart[0].rxReady()
-      || (USART_ISR(_usart[0].peripheral()) & USART_ISR_ABRE))
-  {
+  if (_usart[0].hasErrors() || _usart[0].rxReady() || (USART_ISR(_usart[0].peripheral()) & USART_ISR_ABRE)) {
     _usart[0].clearErrors();
     // Clear the RXNE and ABRE flags -- they may be set with the flags above
     USART_RQR(_usart[0].peripheral()) = USART_RQR_ABKRQ | USART_RQR_RXFRQ;
   }
 }
 
-
-void usart2Isr()
-{
-  if (_usart[1].hasErrors() || _usart[1].rxReady())
-  {
+void usart2Isr() {
+  if (_usart[1].hasErrors() || _usart[1].rxReady()) {
     _usart[1].clearErrors();
   }
 }
 
-
-void usart3_4Isr()
-{
+void usart3_4Isr() {
   // Clear error flags on USART3 (serial remote RX)
   // Also flush RXNE if still set (safety net: SerialRemote::rxIsr normally
   // reads the byte, but if it hasn't been initialized yet, RXNE would remain
   // asserted and the ISR would loop indefinitely via Cortex-M0 tail-chaining)
-  if (_usart[2].hasErrors() || _usart[2].rxReady())
-  {
+  if (_usart[2].hasErrors() || _usart[2].rxReady()) {
     _usart[2].clearErrors();
     USART_RQR(_usart[2].peripheral()) = USART_RQR_RXFRQ;
   }
   // Clear error flags on USART4 (serial remote TX)
-  if (_usart[3].hasErrors())
-  {
+  if (_usart[3].hasErrors()) {
     _usart[3].clearErrors();
   }
 }
 
-
-}
-
-}
+}  // namespace kbxTubeClock::Hardware

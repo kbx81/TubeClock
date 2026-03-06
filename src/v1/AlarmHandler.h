@@ -18,48 +18,42 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Keys.h"
 #include "Settings.h"
 
+namespace kbxTubeClock::AlarmHandler {
 
-namespace kbxTubeClock {
+/// @brief Initialize the alarms
+///
+void initialize();
 
-namespace AlarmHandler {
+/// @brief Handles key presses (during an active alarm)
+/// @param key pressed
+///
+void keyHandler(Keys::Key key);
 
+/// @brief Called from the main application loop
+///
+void loop();
 
-  /// @brief Initialize the alarms
-  ///
-  void initialize();
+/// @brief Indicates whether or or not an alarm is active now
+/// @return true if one or more alarm(s) is/are active
+///
+bool isAlarmActive();
 
-  /// @brief Handles key presses (during an active alarm)
-  /// @param key pressed
-  ///
-  void keyHandler(Keys::Key key);
+/// @brief Clears any active alarms
+///
+void clearAlarm();
 
-  /// @brief Called from the main application loop
-  ///
-  void loop();
+/// @brief Activates the latching alarm
+///
+void activateTimerCounterAlarm();
 
-  /// @brief Indicates whether or or not an alarm is active now
-  /// @return true if one or more alarm(s) is/are active
-  ///
-  bool isAlarmActive();
+/// @brief Manually triggers the hourly chime.
+/// @param hour Hour to encode (0-23). Pass 255 to use the current displayed hour.
+///
+void playChime(uint8_t hour);
 
-  /// @brief Clears any active alarms
-  ///
-  void clearAlarm();
-
-  /// @brief Activates the latching alarm
-  ///
-  void activateTimerCounterAlarm();
-
-  /// @brief Manually triggers the hourly chime.
-  /// @param hour Hour to encode (0-23). Pass 255 to use the current displayed hour.
-  ///
-  void playChime(uint8_t hour);
-}
-
-}
+}  // namespace kbxTubeClock::AlarmHandler

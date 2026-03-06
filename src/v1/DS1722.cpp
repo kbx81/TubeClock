@@ -25,16 +25,12 @@
 #include "SpiMaster.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
-
-namespace kbxTubeClock {
-
-namespace DS1722 {
-
+namespace kbxTubeClock::DS1722 {
 
 // The number of registers in the chip plus one (for the address byte we send)
 //
@@ -42,7 +38,7 @@ static const uint8_t cNumberOfRegisters = 3 + 1;
 
 // Registers of interest
 //
-static const uint8_t cConfigurationRegister  = 0x00;
+static const uint8_t cConfigurationRegister = 0x00;
 static const uint8_t cTemperatureLSBRegister = 0x01;
 static const uint8_t cTemperatureMSBRegister = 0x02;
 
@@ -63,7 +59,7 @@ static uint8_t _spiWorkingBufferOut[cNumberOfRegisters];
 
 // A full copy of DS1722 registers, refreshed by calling refresh() function
 // ...dirty black magic, but it works...
-static uint8_t* _ds1722RegisterIn = _spiWorkingBufferIn + 1;
+static uint8_t *_ds1722RegisterIn = _spiWorkingBufferIn + 1;
 // static uint8_t* _ds1722RegisterOut = _spiWorkingBufferOut + 1;
 
 // Pointer to SpiMaster, initialized by initialize()
@@ -82,23 +78,21 @@ static int16_t _temperatureOffset = 0;
 //
 static bool _connected = false;
 
-
-void initialize()
-{
+void initialize() {
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
-    .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
-    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
-    .gpioPin        = Hardware::cNssTemperaturePin,     // gpio pin on which CS line lives
-    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .strobeCs       = false,                            // CS line is strobed upon xfer completion if true
-    .polarity       = true,                             // CS/CE polarity (true = active high)
-    .cpol           = true,                             // Clock polarity (idle high)
-    .cpha           = true,                             // Clock phase (transition 2)
-    .lsbFirst       = false,                            // MSB first
+      .gpioPort = Hardware::cNssPort,           // gpio port on which CS line lives
+      .misoPort = Hardware::cSpi1Port,          // port on which slave inputs data
+      .br = SPI_CR1_BAUDRATE_FPCLK_DIV_16,      // Baudrate
+      .dataSize = SPI_CR2_DS_8BIT,              // Data size (4 to 16 bits, see RM)
+      .memorySize = DMA_CCR_MSIZE_8BIT,         // Memory word width (8, 16, 32 bit)
+      .peripheralSize = DMA_CCR_PSIZE_8BIT,     // Peripheral word width (8, 16, 32 bit)
+      .gpioPin = Hardware::cNssTemperaturePin,  // gpio pin on which CS line lives
+      .misoPin = Hardware::cSpi1MisoPin,        // pin on which slave inputs data
+      .strobeCs = false,                        // CS line is strobed upon xfer completion if true
+      .polarity = true,                         // CS/CE polarity (true = active high)
+      .cpol = true,                             // Clock polarity (idle high)
+      .cpha = true,                             // Clock phase (transition 2)
+      .lsbFirst = false,                        // MSB first
   };
 
   _spiMaster = Hardware::getSpiMaster();
@@ -106,13 +100,10 @@ void initialize()
   _slaveId = _spiMaster->registerSlave(&mySlave);
 }
 
+bool checkConnection() {
+  SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-bool checkConnection()
-{
-  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
-
-  if (request != nullptr)
-  {
+  if (request != nullptr) {
     // Start writing at the Configuration register
     _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister | cWriteBit;
     // Set the config register to the value we want to use
@@ -123,7 +114,8 @@ bool checkConnection()
     request->length = 2;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while (_spiMaster->transferComplete(_slaveId) == false);
+    while (_spiMaster->transferComplete(_slaveId) == false)
+      ;
 
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
@@ -131,13 +123,14 @@ bool checkConnection()
     request->length = cNumberOfRegisters;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
     // We must wait for the transfer to complete before we touch any buffers again
-    while (_spiMaster->transferComplete(_slaveId) == false);
+    while (_spiMaster->transferComplete(_slaveId) == false)
+      ;
 
     // If we read back the byte we wrote, the IC is very likely connected
-    if (_ds1722RegisterIn[cConfigurationRegister] == cConfigByte)
-    {
+    if (_ds1722RegisterIn[cConfigurationRegister] == cConfigByte) {
       // Kick off a full register refresh
-      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
+      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk)
+        ;
 
       _connected = true;
       return true;
@@ -146,22 +139,14 @@ bool checkConnection()
   return false;
 }
 
+bool isConnected() { return _connected; }
 
-bool isConnected()
-{
-  return _connected;
-}
-
-
-uint16_t getTemperatureRegister()
-{
+uint16_t getTemperatureRegister() {
   return (_ds1722RegisterIn[cTemperatureMSBRegister] << 8) | _ds1722RegisterIn[cTemperatureLSBRegister];
 }
 
-
-int32_t getTemperatureCx10()
-{
-  int16_t temp_whole = (int8_t)_ds1722RegisterIn[cTemperatureMSBRegister];
+int32_t getTemperatureCx10() {
+  int16_t temp_whole = (int8_t) _ds1722RegisterIn[cTemperatureMSBRegister];
   uint16_t temp_frac = _ds1722RegisterIn[cTemperatureLSBRegister] >> 4;
   // (whole * 1000 + (frac >> 1) * 125) / 100 = (whole * 8 + (frac >> 1)) * 5 / 4
   // Replaces expensive / 100 (software divide) with / 4 (shift)
@@ -169,38 +154,25 @@ int32_t getTemperatureCx10()
   return v / 4 + _temperatureOffset;
 }
 
+void setTemperatureOffset(int16_t offset) { _temperatureOffset = offset; }
 
-void setTemperatureOffset(int16_t offset)
-{
-  _temperatureOffset = offset;
-}
+SpiMaster::SpiReqAck refresh(const bool block) {
+  SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-
-SpiMaster::SpiReqAck refresh(const bool block)
-{
-  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
-
-  if (request != nullptr)
-  {
+  if (request != nullptr) {
     // This is the address we want to start reading from
     _spiWorkingBufferOut[cAddressByte] = cConfigurationRegister;
     // Try to read the byte (and other registers) back
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true)) {
+    }
 
     return SpiMaster::SpiReqAck::SpiReqAckOk;
   }
   return SpiMaster::SpiReqAck::SpiReqAckError;
 }
 
+bool transferComplete() { return _spiMaster->transferComplete(_slaveId); }
 
-bool transferComplete()
-{
-  return _spiMaster->transferComplete(_slaveId);
-}
-
-
-}
-
-}
+}  // namespace kbxTubeClock::DS1722

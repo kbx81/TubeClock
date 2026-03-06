@@ -34,36 +34,31 @@
 #include "InfraredRemote.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
+namespace kbxTubeClock::InfraredRemote {
 
-namespace kbxTubeClock {
-
-namespace InfraredRemote
-{
-
-  /// @brief Infrared remote state machine states
-  ///
-  enum IrRxState : uint8_t {
-    IrRxLeadPulse   = 0,
-    IrRxSpace       = 1,
-    IrRxRepeatSpace = 2,
-    IrRxBitHead     = 3,
-    IrRxBitHigh     = 4,
-    IrRxBitLow      = 5,
-    IrRxEndSpace    = 6,
-    IrRxNextBit     = 7,  // does not correspond to the arrays below!
-    IrRxIdle        = 8   // does not correspond to the arrays below!
-  };
-
+/// @brief Infrared remote state machine states
+///
+enum IrRxState : uint8_t {
+  IrRxLeadPulse = 0,
+  IrRxSpace = 1,
+  IrRxRepeatSpace = 2,
+  IrRxBitHead = 3,
+  IrRxBitHigh = 4,
+  IrRxBitLow = 5,
+  IrRxEndSpace = 6,
+  IrRxNextBit = 7,  // does not correspond to the arrays below!
+  IrRxIdle = 8      // does not correspond to the arrays below!
+};
 
 // infrared pulse timings (in microseconds)
 //
-static const uint16_t cIrPulseTimeUpper[] = { 10800, 5400, 2700, 675, 2025, 675, 675 };
-static const uint16_t cIrPulseTimeLower[] = {  7200, 3600, 1800, 450, 1350, 450, 450 };
+static const uint16_t cIrPulseTimeUpper[] = {10800, 5400, 2700, 675, 2025, 675, 675};
+static const uint16_t cIrPulseTimeLower[] = {7200, 3600, 1800, 450, 1350, 450, 450};
 
 // value at which the repeat countdown starts
 //
@@ -96,15 +91,14 @@ static const uint8_t cRepeatCountdownStart = 12;
 // TODO: allow runtime user-defined values and initialize from flash/preferences
 //
 static IrKeyCode _keyCodeTable[IrKey::Count] = {
-  { 0xBF00, 0xF609 },  // A (remote: Enter/Save)
-  { 0xBF00, 0xF50A },  // B (remote: Right)
-  { 0xBF00, 0xF708 },  // C (remote: Left)
-  { 0xBF00, 0xF906 },  // E (remote: Stop/Mode)
-  { 0xBF00, 0xF20D },  // D (remote: Down)
-  { 0xBF00, 0xFA05 },  // U (remote: Up)
-  { 0xBF00, 0xFE01 },  // Power (remote: Play/Pause)
+    {0xBF00, 0xF609},  // A (remote: Enter/Save)
+    {0xBF00, 0xF50A},  // B (remote: Right)
+    {0xBF00, 0xF708},  // C (remote: Left)
+    {0xBF00, 0xF906},  // E (remote: Stop/Mode)
+    {0xBF00, 0xF20D},  // D (remote: Down)
+    {0xBF00, 0xFA05},  // U (remote: Up)
+    {0xBF00, 0xFE01},  // Power (remote: Play/Pause)
 };
-
 
 // the bit we're currently receiving
 //
@@ -134,93 +128,65 @@ volatile static uint8_t _repeatStopCountdown = 0;
 //
 volatile static IrRxState _rxState = IrRxState::IrRxIdle;
 
-
 /// @brief Rolls a bit into the accumulator
 /// @return True if receive is complete (32 bits)
 ///
-bool _rxBit(const uint8_t bit)
-{
-  _incomingPacket |= ((uint32_t)bit << _incomingBit);
+bool _rxBit(const uint8_t bit) {
+  _incomingPacket |= ((uint32_t) bit << _incomingBit);
   return (++_incomingBit >= 32);
 }
 
-
 /// @brief Sets the receiver state machine to idle/default
 ///
-void _setRxIdle()
-{
+void _setRxIdle() {
   _rxState = IrRxIdle;
   _incomingBit = 0;
   _incomingPacket = 0;
 }
 
-
 /// @brief Stores the received packet as 16-bit address and command words
 ///
-void _storeRx()
-{
-  _lastRxAddress = (uint16_t)_incomingPacket;
-  _lastRxCommand = (uint16_t)(_incomingPacket >> 16);
+void _storeRx() {
+  _lastRxAddress = (uint16_t) _incomingPacket;
+  _lastRxCommand = (uint16_t) (_incomingPacket >> 16);
 }
 
+void initialize() { _setRxIdle(); }
 
-void initialize()
-{
-  _setRxIdle();
-}
+bool hasKeyPress() { return _keypressAvailable; }
 
-
-bool hasKeyPress()
-{
-  return _keypressAvailable;
-}
-
-
-IrKey getKeyPress()
-{
+IrKey getKeyPress() {
   uint16_t addr = _lastRxAddress;
   uint16_t cmd = _lastRxCommand;
 
-  for (uint8_t i = 0; i < IrKey::Count; ++i)
-  {
-    if (_keyCodeTable[i].address == addr && _keyCodeTable[i].command == cmd)
-    {
+  for (uint8_t i = 0; i < IrKey::Count; ++i) {
+    if (_keyCodeTable[i].address == addr && _keyCodeTable[i].command == cmd) {
       return static_cast<IrKey>(i);
     }
   }
   return IrKey::None;
 }
 
+bool keyIsHeld() { return (_repeatStopCountdown > 0); }
 
-bool keyIsHeld()
-{
-  return (_repeatStopCountdown > 0);
-}
-
-
-void tick()
-{
+void tick() {
   auto timerValue = timer_get_counter(Hardware::cIrTimer);
   bool pinState = (gpio_get(Hardware::cIrPort, Hardware::cIrPin) != 0);
 
   // reset the counter to begin measuring the now-in-progress pulse
   timer_set_counter(Hardware::cIrTimer, 1);
 
-  switch (_rxState)
-  {
+  switch (_rxState) {
     // after we've received the lead pulse, we should see either a space or a repeat-space
     case IrRxLeadPulse:
-      if ((timerValue > cIrPulseTimeLower[IrRxSpace]) && (timerValue < cIrPulseTimeUpper[IrRxSpace]) && (pinState == false))
-      {
-        _rxState = IrRxSpace;         // advance to the next state
-      }
-      else if ((timerValue > cIrPulseTimeLower[IrRxRepeatSpace]) && (timerValue < cIrPulseTimeUpper[IrRxRepeatSpace]) && (pinState == false))
-      {
-        _rxState = IrRxRepeatSpace;   // advance to the next state
-      }
-      else
-      {
-        _setRxIdle();                 // nothing matched so reset the state machine
+      if ((timerValue > cIrPulseTimeLower[IrRxSpace]) && (timerValue < cIrPulseTimeUpper[IrRxSpace]) &&
+          (pinState == false)) {
+        _rxState = IrRxSpace;  // advance to the next state
+      } else if ((timerValue > cIrPulseTimeLower[IrRxRepeatSpace]) &&
+                 (timerValue < cIrPulseTimeUpper[IrRxRepeatSpace]) && (pinState == false)) {
+        _rxState = IrRxRepeatSpace;  // advance to the next state
+      } else {
+        _setRxIdle();  // nothing matched so reset the state machine
       }
       break;
     // we got the space. now it's time to start receiving bits! we expect a pulse of the IrRxBitHead length
@@ -228,94 +194,73 @@ void tick()
       _repeatStopCountdown = cRepeatCountdownStart;
       [[fallthrough]];
     case IrRxNextBit:
-      if ((timerValue > cIrPulseTimeLower[IrRxBitHead]) && (timerValue < cIrPulseTimeUpper[IrRxBitHead]) && (pinState == true))
-      {
-        _rxState = IrRxBitHead;       // advance to the next state
-      }
-      else
-      {
-        _setRxIdle();                 // nothing matched so reset the state machine
+      if ((timerValue > cIrPulseTimeLower[IrRxBitHead]) && (timerValue < cIrPulseTimeUpper[IrRxBitHead]) &&
+          (pinState == true)) {
+        _rxState = IrRxBitHead;  // advance to the next state
+      } else {
+        _setRxIdle();  // nothing matched so reset the state machine
       }
       break;
     // we just expect a pulse of the IrRxBitHead length to confirm the repeat signal
     case IrRxRepeatSpace:
-      if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) && (pinState == true))
-      {
+      if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) &&
+          (pinState == true)) {
         _repeatStopCountdown = cRepeatCountdownStart;
 
         // _keypressAvailable = true;    // can cause unexpected key presses :(
 
-        _setRxIdle();                 // nothing matched so reset the state machine
+        _setRxIdle();  // nothing matched so reset the state machine
       }
       break;
     // if we got the correct bit-leading pulse, determine the space length to decode the bit value
     case IrRxBitHead:
-      if (pinState == false)
-      {
+      if (pinState == false) {
         uint8_t bit;
-        if ((timerValue > cIrPulseTimeLower[IrRxBitHigh]) && (timerValue < cIrPulseTimeUpper[IrRxBitHigh]))
-        {
+        if ((timerValue > cIrPulseTimeLower[IrRxBitHigh]) && (timerValue < cIrPulseTimeUpper[IrRxBitHigh])) {
           bit = 1;
-        }
-        else if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]))
-        {
+        } else if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow])) {
           bit = 0;
-        }
-        else
-        {
+        } else {
           _setRxIdle();
           break;
         }
         _rxState = _rxBit(bit) ? IrRxEndSpace : IrRxNextBit;
-      }
-      else
-      {
+      } else {
         _setRxIdle();
       }
       break;
 
     case IrRxEndSpace:
-      if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) && (pinState == true))
-      {
+      if ((timerValue > cIrPulseTimeLower[IrRxBitLow]) && (timerValue < cIrPulseTimeUpper[IrRxBitLow]) &&
+          (pinState == true)) {
         _storeRx();
         _keypressAvailable = true;
-        _setRxIdle();                 // we are done! reset the state machine
+        _setRxIdle();  // we are done! reset the state machine
       }
       break;
     // state was idle or undefined. we start from scratch here.
     default:
-      if ((timerValue > cIrPulseTimeLower[IrRxLeadPulse]) && (timerValue < cIrPulseTimeUpper[IrRxLeadPulse]) && (pinState == true))
-      {
-        _rxState = IrRxLeadPulse;   // advance to the next state
-      }
-      else
-      {
+      if ((timerValue > cIrPulseTimeLower[IrRxLeadPulse]) && (timerValue < cIrPulseTimeUpper[IrRxLeadPulse]) &&
+          (pinState == true)) {
+        _rxState = IrRxLeadPulse;  // advance to the next state
+      } else {
         timer_enable_counter(Hardware::cIrTimer);
       }
   }
 }
 
-
-void overflow()
-{
-  if (_repeatStopCountdown == 0)
-  {
+void overflow() {
+  if (_repeatStopCountdown == 0) {
     timer_disable_counter(Hardware::cIrTimer);
 
     _keypressAvailable = false;
-  }
-  else
-  {
+  } else {
     _repeatStopCountdown--;
   }
 
-  if (_rxState != IrRxIdle)
-  {
+  if (_rxState != IrRxIdle) {
     _setRxIdle();
   }
 }
 
-
-}
-
-}
+}  // namespace kbxTubeClock::InfraredRemote

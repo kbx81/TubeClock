@@ -21,11 +21,9 @@
 #include "Keys.h"
 #include "Settings.h"
 
-
 /// @brief View operating modes
 ///
-enum ViewMode : uint8_t
-{
+enum ViewMode : uint8_t {
   ViewMode0,
   ViewMode1,
   ViewMode2,
@@ -38,27 +36,24 @@ enum ViewMode : uint8_t
   ViewMode9
 };
 
-
 // This is the abstract base class for all views in this application
 //
 class View {
+ public:
+  /// The method which is called before this view is displayed
+  /// @param relatedSetting The setting index this view is responsible for editing
+  ///
+  virtual void enter(uint8_t relatedSetting);
 
-  public:
-    /// The method which is called before this view is displayed
-    /// @param relatedSetting The setting index this view is responsible for editing
-    ///
-    virtual void enter(uint8_t relatedSetting);
+  /// Called before loop for any pressed key
+  ///
+  virtual bool keyHandler(kbxTubeClock::Keys::Key key);
 
-    /// Called before loop for any pressed key
-    ///
-    virtual bool keyHandler(kbxTubeClock::Keys::Key key);
+  /// The loop which is called periodically while the view is active
+  ///
+  virtual void loop();
 
-    /// The loop which is called periodically while the view is active
-    ///
-    virtual void loop();
-
-    /// Destructor
-    ///
-    virtual ~View();
-
+  /// Destructor
+  ///
+  virtual ~View();
 };

@@ -1,0 +1,38 @@
+[
+  {
+    "file": "BuildInfo.cpp",
+    "arguments": [
+      "arm-none-eabi-g++",
+      "-Os",
+      "-std=c++17",
+      "-g",
+      "-mthumb",
+      "-mcpu=cortex-m0",
+      "-msoft-float",
+      "-Wextra",
+      "-Wshadow",
+      "-Wredundant-decls",
+      "-Weffc++",
+      "-fno-common",
+      "-ffunction-sections",
+      "-fdata-sections",
+      "-fno-exceptions",
+      "-fno-rtti",
+      "-MD",
+      "-Wall",
+      "-Wundef",
+      "-DHARDWARE_VERSION=1",
+      "-DSETTINGS_PROFILE=3",
+      "-DSTM32F0",
+      "-I../../../../libopencm3/include",
+      "-MF",
+      "../../build/v1/BuildInfo.d",
+      "-o",
+      "../../build/v1/BuildInfo.o",
+      "-c",
+      "BuildInfo.cpp"
+    ],
+    "directory": "/Users/kburzinski/Development/Embedded/ARM/libopencm3/projects/TubeClock/src/v1",
+    "output": "../../build/v1/BuildInfo.o"
+  }
+]

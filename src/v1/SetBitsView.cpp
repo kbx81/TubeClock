@@ -22,20 +22,12 @@
 #include "Settings.h"
 #include "SetBitsView.h"
 
-
 namespace kbxTubeClock {
 
 SetBitsView::SetBitsView()
-  : _setBits(0),
-    _bitsMask(0),
-    _selectedBit(0),
-    _relatedSetting(Settings::Setting::SystemOptions)
-{
-}
+    : _setBits(0), _bitsMask(0), _selectedBit(0), _relatedSetting(Settings::Setting::SystemOptions) {}
 
-
-void SetBitsView::enter(uint8_t relatedSetting)
-{
+void SetBitsView::enter(uint8_t relatedSetting) {
   _relatedSetting = relatedSetting;
 
   _setBits = Application::getSettingsPtr()->getRawSetting(_relatedSetting);
@@ -44,74 +36,56 @@ void SetBitsView::enter(uint8_t relatedSetting)
   _selectedBit = 0;
 }
 
-
-bool SetBitsView::keyHandler(Keys::Key key)
-{
+bool SetBitsView::keyHandler(Keys::Key key) {
   bool tick = true;
 
-  if (key == Keys::Key::A)
-  {
+  if (key == Keys::Key::A) {
     Application::getSettingsPtr()->setRawSetting(_relatedSetting, _setBits);
     Application::notifySettingChanged(_relatedSetting);
 
     DisplayManager::blink();
   }
 
-  if (key == Keys::Key::B)
-  {
-    if ((_setBits & (1 << _selectedBit)) != 0)
-    {
+  if (key == Keys::Key::B) {
+    if ((_setBits & (1 << _selectedBit)) != 0) {
       _setBits &= ~(1 << _selectedBit);
-    }
-    else
-    {
+    } else {
       tick = false;
     }
   }
 
-  if (key == Keys::Key::C)
-  {
-    if ((_setBits & (1 << _selectedBit)) == 0)
-    {
+  if (key == Keys::Key::C) {
+    if ((_setBits & (1 << _selectedBit)) == 0) {
       _setBits |= (1 << _selectedBit);
-    }
-    else
-    {
+    } else {
       tick = false;
     }
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (--_selectedBit > 15)
-    {
+  if (key == Keys::Key::D) {
+    if (--_selectedBit > 15) {
       _selectedBit = 0;
 
       tick = false;
     }
   }
 
-  if (key == Keys::Key::U)
-  {
-    if (++_selectedBit > __builtin_ctz(~_bitsMask) - 1)
-    {
+  if (key == Keys::Key::U) {
+    if (++_selectedBit > __builtin_ctz(~_bitsMask) - 1) {
       _selectedBit = __builtin_ctz(~_bitsMask) - 1;
 
       tick = false;
     }
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void SetBitsView::loop()
-{
+void SetBitsView::loop() {
   // create a new display object with the right colors and bitmask
   Display tcDisp(0, _selectedBit, (_setBits >> _selectedBit) & 1);
   tcDisp.setTubesOff(0b110010);
@@ -119,5 +93,4 @@ void SetBitsView::loop()
   DisplayManager::writeDisplay(tcDisp);
 }
 
-
-}
+}  // namespace kbxTubeClock

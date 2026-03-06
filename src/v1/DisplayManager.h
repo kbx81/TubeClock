@@ -18,101 +18,92 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Display.h"
 #include "RgbLed.h"
 
-
-namespace kbxTubeClock {
-
 /// @brief kbx Binary Clock DisplayManager
 ///
+namespace kbxTubeClock::DisplayManager {
 
-namespace DisplayManager
-{
-  /// @brief Initialize DisplayManager
-  ///
-  void initialize();
+/// @brief Initialize DisplayManager
+///
+void initialize();
 
-  /// @brief Refreshes intensities of tubes that are changing intensity levels due to (an) active crossfade(s)
-  /// @note This function is now a no-op. Refresh is integrated into tick() for better performance.
-  ///
-  void refresh();
+/// @brief Refreshes intensities of tubes that are changing intensity levels due to (an) active crossfade(s)
+/// @note This function is now a no-op. Refresh is integrated into tick() for better performance.
+///
+void refresh();
 
-  /// @brief Triggers a refresh of tubes intensities next time refresh() is called
-  ///
-  void tick();
+/// @brief Triggers a refresh of tubes intensities next time refresh() is called
+///
+void tick();
 
-  /// @brief Triggers a refresh of the tube PWM states and refreshes the drivers
-  ///
-  void tickPWM();
+/// @brief Triggers a refresh of the tube PWM states and refreshes the drivers
+///
+void tickPWM();
 
-  /// @brief Enables/Disables control of the status LED by refresh() (above)
-  /// @param autoRefreshEnabled New state for status LED auto-refreshing
-  ///
-  void setStatusLedAutoRefreshing(const bool autoRefreshEnabled);
+/// @brief Enables/Disables control of the status LED by refresh() (above)
+/// @param autoRefreshEnabled New state for status LED auto-refreshing
+///
+void setStatusLedAutoRefreshing(const bool autoRefreshEnabled);
 
-  /// @brief Returns the current "master" intensity of the display
-  /// @return Current master intensity (0-255)
-  ///
-  uint8_t getMasterIntensity();
+/// @brief Returns the current "master" intensity of the display
+/// @return Current master intensity (0-255)
+///
+uint8_t getMasterIntensity();
 
-  /// @brief Sets the "master" intensity of the display (0-255)
-  /// @param intensity New master intensity for display. Display is updated at next tick()
-  void setMasterIntensity(const uint8_t intensity);
+/// @brief Sets the "master" intensity of the display (0-255)
+/// @param intensity New master intensity for display. Display is updated at next tick()
+void setMasterIntensity(const uint8_t intensity);
 
-  /// @brief Get the state of display blanking
-  /// @return true if display is blank/off
-  ///
-  bool getDisplayBlanking();
+/// @brief Get the state of display blanking
+/// @return true if display is blank/off
+///
+bool getDisplayBlanking();
 
-  /// @brief Returns true if a blink() animation is currently in progress
-  ///
-  bool isBlinkActive();
+/// @brief Returns true if a blink() animation is currently in progress
+///
+bool isBlinkActive();
 
-  /// @brief Blank the display
-  /// @param blank Display is blank (off) if true
-  ///
-  void setDisplayBlanking(const bool blank);
+/// @brief Blank the display
+/// @param blank Display is blank (off) if true
+///
+void setDisplayBlanking(const bool blank);
 
-  /// @brief Gets the interval used for refreshing the tube driver registers
-  /// @return interval at which refresh occurs; based on systick
-  ///
-  uint8_t getDisplayRefreshInterval();
+/// @brief Gets the interval used for refreshing the tube driver registers
+/// @return interval at which refresh occurs; based on systick
+///
+uint8_t getDisplayRefreshInterval();
 
-  /// @brief Set the interval for refreshing the tube driver registers
-  /// @param interval Interval at which refresh occurs; based on systick
-  ///
-  void setDisplayRefreshInterval(const uint8_t interval);
+/// @brief Set the interval for refreshing the tube driver registers
+/// @param interval Interval at which refresh occurs; based on systick
+///
+void setDisplayRefreshInterval(const uint8_t interval);
 
-  /// @brief Blinks the display count times as a non-blocking animation.
-  ///  The animation is driven by tick() and completes asynchronously (~100ms per blink).
-  /// @param count Number of blinks (default 2)
-  ///
-  void blink(uint8_t count = 2);
+/// @brief Blinks the display count times as a non-blocking animation.
+///  The animation is driven by tick() and completes asynchronously (~100ms per blink).
+/// @param count Number of blinks (default 2)
+///
+void blink(uint8_t count = 2);
 
-  /// @brief Writes the passed display into the display buffer. Tubes will fade
-  ///  to the intensities in the new display at the specified rates.
-  /// @param display Display to be written
-  /// @param statusLed Status LED state
-  ///
-  void writeDisplay(const Display &display);
-  void writeDisplay(const Display &display, const RgbLed &statusLed);
+/// @brief Writes the passed display into the display buffer. Tubes will fade
+///  to the intensities in the new display at the specified rates.
+/// @param display Display to be written
+/// @param statusLed Status LED state
+///
+void writeDisplay(const Display &display);
+void writeDisplay(const Display &display, const RgbLed &statusLed);
 
-  /// @brief Sets the status LED's state
-  /// @param statusLed New status LED state
-  ///
-  void writeStatusLed(const RgbLed &statusLed);
+/// @brief Sets the status LED's state
+/// @param statusLed New status LED state
+///
+void writeStatusLed(const RgbLed &statusLed);
 
-  /// @brief Returns the current status LED state as stored in the DisplayManager
-  /// @return Current RgbLed value
-  ///
-  RgbLed getStatusLed();
+/// @brief Returns the current status LED state as stored in the DisplayManager
+/// @return Current RgbLed value
+///
+RgbLed getStatusLed();
 
-
-}
-
-
-}
+}  // namespace kbxTubeClock::DisplayManager

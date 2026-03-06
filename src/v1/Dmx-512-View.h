@@ -18,27 +18,24 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class Dmx512View : public View {
-
-// The view which displays either the date, time, temperature, or a rotation
-//
-public: // Implement the Dmx512View class
+  // The view which displays either the date, time, temperature, or a rotation
+  //
+ public:  // Implement the Dmx512View class
   Dmx512View();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // Channel multiplier - used to increase range of intensities and strobe rates
   //
   static const uint8_t cChannelMultiplier = 4;
@@ -49,8 +46,8 @@ private:
 
   // views for each DMX-512 mode
   //
-  void _dmxExtendedModeView(Dmx512Packet* packet, uint16_t address);
-  void _dmxStandardModeView(Dmx512Packet* packet, uint16_t address);
+  void _dmxExtendedModeView(Dmx512Packet *packet, uint16_t address);
+  void _dmxStandardModeView(Dmx512Packet *packet, uint16_t address);
 };
 
-}
+}  // namespace kbxTubeClock

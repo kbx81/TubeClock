@@ -18,7 +18,6 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
@@ -27,28 +26,25 @@
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class TimeDateTempView : public View {
+  enum FixedDisplayItem : uint8_t {
+    Time = ViewMode::ViewMode0,
+    TimeSeconds = ViewMode::ViewMode1,
+    Date = ViewMode::ViewMode2,
+    Temperature = ViewMode::ViewMode3
+  };
 
-enum FixedDisplayItem : uint8_t
-{
-  Time = ViewMode::ViewMode0,
-  TimeSeconds = ViewMode::ViewMode1,
-  Date = ViewMode::ViewMode2,
-  Temperature = ViewMode::ViewMode3
-};
-
-// The view which displays either the date, time, temperature, or a rotation
-//
-public: // Implement the TimeDateTempView class
+  // The view which displays either the date, time, temperature, or a rotation
+  //
+ public:  // Implement the TimeDateTempView class
   TimeDateTempView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // returns the appropriate dateTimeDisplaySelection for setDisplayFromDateTime
   //
   Display::dateTimeDisplaySelection _getDisplaySelection(const FixedDisplayItem item);
@@ -69,7 +65,7 @@ private:
   //
   uint16_t _getDotsBitmap();
 
-private:
+ private:
   // amount by which we increment/decrement the intensity when manually adjusting
   //
   static const uint8_t cIntensityAdjustmentIncrement;
@@ -84,7 +80,7 @@ private:
 
   // current status LED color (used for AM/PM indication, when enabled)
   //
-  RgbLed   _statusLed;
+  RgbLed _statusLed;
 
   // seconds elapsed since the last display animation
   //
@@ -107,4 +103,4 @@ private:
   bool _refreshStatusLed = false;
 };
 
-}
+}  // namespace kbxTubeClock

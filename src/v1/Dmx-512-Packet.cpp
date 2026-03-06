@@ -19,48 +19,23 @@
 
 #include "Dmx-512-Packet.h"
 
-
 namespace kbxTubeClock {
 
+Dmx512Packet::Dmx512Packet() : _bufferState(DmxBufferState::DmxBufferInvalid) {}
 
-Dmx512Packet::Dmx512Packet()
-: _bufferState(DmxBufferState::DmxBufferInvalid)
-{
-}
-
-
-uint8_t Dmx512Packet::channel(const uint16_t channel) const
-{
-  if (channel < 512)
-  {
+uint8_t Dmx512Packet::channel(const uint16_t channel) const {
+  if (channel < 512) {
     return _dmxPacket[channel + 1];
   }
   return _dmxPacket[1];
 }
 
+uint8_t Dmx512Packet::startCode() const { return _dmxPacket[0]; }
 
-uint8_t Dmx512Packet::startCode() const
-{
-  return _dmxPacket[0];
-}
+uint8_t *Dmx512Packet::getBufferPtr() { return _dmxPacket; }
 
+Dmx512Packet::DmxBufferState Dmx512Packet::getBufferState() const { return _bufferState; }
 
-uint8_t* Dmx512Packet::getBufferPtr()
-{
-  return _dmxPacket;
-}
+void Dmx512Packet::setBufferState(DmxBufferState newState) { _bufferState = newState; }
 
-
-Dmx512Packet::DmxBufferState Dmx512Packet::getBufferState() const
-{
-  return _bufferState;
-}
-
-
-void Dmx512Packet::setBufferState(DmxBufferState newState)
-{
-  _bufferState = newState;
-}
-
-
-}
+}  // namespace kbxTubeClock

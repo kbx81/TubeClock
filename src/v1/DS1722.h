@@ -22,11 +22,7 @@
 #include "Hardware.h"
 #include "SpiMaster.h"
 
-
-namespace kbxTubeClock {
-
-namespace DS1722 {
-
+namespace kbxTubeClock::DS1722 {
 
 /// @brief Initialize the DS1722 module
 ///
@@ -61,6 +57,4 @@ SpiMaster::SpiReqAck refresh(const bool block = false);
 ///
 bool transferComplete();
 
-}
-
-}
+}  // namespace kbxTubeClock::DS1722

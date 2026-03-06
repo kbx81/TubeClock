@@ -20,12 +20,9 @@
 #include "DateTime.h"
 #include "Hardware.h"
 
-
 namespace kbxTubeClock {
 
-
 namespace {
-
 
 // The number of days per month.
 static const uint8_t cDaysPerMonth[] = {0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -41,8 +38,7 @@ static const uint16_t cSecondsPerMinute = 60;
 
 // Calculate the day of the week
 // Using the formula from: http://www.tondering.dk/claus/cal/chrweek.php
-static uint8_t calculateDayOfWeek(int16_t year, int16_t month, int16_t day)
-{
+static uint8_t calculateDayOfWeek(int16_t year, int16_t month, int16_t day) {
   const int16_t a = ((14 - month) / 12);
   const int16_t y = year - a;
   const int16_t m = month + (12 * a) - 2;
@@ -50,262 +46,154 @@ static uint8_t calculateDayOfWeek(int16_t year, int16_t month, int16_t day)
   return d;
 }
 
+static inline bool isLeapYear(uint16_t year) { return ((year & 3) == 0 && year % 100 != 0) || (year % 400 == 0); }
 
-static inline bool isLeapYear(uint16_t year)
-{
-  return ((year & 3) == 0 && year % 100 != 0) || (year % 400 == 0);
-}
-
-
-static inline uint8_t getMaxDayPerMonth(uint16_t year, uint8_t month)
-{
-  if (month == 2 && isLeapYear(year))
-  {
+static inline uint8_t getMaxDayPerMonth(uint16_t year, uint8_t month) {
+  if (month == 2 && isLeapYear(year)) {
     return 29;
   }
   return cDaysPerMonth[month];
 }
 
+}  // namespace
 
-}
-
-
-DateTime::DateTime()
-  : _year(2000), _month(1), _day(1), _hour(0), _minute(0), _second(0), _dayOfWeek(6)
-{
-}
-
+DateTime::DateTime() : _year(2000), _month(1), _day(1), _hour(0), _minute(0), _second(0), _dayOfWeek(6) {}
 
 DateTime::DateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second)
-  : _year(year), _month(month), _day(day), _hour(hour), _minute(minute), _second(second), _dayOfWeek(0)
-{
+    : _year(year), _month(month), _day(day), _hour(hour), _minute(minute), _second(second), _dayOfWeek(0) {
   setDate(year, month, day);
   setTime(hour, minute, second);
 }
 
+DateTime::DateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second,
+                   uint8_t dayOfWeek)
+    : _year(year), _month(month), _day(day), _hour(hour), _minute(minute), _second(second), _dayOfWeek(dayOfWeek) {}
 
-DateTime::DateTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, uint8_t dayOfWeek)
-  : _year(year), _month(month), _day(day), _hour(hour), _minute(minute), _second(second), _dayOfWeek(dayOfWeek)
-{
+bool DateTime::operator==(const DateTime &other) const {
+  return _second == other._second && _minute == other._minute && _hour == other._hour && _day == other._day &&
+         _month == other._month && _year == other._year;
 }
 
+bool DateTime::operator!=(const DateTime &other) const { return !operator==(other); }
 
-bool DateTime::operator==(const DateTime &other) const
-{
-  return _second == other._second &&
-          _minute == other._minute &&
-          _hour == other._hour &&
-          _day == other._day &&
-          _month == other._month &&
-          _year == other._year;
-}
-
-
-bool DateTime::operator!=(const DateTime &other) const
-{
-  return !operator==(other);
-}
-
-
-bool DateTime::operator<(const DateTime &other) const
-{
-  if (_year != other._year)
-  {
+bool DateTime::operator<(const DateTime &other) const {
+  if (_year != other._year) {
     return _year < other._year;
-  }
-  else if (_month != other._month)
-  {
+  } else if (_month != other._month) {
     return _month < other._month;
-  }
-  else if (_day != other._day)
-  {
+  } else if (_day != other._day) {
     return _day < other._day;
-  }
-  else if (_hour != other._hour)
-  {
+  } else if (_hour != other._hour) {
     return _hour < other._hour;
-  }
-  else if (_minute != other._minute)
-  {
+  } else if (_minute != other._minute) {
     return _minute < other._minute;
-  }
-  else
-  {
+  } else {
     return _second < other._second;
   }
 }
 
+bool DateTime::operator<=(const DateTime &other) const { return !(other < *this); }
 
-bool DateTime::operator<=(const DateTime &other) const
-{
-  return !(other < *this);
-}
+bool DateTime::operator>(const DateTime &other) const { return other < *this; }
 
+bool DateTime::operator>=(const DateTime &other) const { return !(*this < other); }
 
-bool DateTime::operator>(const DateTime &other) const
-{
-  return other < *this;
-}
-
-
-bool DateTime::operator>=(const DateTime &other) const
-{
-  return !(*this < other);
-}
-
-
-void DateTime::setDate(uint16_t year, uint16_t month, uint16_t day)
-{
+void DateTime::setDate(uint16_t year, uint16_t month, uint16_t day) {
   // force all values into valid ranges.
-  if (year < 2000)
-  {
+  if (year < 2000) {
     _year = 2000;
-  }
-  else if (year > 9999)
-  {
+  } else if (year > 9999) {
     _year = 9999;
-  }
-  else
-  {
+  } else {
     _year = year;
   }
 
-  if (month < 1)
-  {
+  if (month < 1) {
     _month = 1;
-  }
-  else if (month > 12)
-  {
+  } else if (month > 12) {
     _month = 12;
-  }
-  else
-  {
+  } else {
     _month = month;
   }
 
   const uint8_t maxDayPerMonth = getMaxDayPerMonth(_year, _month);
 
-  if (day < 1)
-  {
+  if (day < 1) {
     _day = 1;
-  }
-  else if (day > maxDayPerMonth)
-  {
+  } else if (day > maxDayPerMonth) {
     _day = maxDayPerMonth;
-  }
-  else
-  {
+  } else {
     _day = day;
   }
 
   _dayOfWeek = calculateDayOfWeek(_year, _month, _day);
 }
 
-
-void DateTime::setTime(uint8_t hour, uint8_t minute, uint8_t second)
-{
-  if (hour > 23)
-  {
+void DateTime::setTime(uint8_t hour, uint8_t minute, uint8_t second) {
+  if (hour > 23) {
     _hour = 23;
-  }
-  else
-  {
+  } else {
     _hour = hour;
   }
-  if (minute > 59)
-  {
+  if (minute > 59) {
     _minute = 59;
-  }
-  else
-  {
+  } else {
     _minute = minute;
   }
-  if (second > 59)
-  {
+  if (second > 59) {
     _second = 59;
-  }
-  else
-  {
+  } else {
     _second = second;
   }
 }
 
-
-uint16_t DateTime::year(const bool bcd) const
-{
-  if (bcd)
-  {
+uint16_t DateTime::year(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_year);
   }
 
   return _year;
 }
 
-
-uint8_t DateTime::yearShort(const bool bcd) const
-{
-  if (bcd)
-  {
+uint8_t DateTime::yearShort(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_year - 2000);
   }
 
   return (_year - 2000);
 }
 
-
-uint8_t DateTime::month(const bool bcd) const
-{
-  if (bcd)
-  {
+uint8_t DateTime::month(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_month);
   }
 
   return _month;
 }
 
-
-uint8_t DateTime::day(const bool bcd) const
-{
-  if (bcd)
-  {
+uint8_t DateTime::day(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_day);
   }
 
   return _day;
 }
 
+uint8_t DateTime::dayOfWeek() const { return _dayOfWeek; }
 
-uint8_t DateTime::dayOfWeek() const
-{
-  return _dayOfWeek;
-}
-
-
-uint8_t DateTime::hour(const bool bcd, const bool format12Hour) const
-{
-  if (format12Hour == true && (_hour > 12 || _hour == 0))
-  {
-    if (bcd && _hour > 0)
-    {
+uint8_t DateTime::hour(const bool bcd, const bool format12Hour) const {
+  if (format12Hour == true && (_hour > 12 || _hour == 0)) {
+    if (bcd && _hour > 0) {
       return Hardware::uint32ToBcd(_hour - 12);
-    }
-    else if (bcd && _hour == 0)
-    {
+    } else if (bcd && _hour == 0) {
       return 0x12;  // hour is zero so return twelve BCD-encoded
-    }
-    else if (!bcd && _hour > 0)
-    {
+    } else if (!bcd && _hour > 0) {
       return _hour - 12;
-    }
-    else
-    {
+    } else {
       return 12;  // plain old twelve
     }
-  }
-  else
-  {
-    if (bcd)
-    {
+  } else {
+    if (bcd) {
       return Hardware::uint32ToBcd(_hour);
     }
 
@@ -313,77 +201,49 @@ uint8_t DateTime::hour(const bool bcd, const bool format12Hour) const
   }
 }
 
-
-uint8_t DateTime::minute(const bool bcd) const
-{
-  if (bcd)
-  {
+uint8_t DateTime::minute(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_minute);
   }
 
   return _minute;
 }
 
-
-uint8_t DateTime::second(const bool bcd) const
-{
-  if (bcd)
-  {
+uint8_t DateTime::second(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_second);
   }
 
   return _second;
 }
 
+bool DateTime::isPM() const { return (_hour >= 12); }
 
-bool DateTime::isPM() const
-{
-  return (_hour >= 12);
-}
+DateTime DateTime::addSeconds(int32_t seconds) const { return fromSecondsSince2000(toSecondsSince2000() + seconds); }
 
-
-DateTime DateTime::addSeconds(int32_t seconds) const
-{
-  return fromSecondsSince2000(toSecondsSince2000() + seconds);
-}
-
-
-DateTime DateTime::addDays(int32_t days) const
-{
+DateTime DateTime::addDays(int32_t days) const {
   return fromSecondsSince2000(toSecondsSince2000() + days * cSecondsPerDay);
 }
 
+uint8_t DateTime::daysThisMonth() const { return getMaxDayPerMonth(_year, _month); }
 
-uint8_t DateTime::daysThisMonth() const
-{
-  return getMaxDayPerMonth(_year, _month);
-}
-
-
-uint32_t DateTime::secondsSinceMidnight(const bool bcd) const
-{
-  if (bcd)
-  {
+uint32_t DateTime::secondsSinceMidnight(const bool bcd) const {
+  if (bcd) {
     return Hardware::uint32ToBcd(_second + (cSecondsPerMinute * _minute) + (cSecondsPerHour * _hour));
   }
   return _second + (cSecondsPerMinute * _minute) + (cSecondsPerHour * _hour);
 }
 
-
-int32_t DateTime::secondsTo(const DateTime &other) const
-{
+int32_t DateTime::secondsTo(const DateTime &other) const {
   return static_cast<int32_t>(other.toSecondsSince2000()) - static_cast<int32_t>(toSecondsSince2000());
 }
 
-
-uint32_t DateTime::toSecondsSince2000() const
-{
+uint32_t DateTime::toSecondsSince2000() const {
   // For 2000-2099: leap years occur every 4 years with no century exception.
   // (y * 365 + (y+3)/4) gives the exact number of days in the first y complete years.
   const uint16_t y = _year - 2000;
-  uint32_t seconds = ((uint32_t)y * 365u + (y + 3u) / 4u) * (uint32_t)cSecondsPerDay;
-  for (uint8_t month = 1; month < _month; ++month)
-  {
+  uint32_t seconds = ((uint32_t) y * 365u + (y + 3u) / 4u) * (uint32_t) cSecondsPerDay;
+  for (uint8_t month = 1; month < _month; ++month) {
     seconds += (static_cast<uint32_t>(getMaxDayPerMonth(_year, month)) * static_cast<uint32_t>(cSecondsPerDay));
   }
   seconds += static_cast<uint32_t>(_day - 1) * static_cast<uint32_t>(cSecondsPerDay);
@@ -393,17 +253,11 @@ uint32_t DateTime::toSecondsSince2000() const
   return seconds;
 }
 
-
-bool DateTime::isFirst() const
-{
+bool DateTime::isFirst() const {
   return _year == 2000 && _month == 1 && _day == 1 && _hour == 0 && _minute == 0 && _second == 0;
 }
 
-
-DateTime DateTime::fromSecondsSince2000(uint32_t secondsSince2000)
-{
-
-
+DateTime DateTime::fromSecondsSince2000(uint32_t secondsSince2000) {
   // Calculate the time
   uint32_t secondsSinceMidnight = secondsSince2000 % cSecondsPerDay;
   const uint8_t hours = secondsSinceMidnight / static_cast<uint32_t>(cSecondsPerHour);
@@ -412,35 +266,31 @@ DateTime DateTime::fromSecondsSince2000(uint32_t secondsSince2000)
   const uint8_t seconds = secondsSinceMidnight % static_cast<uint32_t>(cSecondsPerMinute);
   // Calculate the date
   uint32_t days = secondsSince2000 / static_cast<uint32_t>(cSecondsPerDay);
-  const uint8_t dayOfWeek = (days + 6) % 7; // 2000-01-01 was Saturday (6)
+  const uint8_t dayOfWeek = (days + 6) % 7;  // 2000-01-01 was Saturday (6)
   // Estimate complete years since 2000; days/365 may overshoot by 1 at leap-year
   // boundaries, so recompute exact days used and step back once if needed.
   // Valid for 2000-2099 (no century non-leap exception in this range).
-  uint16_t y = (uint16_t)(days / 365u);
-  uint32_t daysUsed = (uint32_t)y * 365u + (y + 3u) / 4u;
-  if (daysUsed > days)
-  {
+  uint16_t y = (uint16_t) (days / 365u);
+  uint32_t daysUsed = (uint32_t) y * 365u + (y + 3u) / 4u;
+  if (daysUsed > days) {
     --y;
-    daysUsed = (uint32_t)y * 365u + (y + 3u) / 4u;
+    daysUsed = (uint32_t) y * 365u + (y + 3u) / 4u;
   }
   uint16_t year = 2000u + y;
   days -= daysUsed;
   uint16_t month = 1;
   uint32_t daysForThisSection = getMaxDayPerMonth(year, month);
-  while (days >= daysForThisSection)
-  {
+  while (days >= daysForThisSection) {
     ++month;
     days -= daysForThisSection;
     daysForThisSection = getMaxDayPerMonth(year, month);
   }
-  return DateTime(year, month, days+1, hours, minutes, seconds, dayOfWeek);
+  return DateTime(year, month, days + 1, hours, minutes, seconds, dayOfWeek);
 }
 
-
-DateTime DateTime::fromUncheckedValues(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute, uint8_t second, uint8_t dayOfWeek)
-{
+DateTime DateTime::fromUncheckedValues(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, uint8_t minute,
+                                       uint8_t second, uint8_t dayOfWeek) {
   return DateTime(year, month, day, hour, minute, second, dayOfWeek);
 }
 
-
-}
+}  // namespace kbxTubeClock

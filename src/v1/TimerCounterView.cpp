@@ -25,243 +25,177 @@
 #include "Settings.h"
 #include "TimerCounterView.h"
 
-
 namespace kbxTubeClock {
-
 
 // maximum value we can display
 //
 const uint32_t TimerCounterView::cMaxBcdValue = 999999;
 
-
-static TimerCounterView* s_instance = nullptr;
-
+static TimerCounterView *s_instance = nullptr;
 
 TimerCounterView::TimerCounterView()
-  : _lastTime(0),
-    _timerValue(0),
-    _fadeDuration(0),
-    _countUp(false),
-    _alarmReady(false)
-{
+    : _lastTime(0), _timerValue(0), _fadeDuration(0), _countUp(false), _alarmReady(false) {
   s_instance = this;
 }
 
-
-void TimerCounterView::setCountUp(bool countUp)
-{
-  if (!s_instance) return;
+void TimerCounterView::setCountUp(bool countUp) {
+  if (!s_instance) {
+    return;
+  }
   s_instance->_countUp = countUp;
-  const uint16_t resetVal = Application::getSettingsPtr()
-    ->getRawSetting(Settings::Setting::TimerResetValue);
-  s_instance->_alarmReady = countUp
-    ? (s_instance->_timerValue != resetVal)
-    : (s_instance->_timerValue != 0);
+  const uint16_t resetVal = Application::getSettingsPtr()->getRawSetting(Settings::Setting::TimerResetValue);
+  s_instance->_alarmReady = countUp ? (s_instance->_timerValue != resetVal) : (s_instance->_timerValue != 0);
 }
 
-
-void TimerCounterView::setTimerValue(uint32_t value)
-{
-  if (!s_instance) return;
+void TimerCounterView::setTimerValue(uint32_t value) {
+  if (!s_instance) {
+    return;
+  }
   s_instance->_timerValue = value;
-  const uint16_t resetVal = Application::getSettingsPtr()
-    ->getRawSetting(Settings::Setting::TimerResetValue);
-  s_instance->_alarmReady = s_instance->_countUp
-    ? (value != resetVal)
-    : (value != 0);
+  const uint16_t resetVal = Application::getSettingsPtr()->getRawSetting(Settings::Setting::TimerResetValue);
+  s_instance->_alarmReady = s_instance->_countUp ? (value != resetVal) : (value != 0);
 }
 
+uint32_t TimerCounterView::getTimerValue() { return s_instance ? s_instance->_timerValue : 0; }
 
-uint32_t TimerCounterView::getTimerValue()
-{
-  return s_instance ? s_instance->_timerValue : 0;
-}
+bool TimerCounterView::getCountUp() { return s_instance ? s_instance->_countUp : false; }
 
-
-bool TimerCounterView::getCountUp()
-{
-  return s_instance ? s_instance->_countUp : false;
-}
-
-
-void TimerCounterView::enter(uint8_t /*relatedSetting*/)
-{
+void TimerCounterView::enter(uint8_t /*relatedSetting*/) {
   // we don't use the status LED, so turn it off in case it was left on
   DisplayManager::writeStatusLed(RgbLed());
 }
 
-
-bool TimerCounterView::keyHandler(Keys::Key key)
-{
+bool TimerCounterView::keyHandler(Keys::Key key) {
   Settings *pSettings = Application::getSettingsPtr();
   bool tick = true;
 
-  if (key == Keys::Key::A)
-  {
-    if (_countUp == true)
-    {
+  if (key == Keys::Key::A) {
+    if (_countUp == true) {
       Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerRunUp));
-    }
-    else
-    {
+    } else {
       Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerRunDown));
     }
 
     _fadeDuration = pSettings->getRawSetting(Settings::Setting::FadeDuration);
   }
 
-  if (key == Keys::Key::B)
-  {
+  if (key == Keys::Key::B) {
     Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerStop));
   }
 
-  if (key == Keys::Key::C)
-  {
+  if (key == Keys::Key::C) {
     Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerReset));
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (static_cast<TimerMode>(Application::getViewMode()) == TimerMode::TimerStop)
-    {
+  if (key == Keys::Key::D) {
+    if (static_cast<TimerMode>(Application::getViewMode()) == TimerMode::TimerStop) {
       _timerValue--;
       _fadeDuration = 0;
-    }
-    else
-    {
+    } else {
       _countUp = false;
     }
   }
 
-  if (key == Keys::Key::U)
-  {
-    if (static_cast<TimerMode>(Application::getViewMode()) == TimerMode::TimerStop)
-    {
+  if (key == Keys::Key::U) {
+    if (static_cast<TimerMode>(Application::getViewMode()) == TimerMode::TimerStop) {
       _timerValue++;
       _fadeDuration = 0;
-    }
-    else
-    {
+    } else {
       _countUp = true;
     }
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void TimerCounterView::loop()
-{
+void TimerCounterView::loop() {
   Application::ExternalControl externalControlState = Application::getExternalControlState();
-  DateTime  currentTime = Application::dateTime();
-  Display   tcDisp;
+  DateTime currentTime = Application::dateTime();
+  Display tcDisp;
   Settings *pSettings = Application::getSettingsPtr();
   TimerMode currentTimerMode = static_cast<TimerMode>(Application::getViewMode());
-  uint32_t  secondsSinceMidnight = currentTime.secondsSinceMidnight(false);
-  uint16_t  duration = pSettings->getRawSetting(Settings::Setting::FadeDuration),
-            timerResetValue = pSettings->getRawSetting(Settings::Setting::TimerResetValue);
+  uint32_t secondsSinceMidnight = currentTime.secondsSinceMidnight(false);
+  uint16_t duration = pSettings->getRawSetting(Settings::Setting::FadeDuration),
+           timerResetValue = pSettings->getRawSetting(Settings::Setting::TimerResetValue);
 
-  if (((currentTimerMode == TimerMode::TimerRunUp) || (currentTimerMode == TimerMode::TimerRunDown))
-   && (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum))
-  {
+  if (((currentTimerMode == TimerMode::TimerRunUp) || (currentTimerMode == TimerMode::TimerRunDown)) &&
+      (externalControlState != Application::ExternalControl::Dmx512ExtControlEnum)) {
     tcDisp.setTubeDurations(duration);
   }
 
-  if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum)
-  {
+  if (externalControlState == Application::ExternalControl::Dmx512ExtControlEnum) {
     duration = Dmx512Controller::fadeDuration();
     tcDisp.setTubeDurations(duration);
   }
 
   // now determine the bitmask for the display
-  if ((currentTimerMode != TimerMode::TimerStop) && (_lastTime != secondsSinceMidnight))
-  {
+  if ((currentTimerMode != TimerMode::TimerStop) && (_lastTime != secondsSinceMidnight)) {
     _lastTime = secondsSinceMidnight;
 
-    switch (currentTimerMode)
-    {
+    switch (currentTimerMode) {
       case TimerMode::TimerRunUp:
-      _timerValue++;
-      break;
+        _timerValue++;
+        break;
 
       case TimerMode::TimerRunDown:
-      _timerValue--;
-      break;
+        _timerValue--;
+        break;
 
       case TimerMode::TimerReset:
-      if (_countUp == true)
-      {
-        _timerValue = 0;
-      }
-      else
-      {
-        _timerValue = timerResetValue;
-      }
-      AlarmHandler::clearAlarm();   // in case of external control (DMX-512)
-      Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerStop));
-      break;
+        if (_countUp == true) {
+          _timerValue = 0;
+        } else {
+          _timerValue = timerResetValue;
+        }
+        AlarmHandler::clearAlarm();  // in case of external control (DMX-512)
+        Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerStop));
+        break;
 
       default:
-      break;
+        break;
     }
   }
 
   // alarm handling
-  if (_countUp == true)
-  {
-    if ((_timerValue == timerResetValue) && (_alarmReady == true))
-    {
+  if (_countUp == true) {
+    if ((_timerValue == timerResetValue) && (_alarmReady == true)) {
       AlarmHandler::activateTimerCounterAlarm();
       _alarmReady = false;
       Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerStop));
-    }
-    else if ((_timerValue != timerResetValue) && (_alarmReady == false))
-    {
+    } else if ((_timerValue != timerResetValue) && (_alarmReady == false)) {
       _alarmReady = true;
     }
-  }
-  else
-  {
-    if ((_timerValue == 0) && (_alarmReady == true))
-    {
+  } else {
+    if ((_timerValue == 0) && (_alarmReady == true)) {
       AlarmHandler::activateTimerCounterAlarm();
       _alarmReady = false;
       Application::setViewMode(static_cast<ViewMode>(TimerMode::TimerStop));
-    }
-    else if ((_timerValue != 0) && (_alarmReady == false))
-    {
+    } else if ((_timerValue != 0) && (_alarmReady == false)) {
       _alarmReady = true;
     }
   }
 
-  if (_timerValue > cMaxBcdValue)
-  {
+  if (_timerValue > cMaxBcdValue) {
     // we'll use what the timer value is closer to to determine what it
     //  should be reset to
-    if (_timerValue < cMaxBcdValue * 8)
-    {
+    if (_timerValue < cMaxBcdValue * 8) {
       _timerValue = 0;
-    }
-    else
-    {
+    } else {
       _timerValue = cMaxBcdValue;
     }
   }
 
   tcDisp.setDisplayFromWord(_timerValue);
 
-  if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff) == true)
-  {
+  if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff) == true) {
     tcDisp.setMsdTubesOff();
   }
 
   DisplayManager::writeDisplay(tcDisp);
 }
 
-
-}
+}  // namespace kbxTubeClock

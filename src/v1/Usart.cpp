@@ -24,64 +24,51 @@
 #include "Usart.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
-
 
 namespace kbxTubeClock {
 
+Usart::Usart() : _params{0, 0, 0, 0} {}
 
-Usart::Usart()
-: _params{0, 0, 0, 0}
-{
+void Usart::initialize(const UsartParams *usartInit) {
+  _params.usart = usartInit->usart;
+  _params.dmaController = usartInit->dmaController;
+  _params.channelRx = usartInit->channelRx;
+  _params.channelTx = usartInit->channelTx;
 }
 
-
-void Usart::initialize(const UsartParams* usartInit)
-{
-  _params.usart           = usartInit->usart;
-  _params.dmaController   = usartInit->dmaController;
-  _params.channelRx       = usartInit->channelRx;
-  _params.channelTx       = usartInit->channelTx;
-}
-
-
-void Usart::configure(const UsartTransferParams* usartTransferParams)
-{
+void Usart::configure(const UsartTransferParams *usartTransferParams) {
   // Set up USART parameters
   usart_set_baudrate(_params.usart, usartTransferParams->baudRate);
   usart_set_databits(_params.usart, usartTransferParams->dataBits);
   usart_set_stopbits(_params.usart, usartTransferParams->stopBits);
-	usart_set_parity(_params.usart, usartTransferParams->parity);
-	usart_set_mode(_params.usart, usartTransferParams->mode);
-	usart_set_flow_control(_params.usart, usartTransferParams->flowControl);
+  usart_set_parity(_params.usart, usartTransferParams->parity);
+  usart_set_mode(_params.usart, usartTransferParams->mode);
+  usart_set_flow_control(_params.usart, usartTransferParams->flowControl);
 
-  USART_CR2(_params.usart) |= (usartTransferParams->autoBaudMode & ((USART_CR2_ABRMOD_MASK << USART_CR2_ABRMOD_SHIFT) | USART_CR2_ABREN));
+  USART_CR2(_params.usart) |=
+      (usartTransferParams->autoBaudMode & ((USART_CR2_ABRMOD_MASK << USART_CR2_ABRMOD_SHIFT) | USART_CR2_ABREN));
 
-  if (usartTransferParams->driverEnableMode == true)
-  {
+  if (usartTransferParams->driverEnableMode == true) {
     USART_CR3(_params.usart) |= USART_CR3_DEM;
   }
 
-  if (usartTransferParams->swapTxRx)
-  {
+  if (usartTransferParams->swapTxRx) {
     USART_CR2(_params.usart) |= USART_CR2_SWAP;
   }
 }
 
-
-Usart::UsartReqAck Usart::receiveDma(UsartTransferReq* request)
-{
-  if ((DMA_ISR(_params.dmaController) & DMA_ISR_TCIF(_params.channelRx))
-      || !(USART_CR3(_params.usart) & USART_CR3_DMAR))
-  {
+Usart::UsartReqAck Usart::receiveDma(UsartTransferReq *request) {
+  if ((DMA_ISR(_params.dmaController) & DMA_ISR_TCIF(_params.channelRx)) ||
+      !(USART_CR3(_params.usart) & USART_CR3_DMAR)) {
     // Reset DMA channel
     dma_channel_reset(_params.dmaController, _params.channelRx);
     // Set up Rx DMA, note it has higher priority to avoid overrun
-    dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t)&USART_RDR(_params.usart));
-    dma_set_memory_address(_params.dmaController, _params.channelRx, (uint32_t)request->buffer);
+    dma_set_peripheral_address(_params.dmaController, _params.channelRx, (uint32_t) &USART_RDR(_params.usart));
+    dma_set_memory_address(_params.dmaController, _params.channelRx, (uint32_t) request->buffer);
     dma_set_number_of_data(_params.dmaController, _params.channelRx, request->length);
     dma_set_read_from_peripheral(_params.dmaController, _params.channelRx);
     dma_enable_memory_increment_mode(_params.dmaController, _params.channelRx);
@@ -100,16 +87,13 @@ Usart::UsartReqAck Usart::receiveDma(UsartTransferReq* request)
   return Usart::UsartReqAck::UsartReqAckBusy;
 }
 
-
-Usart::UsartReqAck Usart::transmitDma(UsartTransferReq* request)
-{
-  if (USART_ISR(_params.usart) & USART_ISR_TC)
-  {
+Usart::UsartReqAck Usart::transmitDma(UsartTransferReq *request) {
+  if (USART_ISR(_params.usart) & USART_ISR_TC) {
     // Reset DMA channel
     dma_channel_reset(_params.dmaController, _params.channelTx);
     // Set up tx DMA
-    dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t)&USART_TDR(_params.usart));
-    dma_set_memory_address(_params.dmaController, _params.channelTx, (uint32_t)request->buffer);
+    dma_set_peripheral_address(_params.dmaController, _params.channelTx, (uint32_t) &USART_TDR(_params.usart));
+    dma_set_memory_address(_params.dmaController, _params.channelTx, (uint32_t) request->buffer);
     dma_set_number_of_data(_params.dmaController, _params.channelTx, request->length);
     dma_set_read_from_memory(_params.dmaController, _params.channelTx);
     dma_enable_memory_increment_mode(_params.dmaController, _params.channelTx);
@@ -128,23 +112,10 @@ Usart::UsartReqAck Usart::transmitDma(UsartTransferReq* request)
   return Usart::UsartReqAck::UsartReqAckBusy;
 }
 
+void Usart::dmaComplete() {}
 
-void Usart::dmaComplete()
-{
+void Usart::enable() const { usart_enable(_params.usart); }
 
-}
+void Usart::disable() const { usart_disable(_params.usart); }
 
-
-void Usart::enable() const
-{
-  usart_enable(_params.usart);
-}
-
-
-void Usart::disable() const
-{
-  usart_disable(_params.usart);
-}
-
-
-}
+}  // namespace kbxTubeClock

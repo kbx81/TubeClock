@@ -1,0 +1,8 @@
+---
+Checks: '-*,llvm-namespace-comment'
+WarningsAsErrors: ''
+CheckOptions:
+  - key: llvm-namespace-comment.ShortNamespaceLines
+    value: '1'
+  - key: llvm-namespace-comment.SpacesBeforeComments
+    value: '2'

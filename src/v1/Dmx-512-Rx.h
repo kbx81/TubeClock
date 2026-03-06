@@ -21,11 +21,7 @@
 #include <cstdint>
 #include "Dmx-512-Packet.h"
 
-
-namespace kbxTubeClock {
-
-namespace Dmx512Rx {
-
+namespace kbxTubeClock::Dmx512Rx {
 
 // Initialize it all
 //
@@ -37,7 +33,7 @@ bool signalIsActive();
 
 // Returns a pointer to the last DMX-512 packet received
 //
-Dmx512Packet* getLastPacket();
+Dmx512Packet *getLastPacket();
 
 // Interrupt service routines
 //
@@ -46,6 +42,4 @@ void rxCompleteIsr();
 void timerUartIsr();
 void timerSupervisorIsr();
 
-}
-
-}
+}  // namespace kbxTubeClock::Dmx512Rx

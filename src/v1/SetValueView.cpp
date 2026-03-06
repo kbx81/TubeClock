@@ -23,67 +23,45 @@
 #include "Settings.h"
 #include "SetValueView.h"
 
-
 namespace kbxTubeClock {
 
+SetValueView::SetValueView() : _setValue(0), _maxValue(0), _relatedSetting(Settings::Setting::TimerResetValue) {}
 
-SetValueView::SetValueView()
-  : _setValue(0),
-    _maxValue(0),
-    _relatedSetting(Settings::Setting::TimerResetValue)
-{
-}
-
-
-void SetValueView::enter(uint8_t relatedSetting)
-{
+void SetValueView::enter(uint8_t relatedSetting) {
   _relatedSetting = relatedSetting;
 
   _setValue = Application::getSettingsPtr()->getRawSetting(_relatedSetting);
   _maxValue = Settings::cSettingData[_relatedSetting];
 }
 
-
-bool SetValueView::keyHandler(Keys::Key key)
-{
+bool SetValueView::keyHandler(Keys::Key key) {
   bool tick = true;
 
-  if (key == Keys::Key::A)
-  {
+  if (key == Keys::Key::A) {
     Application::getSettingsPtr()->setRawSetting(_relatedSetting, _setValue);
     Application::notifySettingChanged(_relatedSetting);
 
     DisplayManager::blink();
   }
 
-  if (key == Keys::Key::B)
-  {
-    if (_setValue == 1)
-    {
+  if (key == Keys::Key::B) {
+    if (_setValue == 1) {
       tick = false;
-    }
-    else
-    {
+    } else {
       _setValue = 1;
     }
   }
 
-  if (key == Keys::Key::C)
-  {
-    if (_setValue == _maxValue)
-    {
+  if (key == Keys::Key::C) {
+    if (_setValue == _maxValue) {
       tick = false;
-    }
-    else
-    {
+    } else {
       _setValue = _maxValue;
     }
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (--_setValue > _maxValue)
-    {
+  if (key == Keys::Key::D) {
+    if (--_setValue > _maxValue) {
       _setValue = 0;
       tick = false;
     }
@@ -95,34 +73,28 @@ bool SetValueView::keyHandler(Keys::Key key)
     }
   }
 
-  if (key == Keys::Key::U)
-  {
-    if (++_setValue > _maxValue)
-    {
+  if (key == Keys::Key::U) {
+    if (++_setValue > _maxValue) {
       _setValue = _maxValue;
       tick = false;
     }
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void SetValueView::loop()
-{
+void SetValueView::loop() {
   int16_t offsetInMinutes = (_setValue - 56) * 15;
   uint32_t dotsBitmap = 0;
   auto displayedValue = _setValue;
   DateTime offsetTime(2001, 1, 1);  // ensure date after 2000/1/1 in case of subtraction
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
 
-  switch (_relatedSetting)
-  {
+  switch (_relatedSetting) {
     // this is because DMX-512 starts counting at one and not at zero
     case Settings::Setting::DmxAddress:
       displayedValue += 1;
@@ -130,8 +102,7 @@ void SetValueView::loop()
 
     // make time zone display logical
     case Settings::Setting::TimeZone:
-      if (offsetInMinutes < 0)
-      {
+      if (offsetInMinutes < 0) {
         dotsBitmap = 0b0001;    // negative value/offset indicator
         offsetInMinutes *= -1;  // ensure correct display of the offset when it's negative
       }
@@ -150,13 +121,12 @@ void SetValueView::loop()
   Display tcDisp(displayedValue);
   tcDisp.setDots(dotsBitmap, dot);
 
-  if (Application::getSettingsPtr()->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::MSDsOff) == true)
-  {
+  if (Application::getSettingsPtr()->getSetting(Settings::Setting::SystemOptions,
+                                                Settings::SystemOptionsBits::MSDsOff) == true) {
     tcDisp.setMsdTubesOff();
   }
 
   DisplayManager::writeDisplay(tcDisp);
 }
 
-
-}
+}  // namespace kbxTubeClock

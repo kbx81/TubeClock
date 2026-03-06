@@ -18,19 +18,16 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class SetTempCalibrationView : public View {
-
-public:
+ public:
   static const uint8_t cSensorCount = 4;
 
   SetTempCalibrationView();
@@ -38,10 +35,10 @@ public:
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   int8_t _selectedSensor;
 
   int16_t _calibrationValue[cSensorCount];
 };
 
-}
+}  // namespace kbxTubeClock

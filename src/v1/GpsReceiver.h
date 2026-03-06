@@ -18,59 +18,50 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "DateTime.h"
 #include "Hardware.h"
 
-
-namespace kbxTubeClock {
-
 /// @brief kbx Tube Clock GpsReceiver
 ///
+namespace kbxTubeClock::GpsReceiver {
 
-namespace GpsReceiver
-{
-  /// @brief Initialize the GPS receiver (cache USART pointer)
-  ///
-  void initialize();
+/// @brief Initialize the GPS receiver (cache USART pointer)
+///
+void initialize();
 
-  /// @brief Check if the GPS module has sent anything meaningful at all
-  /// @return True if connected
-  ///
-  bool isConnected();
+/// @brief Check if the GPS module has sent anything meaningful at all
+/// @return True if connected
+///
+bool isConnected();
 
-  /// @brief Check if the GPS has received a valid date and time
-  /// @return True if date & time is valid
-  ///
-  bool isValid();
+/// @brief Check if the GPS has received a valid date and time
+/// @return True if date & time is valid
+///
+bool isValid();
 
-  /// @brief Get the current date & time based on the GPS receiver
-  /// @return DateTime object with current date & time
-  ///
-  DateTime getDateTime();
+/// @brief Get the current date & time based on the GPS receiver
+/// @return DateTime object with current date & time
+///
+DateTime getDateTime();
 
-  /// @brief Get the adjusted date & time based on the GPS receiver & time zone
-  /// @return DateTime object with local date & time
-  ///
-  DateTime getLocalDateTime();
+/// @brief Get the adjusted date & time based on the GPS receiver & time zone
+/// @return DateTime object with local date & time
+///
+DateTime getLocalDateTime();
 
-  /// @brief Get the current number of satellites the GPS receiver sees
-  /// @return Number of satellites in view as reported by the GPS receiver
-  ///
-  uint8_t getSatellitesInView();
+/// @brief Get the current number of satellites the GPS receiver sees
+/// @return Number of satellites in view as reported by the GPS receiver
+///
+uint8_t getSatellitesInView();
 
-  /// @brief Sets the offset used to compute the local time
-  ///
-  void setTimeZone(int16_t offsetInMinutes);
+/// @brief Sets the offset used to compute the local time
+///
+void setTimeZone(int16_t offsetInMinutes);
 
-  /// @brief Call from USART recieve interrupt
-  ///
-  void rxIsr();
+/// @brief Call from USART recieve interrupt
+///
+void rxIsr();
 
-
-}
-
-
-}
+}  // namespace kbxTubeClock::GpsReceiver

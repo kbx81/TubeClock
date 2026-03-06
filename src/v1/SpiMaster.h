@@ -26,32 +26,28 @@
 //     state = SpiReqAckQueued to initiate a transfer via the queue
 #pragma once
 
-
 #include <cstdint>
-
 
 namespace kbxTubeClock {
 
 class SpiMaster {
-
-public:
-
+ public:
   /// @brief Request return codes
   ///
   enum SpiReqAck : uint8_t {
     SpiReqAckOk,
     SpiReqAckBusy,
     SpiReqAckError,
-    SpiReqAckQueued
+    SpiReqAckQueued,
   };
 
   /// @brief Structure defining SPI object initialization
   ///
   struct SpiMasterParams {
-    uint32_t spi;             // SPI peripheral identifier
-    uint32_t dmaController;   // DMA controller base address
-    uint8_t  channelRx;       // Recieve DMA channel number: 1-7 for DMA1
-    uint8_t  channelTx;       // Transmit DMA channel number: 1-7 for DMA1
+    uint32_t spi;            // SPI peripheral identifier
+    uint32_t dmaController;  // DMA controller base address
+    uint8_t channelRx;       // Recieve DMA channel number: 1-7 for DMA1
+    uint8_t channelTx;       // Transmit DMA channel number: 1-7 for DMA1
   };
 
   /// @brief Structure defining SPI transfer requests
@@ -65,11 +61,11 @@ public:
     uint32_t peripheralSize;  // Peripheral word width (8, 16, 32 bit)
     uint16_t gpioPin;         // gpio pin on which CS line lives
     uint16_t misoPin;         // pin on which slave inputs data
-    bool     strobeCs;        // CS line is strobed upon xfer completion if true
-    bool     polarity;        // CS/CE polarity (active high = true)
-    bool     cpol;            // Clock polarity (true = idle high)
-    bool     cpha;            // Clock phase (true = transition 2)
-    bool     lsbFirst;        // Frame format (true = LSB first)
+    bool strobeCs;            // CS line is strobed upon xfer completion if true
+    bool polarity;            // CS/CE polarity (active high = true)
+    bool cpol;                // Clock polarity (true = idle high)
+    bool cpha;                // Clock phase (true = transition 2)
+    bool lsbFirst;            // Frame format (true = LSB first)
   };
 
   /// @brief Structure defining SPI transfer requests
@@ -82,8 +78,7 @@ public:
     uint8_t slave;
   };
 
-public:
-
+ public:
   /// @brief maximum number of slaves supported
   ///
   static const uint8_t cMaxSlaves = 4;
@@ -96,35 +91,33 @@ public:
   ///
   static const uint8_t cQueueSize = cMaxSlaves;
 
-
   /// @brief Default constructor
   ///
   SpiMaster();
 
-
   /// @brief Initialize SPI
   /// @param spiInit structure containing desired master configuration
-  void initialize(const SpiMasterParams* spiInit);
+  void initialize(const SpiMasterParams *spiInit);
 
   /// @brief Queues up a transfer via SPI via DMA
   /// @param slave structure containing desired slave configuration
   /// @return ID of slave as registered or cNoSlave if failure
-  uint8_t registerSlave(SpiSlave* slave);
+  uint8_t registerSlave(SpiSlave *slave);
 
   /// @brief Gets a pointer to the slave's transfer request buffer
   /// @param slave ID number to perform transfer for
   /// @return SpiTransferReq pointer to the slave's transfer request buffer
-  SpiTransferReq* getTransferRequestBuffer(const uint8_t slave);
+  SpiTransferReq *getTransferRequestBuffer(const uint8_t slave);
 
   /// @brief Queues up a transfer via SPI via DMA
   /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck queueTransfer(SpiTransferReq* request);
+  SpiReqAck queueTransfer(SpiTransferReq *request);
 
   /// @brief Transfers data in/out through the SPI via DMA
   /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck transfer(SpiTransferReq* request);
+  SpiReqAck transfer(SpiTransferReq *request);
 
   /// @brief Indicates if a given slave's transfer has completed
   /// @return true if transfer is complete
@@ -148,8 +141,7 @@ public:
   ///
   bool queuesEmpty();
 
-private:
-
+ private:
   SpiReqAck _configureMaster(const uint8_t slave);
 
   void _activateCsCe(const uint8_t slave);
@@ -183,7 +175,6 @@ private:
   /// @brief transfer requests from slaves that the SPI needs to do
   ///
   SpiTransferReq _transferRequest[cMaxSlaves];
-
 };
 
-}
+}  // namespace kbxTubeClock

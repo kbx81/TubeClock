@@ -18,15 +18,12 @@
 //
 #pragma once
 
-
 #include <cstdint>
-
 
 namespace kbxTubeClock {
 
-class RgbLed
-{
-public:
+class RgbLed {
+ public:
   /// @brief Create a new RgbLed instance with specified intensities and duration
   ///
   /// @param red Initial value for red element
@@ -36,12 +33,11 @@ public:
   ///
   RgbLed(const uint16_t red = 0, const uint16_t green = 0, const uint16_t blue = 0, const uint32_t duration = 0);
 
-public:
+ public:
   /// Important constants
   ///
-  static const uint16_t cLed100Percent   = 10000;
-  static const uint16_t cLedMaxIntensity =  4095;
-
+  static const uint16_t cLed100Percent = 10000;
+  static const uint16_t cLedMaxIntensity = 4095;
 
   /// @brief Compare this RgbLed to another
   /// @param LED to compare with
@@ -97,13 +93,13 @@ public:
   ///
   void gammaCorrect12bit();
 
-private:
+ private:
   /// 4096-step (12 bit) brightness table: gamma = 2.2
   ///
   static const uint16_t cGammaTable[4096];
 
-  uint16_t _red, _green, _blue; ///< Intensities for Red, Green, and Blue elements
-  uint32_t _duration;           ///< Duration over which this LED should transition
+  uint16_t _red, _green, _blue;  ///< Intensities for Red, Green, and Blue elements
+  uint32_t _duration;            ///< Duration over which this LED should transition
 };
 
-}
+}  // namespace kbxTubeClock

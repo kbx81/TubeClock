@@ -18,7 +18,6 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Application.h"
@@ -26,39 +25,34 @@
 #include "View.h"
 #include "DateTime.h"
 
-
 namespace kbxTubeClock {
 
 class SystemStatusView : public View {
-
-  enum DisplayItem : uint8_t
-  {
-    TubeLifetime      = ViewMode::ViewMode0,
-    GpsStatus         = ViewMode::ViewMode1,
-    StatusDS3234      = ViewMode::ViewMode2,
-    StatusDS1722      = ViewMode::ViewMode3,
-    StatusLM74        = ViewMode::ViewMode4,
-    VoltageVddA       = ViewMode::ViewMode5,
-    VoltageBattery    = ViewMode::ViewMode6,
-    StartupResult     = ViewMode::ViewMode7,
-    FirmwareVersion   = ViewMode::ViewMode8,
-    BuildNumber       = ViewMode::ViewMode9,
+  enum DisplayItem : uint8_t {
+    TubeLifetime = ViewMode::ViewMode0,
+    GpsStatus = ViewMode::ViewMode1,
+    StatusDS3234 = ViewMode::ViewMode2,
+    StatusDS1722 = ViewMode::ViewMode3,
+    StatusLM74 = ViewMode::ViewMode4,
+    VoltageVddA = ViewMode::ViewMode5,
+    VoltageBattery = ViewMode::ViewMode6,
+    StartupResult = ViewMode::ViewMode7,
+    FirmwareVersion = ViewMode::ViewMode8,
+    BuildNumber = ViewMode::ViewMode9,
   };
 
-
-/// @brief The view which displays the UI for setting times and dates
-///
-public: // Implement the SystemStatusView class
+  /// @brief The view which displays the UI for setting times and dates
+  ///
+ public:  // Implement the SystemStatusView class
   SystemStatusView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   /// @brief the selected byte
   ///
   int8_t _selectedView;
-
 };
 
-}
+}  // namespace kbxTubeClock

@@ -40,36 +40,21 @@
 
 namespace kbxTubeClock {
 
-
-Display::Display()
-{
-  for (uint8_t tube = 0; tube < cTubeCount; tube++)
-  {
+Display::Display() {
+  for (uint8_t tube = 0; tube < cTubeCount; tube++) {
     _tube[tube].setIntensity(NixieGlyph::cGlyphMaximumIntensity);
   }
 }
 
+Display::Display(const uint32_t word) : Display() { setDisplayFromWord(word); }
 
-Display::Display(const uint32_t word)
-  : Display()
-{
-  setDisplayFromWord(word);
-}
-
-
-Display::Display(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0)
-  : Display()
-{
+Display::Display(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0) : Display() {
   setDisplayFromBytes(byte2, byte1, byte0);
 }
 
-
-bool Display::operator==(const Display &other) const
-{
-  for (uint8_t i = 0; i < cTubeCount; i++)
-  {
-    if (_tube[i] != other._tube[i])
-    {
+bool Display::operator==(const Display &other) const {
+  for (uint8_t i = 0; i < cTubeCount; i++) {
+    if (_tube[i] != other._tube[i]) {
       return false;
     }
   }
@@ -77,37 +62,25 @@ bool Display::operator==(const Display &other) const
   return true;
 }
 
+bool Display::operator!=(const Display &other) const { return !(*this == other); }
 
-bool Display::operator!=(const Display &other) const
-{
-  return !(*this == other);
-}
-
-
-void Display::setDisplayFromRaw(const NixieTube *data)
-{
-  for (uint8_t i = 0; i < cTubeCount; i++)
-  {
+void Display::setDisplayFromRaw(const NixieTube *data) {
+  for (uint8_t i = 0; i < cTubeCount; i++) {
     _tube[i] = data[i];
   }
 }
 
-
-void Display::setDisplayFromWord(const uint32_t word, const uint8_t bitmap)
-{
+void Display::setDisplayFromWord(const uint32_t word, const uint8_t bitmap) {
   auto encoded = uint32ToBcd(word);
 
-  for (uint8_t i = 0; i < cTubeCount; i++)
-  {
+  for (uint8_t i = 0; i < cTubeCount; i++) {
     _tube[i].setGlyph((encoded >> (i * 4)) & 0x0f);
   }
 
   setTubesOff(bitmap);
 }
 
-
-void Display::setDisplayFromBytes(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap)
-{
+void Display::setDisplayFromBytes(const uint8_t byte2, const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap) {
   uint8_t i = 0;
 
   _tube[i++].setGlyph(byte0 % 10);
@@ -120,9 +93,8 @@ void Display::setDisplayFromBytes(const uint8_t byte2, const uint8_t byte1, cons
   setTubesOff(bitmap);
 }
 
-
-void Display::setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, const uint8_t byte3, const uint8_t byte2, const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap)
-{
+void Display::setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, const uint8_t byte3, const uint8_t byte2,
+                                    const uint8_t byte1, const uint8_t byte0, const uint8_t bitmap) {
   uint8_t i = 0;
 
   _tube[i++].setGlyph(byte0);
@@ -135,189 +107,131 @@ void Display::setDisplayFromNibbles(const uint8_t byte5, const uint8_t byte4, co
   setTubesOff(bitmap);
 }
 
-
-void Display::setDisplayFromDateTime(const DateTime &dateTime, const uint8_t item, const bool bcd)
-{
-  switch (item)
-  {
+void Display::setDisplayFromDateTime(const DateTime &dateTime, const uint8_t item, const bool bcd) {
+  switch (item) {
     case 0:
-    setDisplayFromBytes(dateTime.yearShort(bcd), dateTime.month(bcd), dateTime.day(bcd));
-    break;
+      setDisplayFromBytes(dateTime.yearShort(bcd), dateTime.month(bcd), dateTime.day(bcd));
+      break;
 
     case 1:
-    setDisplayFromBytes(dateTime.day(bcd), dateTime.month(bcd), dateTime.yearShort(bcd));
-    break;
+      setDisplayFromBytes(dateTime.day(bcd), dateTime.month(bcd), dateTime.yearShort(bcd));
+      break;
 
     case 2:
-    setDisplayFromBytes(dateTime.month(bcd), dateTime.day(bcd), dateTime.yearShort(bcd));
-    break;
+      setDisplayFromBytes(dateTime.month(bcd), dateTime.day(bcd), dateTime.yearShort(bcd));
+      break;
 
     case 3:
-    setDisplayFromBytes(dateTime.hour(bcd, true), dateTime.minute(bcd), dateTime.second(bcd));
-    break;
+      setDisplayFromBytes(dateTime.hour(bcd, true), dateTime.minute(bcd), dateTime.second(bcd));
+      break;
 
     default:
-    setDisplayFromBytes(dateTime.hour(bcd, false), dateTime.minute(bcd), dateTime.second(bcd));
+      setDisplayFromBytes(dateTime.hour(bcd, false), dateTime.minute(bcd), dateTime.second(bcd));
   }
 }
 
-
-void Display::setDisplayFromDateTime(const DateTime &dateTime, const dateTimeDisplaySelection item, const bool bcd)
-{
+void Display::setDisplayFromDateTime(const DateTime &dateTime, const dateTimeDisplaySelection item, const bool bcd) {
   setDisplayFromDateTime(dateTime, static_cast<uint8_t>(item), bcd);
 }
 
-
-void Display::setTubeToValue(const uint8_t tubeNumber, const uint8_t tubeValue)
-{
-  if (tubeNumber < cTubeCount)
-  {
+void Display::setTubeToValue(const uint8_t tubeNumber, const uint8_t tubeValue) {
+  if (tubeNumber < cTubeCount) {
     _tube[tubeNumber].setGlyph(tubeValue);
   }
 }
 
-
-void Display::setTubeFromRaw(const uint8_t tubeNumber, const NixieTube &tube)
-{
-  if (tubeNumber < cTubeCount)
-  {
+void Display::setTubeFromRaw(const uint8_t tubeNumber, const NixieTube &tube) {
+  if (tubeNumber < cTubeCount) {
     _tube[tubeNumber] = tube;
   }
 }
 
-
-void Display::setDot(const uint8_t dotNumber, const NixieGlyph &dot)
-{
-  if (dotNumber < cDotCount)
-  {
+void Display::setDot(const uint8_t dotNumber, const NixieGlyph &dot) {
+  if (dotNumber < cDotCount) {
     _dot[dotNumber] = dot;
   }
 }
 
-
-void Display::setDots(const uint32_t bitmap, const NixieGlyph &dot, const bool setAllDotDurations)
-{
-  for (uint8_t i = 0; (i < cDotCount) && (((bitmap >> i) != 0) || (setAllDotDurations == true)); i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setDots(const uint32_t bitmap, const NixieGlyph &dot, const bool setAllDotDurations) {
+  for (uint8_t i = 0; (i < cDotCount) && (((bitmap >> i) != 0) || (setAllDotDurations == true)); i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _dot[i] = dot;
-    }
-    else if (setAllDotDurations == true)
-    {
+    } else if (setAllDotDurations == true) {
       _dot[i].setDuration(dot.getDuration());
     }
   }
 }
 
-
-void Display::setDots(const uint32_t bitmap, const NixieGlyph &dotOn, const NixieGlyph &dotOff)
-{
-  for (uint8_t i = 0; i < cDotCount; i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setDots(const uint32_t bitmap, const NixieGlyph &dotOn, const NixieGlyph &dotOff) {
+  for (uint8_t i = 0; i < cDotCount; i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _dot[i] = dotOn;
-    }
-    else
-    {
+    } else {
       _dot[i] = dotOff;
     }
   }
 }
 
-
-void Display::setTubeDuration(const uint8_t tubeNumber, const uint16_t tubeDuration)
-{
-  if (tubeNumber < cTubeCount)
-  {
+void Display::setTubeDuration(const uint8_t tubeNumber, const uint16_t tubeDuration) {
+  if (tubeNumber < cTubeCount) {
     _tube[tubeNumber].setDuration(tubeDuration);
   }
 }
 
-
-void Display::setTubeDurations(const uint16_t tubeDuration, const uint8_t bitmap)
-{
-  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setTubeDurations(const uint16_t tubeDuration, const uint8_t bitmap) {
+  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _tube[i].setDuration(tubeDuration);
     }
   }
 }
 
-
-void Display::setTubeIntensity(const uint8_t tubeNumber, const uint16_t tubeIntensity)
-{
-  if (tubeNumber < cTubeCount)
-  {
+void Display::setTubeIntensity(const uint8_t tubeNumber, const uint16_t tubeIntensity) {
+  if (tubeNumber < cTubeCount) {
     _tube[tubeNumber].setIntensity(tubeIntensity);
   }
 }
 
-
-void Display::setTubeIntensities(const uint16_t tubeIntensity, const uint8_t bitmap)
-{
-  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setTubeIntensities(const uint16_t tubeIntensity, const uint8_t bitmap) {
+  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _tube[i].setIntensity(tubeIntensity);
     }
   }
 }
 
-
-void Display::setTubeIntensities(const uint16_t tubeIntensityHigh, const uint16_t tubeIntensityLow, const uint8_t bitmap)
-{
-  for (uint8_t i = 0; i < cTubeCount; i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setTubeIntensities(const uint16_t tubeIntensityHigh, const uint16_t tubeIntensityLow,
+                                 const uint8_t bitmap) {
+  for (uint8_t i = 0; i < cTubeCount; i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _tube[i].setIntensity(tubeIntensityHigh);
-    }
-    else
-    {
+    } else {
       _tube[i].setIntensity(tubeIntensityLow);
     }
   }
 }
 
-
-void Display::setTubeOff(const uint8_t tubeNumber)
-{
-  if (tubeNumber < cTubeCount)
-  {
+void Display::setTubeOff(const uint8_t tubeNumber) {
+  if (tubeNumber < cTubeCount) {
     _tube[tubeNumber].setOff();
   }
 }
 
-
-void Display::setTubesOff(const uint8_t bitmap)
-{
-  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++)
-  {
-    if (((bitmap >> i) & 1) == 1)
-    {
+void Display::setTubesOff(const uint8_t bitmap) {
+  for (uint8_t i = 0; (i < cTubeCount) && ((bitmap >> i) != 0); i++) {
+    if (((bitmap >> i) & 1) == 1) {
       _tube[i].setOff();
     }
   }
 }
 
-
-void Display::setMsdTubesOff(const uint8_t keepOnMask)
-{
+void Display::setMsdTubesOff(const uint8_t keepOnMask) {
   uint8_t i = 0, tubesToTurnOff = 0;
 
-  for (i = 0; i < cTubeCount; i++)
-  {
-    if (_tube[cTubeCount - 1 - i].getGlyph() == 0)
-    {
+  for (i = 0; i < cTubeCount; i++) {
+    if (_tube[cTubeCount - 1 - i].getGlyph() == 0) {
       tubesToTurnOff |= (1 << (cTubeCount - 1 - i));
-    }
-    else
-    {
+    } else {
       break;
     }
   }
@@ -325,69 +239,52 @@ void Display::setMsdTubesOff(const uint8_t keepOnMask)
   setTubesOff(tubesToTurnOff & keepOnMask);
 }
 
-
-uint8_t Display::getTubeIntensity(const uint8_t tubeNumber) const
-{
-  if (tubeNumber < cTubeCount)
-  {
+uint8_t Display::getTubeIntensity(const uint8_t tubeNumber) const {
+  if (tubeNumber < cTubeCount) {
     return _tube[tubeNumber].getIntensity();
   }
 
-  return 0;   // safe default
+  return 0;  // safe default
 }
 
-
-uint8_t Display::getTubeValue(const uint8_t tubeNumber) const
-{
-  if (tubeNumber < cTubeCount)
-  {
+uint8_t Display::getTubeValue(const uint8_t tubeNumber) const {
+  if (tubeNumber < cTubeCount) {
     return _tube[tubeNumber].getGlyph();
   }
 
-  return 0;   // safe default
+  return 0;  // safe default
 }
 
-
-NixieTube Display::getTubeRaw(const uint8_t tubeNumber) const
-{
-  if (tubeNumber < cTubeCount)
-  {
+NixieTube Display::getTubeRaw(const uint8_t tubeNumber) const {
+  if (tubeNumber < cTubeCount) {
     return _tube[tubeNumber];
   }
 
-  return NixieTube();   // safe default
+  return NixieTube();  // safe default
 }
 
-
-NixieGlyph Display::getDotRaw(const uint8_t dotNumber) const
-{
-  if (dotNumber < cDotCount)
-  {
+NixieGlyph Display::getDotRaw(const uint8_t dotNumber) const {
+  if (dotNumber < cDotCount) {
     return _dot[dotNumber];
   }
 
-  return NixieGlyph();   // safe default
+  return NixieGlyph();  // safe default
 }
 
+uint32_t Display::uint32ToBcd(uint32_t uint32Value) {
+  uint32_t result = 0;
+  uint8_t shift = 0;
 
-uint32_t Display::uint32ToBcd(uint32_t uint32Value)
-{
-    uint32_t result = 0;
-    uint8_t shift = 0;
+  if (uint32Value > 99999999) {
+    uint32Value = 0;
+  }
 
-    if (uint32Value > 99999999)
-    {
-      uint32Value = 0;
-    }
-
-    while (uint32Value != 0)
-    {
-        result +=  (uint32Value % 10) << shift;
-        uint32Value = uint32Value / 10;
-        shift += 4;
-    }
-    return result;
+  while (uint32Value != 0) {
+    result += (uint32Value % 10) << shift;
+    uint32Value = uint32Value / 10;
+    shift += 4;
+  }
+  return result;
 }
 
-
-};
+};  // namespace kbxTubeClock

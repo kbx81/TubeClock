@@ -26,11 +26,7 @@
 #include "Settings.h"
 #include "View.h"
 
-
-namespace kbxTubeClock {
-
-namespace Dmx512Controller {
-
+namespace kbxTubeClock::Dmx512Controller {
 
 // Pitch multiplier - increases the range of available tone pitches/frequencies
 //
@@ -72,34 +68,23 @@ volatile static uint16_t _strobeDelay = cStrobeMinimumRate;
 // Updated by setDmx512Active() when external control mode changes
 static bool _dmx512Active = false;
 
-
-void _dmxExtendedModeController(Dmx512Packet* packet, uint16_t address)
-{
+void _dmxExtendedModeController(Dmx512Packet *packet, uint16_t address) {
   // RgbLed dmxLed[2];
   uint16_t pitch = 0;
   uint8_t level = 0;
-  const Application::OperatingMode opMode[] = { Application::OperatingMode::OperatingModeDmx512Display,
-                                                Application::OperatingMode::OperatingModeFixedDisplay,
-                                                Application::OperatingMode::OperatingModeFixedDisplay,
-                                                Application::OperatingMode::OperatingModeFixedDisplay,
-                                                Application::OperatingMode::OperatingModeTimerCounter,
-                                                Application::OperatingMode::OperatingModeTimerCounter,
-                                                Application::OperatingMode::OperatingModeTimerCounter,
-                                                Application::OperatingMode::OperatingModeTimerCounter };
-  const ViewMode viewMode[] = { ViewMode::ViewMode0,
-                                ViewMode::ViewMode0,
-                                ViewMode::ViewMode2,
-                                ViewMode::ViewMode3,
-                                ViewMode::ViewMode0,
-                                ViewMode::ViewMode1,
-                                ViewMode::ViewMode2,
-                                ViewMode::ViewMode3 };
+  const Application::OperatingMode opMode[] = {
+      Application::OperatingMode::OperatingModeDmx512Display, Application::OperatingMode::OperatingModeFixedDisplay,
+      Application::OperatingMode::OperatingModeFixedDisplay,  Application::OperatingMode::OperatingModeFixedDisplay,
+      Application::OperatingMode::OperatingModeTimerCounter,  Application::OperatingMode::OperatingModeTimerCounter,
+      Application::OperatingMode::OperatingModeTimerCounter,  Application::OperatingMode::OperatingModeTimerCounter};
+  const ViewMode viewMode[] = {ViewMode::ViewMode0, ViewMode::ViewMode0, ViewMode::ViewMode2, ViewMode::ViewMode3,
+                               ViewMode::ViewMode0, ViewMode::ViewMode1, ViewMode::ViewMode2, ViewMode::ViewMode3};
 
   // first, set the display mode based on channel offset 0
   level = packet->channel(address++) / 32;
   Application::setOperatingMode(opMode[level]);
   Application::setViewMode(viewMode[level]);
- 
+
   // next, set the beeper volume. volume only uses upper three bits
   level = packet->channel(address++) >> 5;
   Hardware::setVolume(level);
@@ -110,93 +95,63 @@ void _dmxExtendedModeController(Dmx512Packet* packet, uint16_t address)
 
   // next, set up strobing if it is enabled (greater than zero)
   _strobeDelay = packet->channel(address++) * cChannelMultiplier;
-  if (_strobeDelay > 0)
-  {
+  if (_strobeDelay > 0) {
     _strobeDelay += cStrobeMinimumRate;
-  }
-  else
-  {
+  } else {
     _strobeCounter = 0;
   }
- 
+
   // determine and store the fade duration
   _fadeDuration = (packet->channel(address++) * cChannelMultiplier) + cChannelMultiplier;
- 
+
   // next, determine the master intensity level (DMX channel is already 0-255)
   _masterIntensityLevel = packet->channel(address);
 }
 
-
-void _dmxStandardModeController(Dmx512Packet* packet, uint16_t address)
-{
+void _dmxStandardModeController(Dmx512Packet *packet, uint16_t address) {
   // DMX channel value is already 0-255, use directly
   _masterIntensityLevel = packet->channel(address);
 }
 
+void initialize() {}
 
-void initialize()
-{
-}
-
-
-void controller()
-{
-  Dmx512Packet* packet = Dmx512Rx::getLastPacket();
+void controller() {
+  Dmx512Packet *packet = Dmx512Rx::getLastPacket();
   Settings *pSettings = Application::getSettingsPtr();
   uint16_t address = pSettings->getRawSetting(Settings::Setting::DmxAddress);
 
-  if (packet->startCode() == 0)
-  {
-    if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DmxExtended) == true)
-    {
+  if (packet->startCode() == 0) {
+    if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DmxExtended) == true) {
       _dmxExtendedModeController(packet, address);
-    }
-    else
-    {
+    } else {
       _dmxStandardModeController(packet, address);
     }
-  DisplayManager::setMasterIntensity(_masterIntensityLevel);
+    DisplayManager::setMasterIntensity(_masterIntensityLevel);
   }
 }
 
+uint16_t fadeDuration() { return _fadeDuration; }
 
-uint16_t fadeDuration()
-{
-  return _fadeDuration;
-}
-
-
-void strobeTimer()
-{
+void strobeTimer() {
   // Use cached state instead of function call to minimize ISR overhead
-  if (!_dmx512Active) return;
+  if (!_dmx512Active) {
+    return;
+  }
 
-  if (_strobeDelay > 0)
-  {
+  if (_strobeDelay > 0) {
     _strobeCounter++;
   }
 
-  if ((_masterIntensityLevel > 0) && ((_strobeDelay == 0) || (_strobeCounter > _strobeDelay)))
-  {
+  if ((_masterIntensityLevel > 0) && ((_strobeDelay == 0) || (_strobeCounter > _strobeDelay))) {
     DisplayManager::setDisplayBlanking(false);
-    if (_strobeCounter > _strobeDelay + cStrobeDuration)
-    {
+    if (_strobeCounter > _strobeDelay + cStrobeDuration) {
       _strobeCounter = 0;
     }
-  }
-  else
-  {
+  } else {
     DisplayManager::setDisplayBlanking(true);
   }
 }
 
+void setDmx512Active(const bool active) { _dmx512Active = active; }
 
-void setDmx512Active(const bool active)
-{
-  _dmx512Active = active;
-}
-
-
-}
-
-}
+}  // namespace kbxTubeClock::Dmx512Controller

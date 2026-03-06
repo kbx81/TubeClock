@@ -22,110 +22,77 @@
 #include "Settings.h"
 #include "SetTempCalibrationView.h"
 
-
 namespace kbxTubeClock {
 
-
 static const Settings::Setting cCalibrationSettings[SetTempCalibrationView::cSensorCount] = {
-  Settings::Setting::TemperatureCalibrationSTM32,
-  Settings::Setting::TemperatureCalibrationDS3234,
-  Settings::Setting::TemperatureCalibrationDS1722,
-  Settings::Setting::TemperatureCalibrationLM74
-};
+    Settings::Setting::TemperatureCalibrationSTM32, Settings::Setting::TemperatureCalibrationDS3234,
+    Settings::Setting::TemperatureCalibrationDS1722, Settings::Setting::TemperatureCalibrationLM74};
 
+SetTempCalibrationView::SetTempCalibrationView() : _selectedSensor(0), _calibrationValue{0, 0, 0, 0} {}
 
-SetTempCalibrationView::SetTempCalibrationView()
-  : _selectedSensor(0),
-    _calibrationValue{0, 0, 0, 0}
-{
-}
-
-
-void SetTempCalibrationView::enter(uint8_t /*relatedSetting*/)
-{
+void SetTempCalibrationView::enter(uint8_t /*relatedSetting*/) {
   _selectedSensor = static_cast<int8_t>(Application::getViewMode());
 
-  Settings* pSettings = Application::getSettingsPtr();
+  Settings *pSettings = Application::getSettingsPtr();
 
-  for (uint8_t i = 0; i < cSensorCount; i++)
-  {
-    _calibrationValue[i] = (int16_t)pSettings->getRawSetting(cCalibrationSettings[i])
-                           - Settings::cCalibrationMidpoint;
+  for (uint8_t i = 0; i < cSensorCount; i++) {
+    _calibrationValue[i] = (int16_t) pSettings->getRawSetting(cCalibrationSettings[i]) - Settings::cCalibrationMidpoint;
   }
 }
 
-
-bool SetTempCalibrationView::keyHandler(Keys::Key key)
-{
+bool SetTempCalibrationView::keyHandler(Keys::Key key) {
   bool tick = true;
 
-  if (key == Keys::Key::A)
-  {
-    Settings* pSettings = Application::getSettingsPtr();
+  if (key == Keys::Key::A) {
+    Settings *pSettings = Application::getSettingsPtr();
 
-    for (uint8_t i = 0; i < cSensorCount; i++)
-    {
+    for (uint8_t i = 0; i < cSensorCount; i++) {
       pSettings->setRawSetting(cCalibrationSettings[i],
-        static_cast<uint16_t>(_calibrationValue[i] + Settings::cCalibrationMidpoint));
+                               static_cast<uint16_t>(_calibrationValue[i] + Settings::cCalibrationMidpoint));
       Application::notifySettingChanged(cCalibrationSettings[i]);
     }
 
     DisplayManager::blink();
   }
 
-  if (key == Keys::Key::B)
-  {
-    if (--_selectedSensor < 0)
-    {
+  if (key == Keys::Key::B) {
+    if (--_selectedSensor < 0) {
       _selectedSensor = cSensorCount - 1;
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedSensor));
   }
 
-  if (key == Keys::Key::C)
-  {
-    if (++_selectedSensor >= cSensorCount)
-    {
+  if (key == Keys::Key::C) {
+    if (++_selectedSensor >= cSensorCount) {
       _selectedSensor = 0;
     }
     Application::setViewMode(static_cast<ViewMode>(_selectedSensor));
   }
 
-  if (key == Keys::Key::D)
-  {
-    if (_calibrationValue[_selectedSensor] > -Settings::cCalibrationMidpoint)
-    {
+  if (key == Keys::Key::D) {
+    if (_calibrationValue[_selectedSensor] > -Settings::cCalibrationMidpoint) {
       _calibrationValue[_selectedSensor]--;
-    }
-    else
-    {
+    } else {
       tick = false;
     }
   }
 
-  if (key == Keys::Key::U)
-  {
-    if (_calibrationValue[_selectedSensor] < Settings::cCalibrationMidpoint)
-    {
+  if (key == Keys::Key::U) {
+    if (_calibrationValue[_selectedSensor] < Settings::cCalibrationMidpoint) {
       _calibrationValue[_selectedSensor]++;
-    }
-    else
-    {
+    } else {
       tick = false;
     }
   }
 
-  if (key == Keys::Key::E)
-  {
+  if (key == Keys::Key::E) {
     Application::setOperatingMode(Application::OperatingMode::OperatingModeMainMenu);
   }
 
   return tick;
 }
 
-
-void SetTempCalibrationView::loop()
-{
+void SetTempCalibrationView::loop() {
   _selectedSensor = static_cast<int8_t>(Application::getViewMode());
 
   int16_t value = _calibrationValue[_selectedSensor];
@@ -138,7 +105,7 @@ void SetTempCalibrationView::loop()
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
   Display tcDisp;
 
-  // Display absolute value on tubes 1-0 
+  // Display absolute value on tubes 1-0
   tcDisp.setDisplayFromWord(absValue);
 
   // Sensor number (1-4) on tubes 0-1
@@ -153,5 +120,4 @@ void SetTempCalibrationView::loop()
   DisplayManager::writeDisplay(tcDisp);
 }
 
-
-}
+}  // namespace kbxTubeClock

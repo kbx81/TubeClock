@@ -18,26 +18,23 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "Settings.h"
 #include "View.h"
 
-
 namespace kbxTubeClock {
 
 class MainMenuView : public View {
-
-// The view which displays either the date, time, temperature, or a rotation
-//
-public: // Implement the MainMainView class
+  // The view which displays either the date, time, temperature, or a rotation
+  //
+ public:  // Implement the MainMainView class
   MainMenuView();
   virtual void enter(uint8_t relatedSetting) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
-private:
+ private:
   // the currently selected & displayed mode
   //
   uint8_t _selectedMode;
@@ -45,7 +42,6 @@ private:
   // the mode that was last selected
   //
   uint8_t _previousMode;
-
 };
 
-}
+}  // namespace kbxTubeClock

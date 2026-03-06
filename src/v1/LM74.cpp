@@ -25,16 +25,12 @@
 #include "SpiMaster.h"
 
 #if HARDWARE_VERSION == 1
-  #include "Hardware_v1.h"
+#include "Hardware_v1.h"
 #else
-  #error HARDWARE_VERSION must be defined with a value of 1
+#error HARDWARE_VERSION must be defined with a value of 1
 #endif
 
-
-namespace kbxTubeClock {
-
-namespace LM74 {
-
+namespace kbxTubeClock::LM74 {
 
 // The number of 8-bit registers in the chip
 //
@@ -71,23 +67,21 @@ static int16_t _temperatureOffset = 0;
 //
 static bool _connected = false;
 
-
-void initialize()
-{
+void initialize() {
   SpiMaster::SpiSlave mySlave = {
-    .gpioPort       = Hardware::cNssPort,               // gpio port on which CS line lives
-    .misoPort       = Hardware::cSpi1Port,              // port on which slave inputs data
-    .br             = SPI_CR1_BAUDRATE_FPCLK_DIV_16,    // Baudrate
-    .dataSize       = SPI_CR2_DS_8BIT,                  // Data size (4 to 16 bits, see RM)
-    .memorySize     = DMA_CCR_MSIZE_8BIT,               // Memory word width (8, 16, 32 bit)
-    .peripheralSize = DMA_CCR_PSIZE_8BIT,               // Peripheral word width (8, 16, 32 bit)
-    .gpioPin        = Hardware::cNssTemperaturePin,     // gpio pin on which CS line lives
-    .misoPin        = Hardware::cSpi1MisoPin,           // pin on which slave inputs data
-    .strobeCs       = false,                            // CS line is strobed upon xfer completion if true
-    .polarity       = false,                            // CS/CE polarity (true = active high)
-    .cpol           = true,                             // Clock polarity (idle high)
-    .cpha           = true,                             // Clock phase (transition 2)
-    .lsbFirst       = false,                            // MSB first
+      .gpioPort = Hardware::cNssPort,           // gpio port on which CS line lives
+      .misoPort = Hardware::cSpi1Port,          // port on which slave inputs data
+      .br = SPI_CR1_BAUDRATE_FPCLK_DIV_16,      // Baudrate
+      .dataSize = SPI_CR2_DS_8BIT,              // Data size (4 to 16 bits, see RM)
+      .memorySize = DMA_CCR_MSIZE_8BIT,         // Memory word width (8, 16, 32 bit)
+      .peripheralSize = DMA_CCR_PSIZE_8BIT,     // Peripheral word width (8, 16, 32 bit)
+      .gpioPin = Hardware::cNssTemperaturePin,  // gpio pin on which CS line lives
+      .misoPin = Hardware::cSpi1MisoPin,        // pin on which slave inputs data
+      .strobeCs = false,                        // CS line is strobed upon xfer completion if true
+      .polarity = false,                        // CS/CE polarity (true = active high)
+      .cpol = true,                             // Clock polarity (idle high)
+      .cpha = true,                             // Clock phase (transition 2)
+      .lsbFirst = false,                        // MSB first
   };
 
   _spiMaster = Hardware::getSpiMaster();
@@ -95,41 +89,38 @@ void initialize()
   _slaveId = _spiMaster->registerSlave(&mySlave);
 }
 
+bool checkConnection() {
+  SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-bool checkConnection()
-{
-  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
-
-  if (request != nullptr)
-  {
+  if (request != nullptr) {
     // First read
     request->bufferIn = _lm74Register;
     request->bufferOut = _spareBuffer;
     request->length = cNumberOfRegisters;
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
-    while (_spiMaster->transferComplete(_slaveId) == false);
+    while (_spiMaster->transferComplete(_slaveId) == false)
+      ;
 
     uint8_t read1_msb = _lm74Register[0];
     uint8_t read1_lsb = _lm74Register[1];
 
     // Second read
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
-    while (_spiMaster->transferComplete(_slaveId) == false);
+    while (_spiMaster->transferComplete(_slaveId) == false)
+      ;
 
     uint8_t read2_msb = _lm74Register[0];
     uint8_t read2_lsb = _lm74Register[1];
 
     // POR case: both reads must show MSB=0xFF, LSB bits[7:2]=0x00
-    bool porMatch = (read1_msb == 0xff) && ((read1_lsb & 0xfc) == 0)
-                 && (read2_msb == 0xff) && ((read2_lsb & 0xfc) == 0);
+    bool porMatch =
+        (read1_msb == 0xff) && ((read1_lsb & 0xfc) == 0) && (read2_msb == 0xff) && ((read2_lsb & 0xfc) == 0);
 
     // Post-conversion case: D2 (conversion complete) set in both reads,
     //  MSB != 0xFF (reject floating-high / ambiguous POR overlap),
     //  and temperature values match within +/-2 LSBs
     bool postConv = false;
-    if (((read1_lsb & 0x04) == 0x04) && ((read2_lsb & 0x04) == 0x04)
-        && (read1_msb != 0xff) && (read2_msb != 0xff))
-    {
+    if (((read1_lsb & 0x04) == 0x04) && ((read2_lsb & 0x04) == 0x04) && (read1_msb != 0xff) && (read2_msb != 0xff)) {
       // Compare temperature using D15:D3 (mask off D2:D0)
       uint16_t raw1 = (read1_msb << 8) | (read1_lsb & 0xf8);
       uint16_t raw2 = (read2_msb << 8) | (read2_lsb & 0xf8);
@@ -138,10 +129,10 @@ bool checkConnection()
       postConv = (diff <= 16);
     }
 
-    if (porMatch || postConv)
-    {
+    if (porMatch || postConv) {
       // Kick off a full register refresh
-      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk);
+      while (refresh(true) != SpiMaster::SpiReqAck::SpiReqAckOk)
+        ;
 
       _connected = true;
       return true;
@@ -150,24 +141,12 @@ bool checkConnection()
   return false;
 }
 
+bool isConnected() { return _connected; }
 
-bool isConnected()
-{
-  return _connected;
-}
+uint16_t getTemperatureRegister() { return (_lm74Register[0] << 8) | _lm74Register[1]; }
 
-
-uint16_t getTemperatureRegister()
-{
-  return (_lm74Register[0] << 8) | _lm74Register[1];
-}
-
-
-int32_t getTemperatureCx10()
-{
-  int16_t temp_whole = ((_lm74Register[0] & 0x80) << 8) |
-                        (_lm74Register[0] << 1) |
-                        (_lm74Register[1] >> 7);
+int32_t getTemperatureCx10() {
+  int16_t temp_whole = ((_lm74Register[0] & 0x80) << 8) | (_lm74Register[0] << 1) | (_lm74Register[1] >> 7);
   uint16_t temp_frac = (_lm74Register[1] & 0x7f) >> 3;
   // (whole * 1000 + (frac >> 1) * 125) / 100 = (whole * 8 + (frac >> 1)) * 5 / 4
   // Replaces expensive / 100 (software divide) with / 4 (shift)
@@ -175,23 +154,17 @@ int32_t getTemperatureCx10()
   return v / 4 + _temperatureOffset;
 }
 
+void setTemperatureOffset(int16_t offset) { _temperatureOffset = offset; }
 
-void setTemperatureOffset(int16_t offset)
-{
-  _temperatureOffset = offset;
-}
+SpiMaster::SpiReqAck refresh(const bool block) {
+  SpiMaster::SpiTransferReq *request = _spiMaster->getTransferRequestBuffer(_slaveId);
 
-
-SpiMaster::SpiReqAck refresh(const bool block)
-{
-  SpiMaster::SpiTransferReq* request = _spiMaster->getTransferRequestBuffer(_slaveId);
-
-  if (request != nullptr)
-  {
+  if (request != nullptr) {
     // Trigger a read of the temperature registers
     request->state = SpiMaster::SpiReqAck::SpiReqAckQueued;
 
-    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true));
+    while ((_spiMaster->transferComplete(_slaveId) == false) && (block == true))
+      ;
 
     return SpiMaster::SpiReqAck::SpiReqAckOk;
   }
@@ -199,13 +172,6 @@ SpiMaster::SpiReqAck refresh(const bool block)
   return SpiMaster::SpiReqAck::SpiReqAckError;
 }
 
+bool transferComplete() { return _spiMaster->transferComplete(_slaveId); }
 
-bool transferComplete()
-{
-  return _spiMaster->transferComplete(_slaveId);
-}
-
-
-}
-
-}
+}  // namespace kbxTubeClock::LM74

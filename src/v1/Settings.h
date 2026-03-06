@@ -18,92 +18,83 @@
 //
 #pragma once
 
-
 #include <cstdint>
 
 #include "DateTime.h"
 
-
 namespace kbxTubeClock {
 
 class Settings {
-
-public:
-
+ public:
   /// @brief Types of settings we keep
   ///
-  enum Setting : uint8_t
-  {
-    SystemOptions                =  0,
-    BeepStates                   =  1,
-    BlinkStates                  =  2,
-    OnOffStates                  =  3,
-    TimeDisplayDuration          =  4,
-    DateDisplayDuration          =  5,
-    TemperatureDisplayDuration   =  6,
-    FadeDuration                 =  7,
-    DstBeginMonth                =  8,
-    DstBeginDowOrdinal           =  9,
-    DstEndMonth                  = 10,
-    DstEndDowOrdinal             = 11,
-    DstSwitchDayOfWeek           = 12,
-    DstSwitchHour                = 13,
-    EffectDuration               = 14,
-    EffectFrequency              = 15,
-    MinimumIntensity             = 16,
-    BeeperVolume                 = 17,
-    TemperatureCalibrationSTM32  = 18,
+  enum Setting : uint8_t {
+    SystemOptions = 0,
+    BeepStates = 1,
+    BlinkStates = 2,
+    OnOffStates = 3,
+    TimeDisplayDuration = 4,
+    DateDisplayDuration = 5,
+    TemperatureDisplayDuration = 6,
+    FadeDuration = 7,
+    DstBeginMonth = 8,
+    DstBeginDowOrdinal = 9,
+    DstEndMonth = 10,
+    DstEndDowOrdinal = 11,
+    DstSwitchDayOfWeek = 12,
+    DstSwitchHour = 13,
+    EffectDuration = 14,
+    EffectFrequency = 15,
+    MinimumIntensity = 16,
+    BeeperVolume = 17,
+    TemperatureCalibrationSTM32 = 18,
     TemperatureCalibrationDS3234 = 19,
     TemperatureCalibrationDS1722 = 20,
-    TemperatureCalibrationLM74   = 21,
-    DisplayRefreshInterval       = 22,
-    DateFormat                   = 23,
-    TimeZone                     = 24,
-    ColonBehavior                = 25,
-    TimerResetValue              = 26,
-    DmxAddress                   = 27
+    TemperatureCalibrationLM74 = 21,
+    DisplayRefreshInterval = 22,
+    DateFormat = 23,
+    TimeZone = 24,
+    ColonBehavior = 25,
+    TimerResetValue = 26,
+    DmxAddress = 27
   };
 
   /// @brief Settings we keep
   ///
-  enum SystemOptionsBits : uint8_t
-  {
-    Display12Hour               = 0,
-    StatusLedAsAmPm             = 1,
-    HourlyChime                 = 2,
-    DstEnable                   = 3,
-    DisplayFahrenheit           = 4,
-    AutoAdjustIntensity         = 5,
-    StartupToToggle             = 6,
-    DmxExtended                 = 7,
-    MSDsOff                     = 8,
-    TriggerEffectOnRotate       = 9
+  enum SystemOptionsBits : uint8_t {
+    Display12Hour = 0,
+    StatusLedAsAmPm = 1,
+    HourlyChime = 2,
+    DstEnable = 3,
+    DisplayFahrenheit = 4,
+    AutoAdjustIntensity = 5,
+    StartupToToggle = 6,
+    DmxExtended = 7,
+    MSDsOff = 8,
+    TriggerEffectOnRotate = 9
   };
 
   /// @brief Enums for time slots
   ///
-  enum Slot : uint8_t
-  {
-    Slot1           = 0,
-    Slot2           = 1,
-    Slot3           = 2,
-    Slot4           = 3,
-    Slot5           = 4,
-    Slot6           = 5,
-    Slot7           = 6,
-    Slot8           = 7,
-    SlotDate        = 8,
+  enum Slot : uint8_t {
+    Slot1 = 0,
+    Slot2 = 1,
+    Slot3 = 2,
+    Slot4 = 3,
+    Slot5 = 4,
+    Slot6 = 5,
+    Slot7 = 6,
+    Slot8 = 7,
+    SlotDate = 8,
     SlotTemperature = 9,
-    SlotTimer       = 10,
-    SlotMenu        = 11,
-    SlotSet         = 12,
-    SlotDmx         = 13,
-    SlotCalculated  = 14
+    SlotTimer = 10,
+    SlotMenu = 11,
+    SlotSet = 12,
+    SlotDmx = 13,
+    SlotCalculated = 14
   };
 
-
-public:
-
+ public:
   /// @brief Where settings will be written in FLASH
   /// @note This address is provided by the linker script (__settings_flash_start)
   ///       and is located at the end of flash memory to prevent conflicts with code
@@ -121,7 +112,6 @@ public:
   /// @brief Default constructor
   ///
   Settings();
-
 
   /// @brief Initialize settings
   ///
@@ -142,7 +132,6 @@ public:
   ///
   bool saveToFlashIfChanged();
 
-
   /// @brief Returns a setting
   /// @return true if setting is enabled, false otherwise
   ///
@@ -161,7 +150,6 @@ public:
   ///
   void setRawSetting(const uint8_t setting, const uint16_t value);
 
-
   /// @brief Get a time value stored in the settings
   ///
   DateTime getTime(const Slot setting);
@@ -177,8 +165,7 @@ public:
   ///
   bool hvState();
 
-private:
-
+ private:
   /// @brief array of values for various settings data
   ///
   uint16_t _setting[Setting::DmxAddress + 1];
@@ -192,4 +179,4 @@ private:
   uint32_t _crc;
 };
 
-}
+}  // namespace kbxTubeClock

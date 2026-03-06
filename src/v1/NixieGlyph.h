@@ -18,15 +18,12 @@
 //
 #pragma once
 
-
 #include <cstdint>
-
 
 namespace kbxTubeClock {
 
-class NixieGlyph
-{
-public:
+class NixieGlyph {
+ public:
   /// @brief Create a new NixieGlyph instance with specified intensity and duration
   ///
   /// @param intensity Initial value for glyph (0-255)
@@ -34,11 +31,10 @@ public:
   ///
   NixieGlyph(const uint8_t intensity = 0, const uint32_t duration = 0);
 
-public:
+ public:
   /// Important constants
   ///
   static const uint8_t cGlyphMaximumIntensity = 255;  // Maximum PWM intensity value
-
 
   /// @brief Compare this NixieGlyph to another
   /// @param LED to compare with
@@ -76,11 +72,12 @@ public:
   /// @param start Starting glyph intensity
   /// @param target Target glyph intensity
   ///
-  void setFromLinearInterpolation(uint32_t currentTick, uint32_t totalTicks, const NixieGlyph &start, const NixieGlyph &target);
+  void setFromLinearInterpolation(uint32_t currentTick, uint32_t totalTicks, const NixieGlyph &start,
+                                  const NixieGlyph &target);
 
-private:
-  uint8_t _intensity;       ///< Intensity of the glyph (0-255)
-  uint32_t _duration;       ///< Duration over which this glyph should transition
+ private:
+  uint8_t _intensity;  ///< Intensity of the glyph (0-255)
+  uint32_t _duration;  ///< Duration over which this glyph should transition
 };
 
-}
+}  // namespace kbxTubeClock
