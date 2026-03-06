@@ -35,6 +35,11 @@ namespace SerialRemote
   ///
   void rxIsr(uint32_t usart);
 
+  /// @brief Process a single received byte (e.g. from USB CDC-ACM)
+  /// @param c The received character
+  ///
+  void rxByte(char c);
+
   /// @brief Called from USART TX interrupt to send next byte
   /// @param usart The USART peripheral base address that triggered the interrupt
   ///

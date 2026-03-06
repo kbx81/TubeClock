@@ -29,6 +29,7 @@
 #include "RtttlPlayer.h"
 #include "SerialRemote.h"
 #include "Settings.h"
+#include "UsbSerial.h"
 #include "TimerCounterView.h"
 
 #if HARDWARE_VERSION == 1
@@ -305,6 +306,9 @@ static void _txSendResponse()
     _txIndex[i] = 1;
     _txUsartPtrs[i]->enableTxInterrupt();
   }
+
+  // Also send via USB if the host is connected
+  UsbSerial::write(reinterpret_cast<const uint8_t*>(_txBuffer), _txLength);
 }
 
 
@@ -645,42 +649,9 @@ static void _txProcessQueue()
 // --- Forward declaration for command handler ---
 static void _handleCommand(const char* payload, uint8_t length);
 
-
-void initialize()
+// --- RX state machine: process a single received byte ---
+static void _rxProcessByte(char rxChar)
 {
-  _txUsartPtrs[0] = Hardware::getUsart(0);  // USART1
-  _txUsartPtrs[1] = Hardware::getUsart(3);  // USART4
-  _rxUsart3Ptr    = Hardware::getUsart(2);  // USART3
-
-  // Enable USART3 RX interrupt now that the ISR handler is ready.
-  // (Must not be enabled earlier -- before _rxUsart3Ptr is set, rxIsr()
-  //  would return without reading the byte, leaving RXNE asserted and
-  //  locking the CPU in an infinite ISR tail-chain on Cortex-M0.)
-  _rxUsart3Ptr->enableRxInterrupt();
-
-  // Enqueue the boot notification as the very first queue entry so it is
-  // transmitted before any other unsolicited notifications.
-  QueueEntry bootEntry;
-  bootEntry.type = NotificationType::Boot;
-  _queueEnqueue(bootEntry);
-}
-
-
-void rxIsr(uint32_t usart)
-{
-  // Look up the Usart instance for this peripheral
-  Usart* u = (usart == Hardware::cGpsUsart) ? _txUsartPtrs[0] : _rxUsart3Ptr;
-  if (u == nullptr) return;
-
-  // Check if the RXNE flag is set for this USART
-  if (!u->rxReady())
-  {
-    return;
-  }
-
-  // Read the received byte (clears RXNE flag)
-  char rxChar = u->readByte();
-
   switch (_rxState)
   {
     case RxState::RxGettingHeader:
@@ -783,6 +754,49 @@ void rxIsr(uint32_t usart)
       }
       break;
   }
+}
+
+
+void initialize()
+{
+  _txUsartPtrs[0] = Hardware::getUsart(0);  // USART1
+  _txUsartPtrs[1] = Hardware::getUsart(3);  // USART4
+  _rxUsart3Ptr    = Hardware::getUsart(2);  // USART3
+
+  // Enable USART3 RX interrupt now that the ISR handler is ready.
+  // (Must not be enabled earlier -- before _rxUsart3Ptr is set, rxIsr()
+  //  would return without reading the byte, leaving RXNE asserted and
+  //  locking the CPU in an infinite ISR tail-chain on Cortex-M0.)
+  _rxUsart3Ptr->enableRxInterrupt();
+
+  // Enqueue the boot notification as the very first queue entry so it is
+  // transmitted before any other unsolicited notifications.
+  QueueEntry bootEntry;
+  bootEntry.type = NotificationType::Boot;
+  _queueEnqueue(bootEntry);
+}
+
+
+void rxIsr(uint32_t usart)
+{
+  // Look up the Usart instance for this peripheral
+  Usart* u = (usart == Hardware::cGpsUsart) ? _txUsartPtrs[0] : _rxUsart3Ptr;
+  if (u == nullptr) return;
+
+  // Check if the RXNE flag is set for this USART
+  if (!u->rxReady())
+  {
+    return;
+  }
+
+  // Read the received byte (clears RXNE flag) and run the state machine
+  _rxProcessByte(u->readByte());
+}
+
+
+void rxByte(char c)
+{
+  _rxProcessByte(c);
 }
 
 

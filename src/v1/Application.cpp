@@ -18,9 +18,9 @@
 //
 #include <cstdint>
 
+#include "AlarmHandler.h"
 #include "Animator.h"
 #include "Application.h"
-#include "AlarmHandler.h"
 #include "DateTime.h"
 #include "Display.h"
 #include "DisplayManager.h"
@@ -29,18 +29,19 @@
 #include "Dmx-512-View.h"
 #include "GpsReceiver.h"
 #include "Keys.h"
+#include "MainMenuView.h"
 #include "RtttlPlayer.h"
 #include "SerialRemote.h"
+#include "SetBitsView.h"
+#include "SetTempCalibrationView.h"
+#include "SetTimeDateView.h"
 #include "Settings.h"
-#include "MainMenuView.h"
+#include "SetValueView.h"
+#include "SystemStatusView.h"
 #include "TestDisplayView.h"
 #include "TimeDateTempView.h"
 #include "TimerCounterView.h"
-#include "SetTimeDateView.h"
-#include "SetTempCalibrationView.h"
-#include "SetValueView.h"
-#include "SetBitsView.h"
-#include "SystemStatusView.h"
+#include "UsbSerial.h"
 
 
 // Workaround for  "hidden symbol `__dso_handle' isn't defined" linker error
@@ -619,6 +620,9 @@ void loop()
     {
       DisplayManager::setMasterIntensity(_masterIntensity);
     }
+
+    // Service USB CDC-ACM (enumeration, RX, and TX all handled here)
+    UsbSerial::poll();
 
     // Process any pending serial remote commands
     SerialRemote::process();

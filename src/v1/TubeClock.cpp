@@ -36,6 +36,7 @@
 #include "InfraredRemote.h"
 #include "Keys.h"
 #include "SerialRemote.h"
+#include "UsbSerial.h"
 
 
 using namespace kbxTubeClock;
@@ -144,6 +145,13 @@ void usart1_isr(void)
 	SerialRemote::rxIsr(USART1);
 	SerialRemote::txIsr(USART1);
 	Hardware::usart1Isr();
+}
+
+
+/* USB -- CDC-ACM serial interface */
+void usb_isr(void)
+{
+	UsbSerial::poll();
 }
 
 

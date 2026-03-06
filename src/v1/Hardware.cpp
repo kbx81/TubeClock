@@ -57,6 +57,7 @@
 #include "RgbLed.h"
 #include "SpiMaster.h"
 #include "Usart.h"
+#include "UsbSerial.h"
 
 #if HARDWARE_VERSION == 1
   #include "Hardware_v1.h"
@@ -1344,6 +1345,8 @@ void initialize()
 
   _systickSetup(1);   // tick every 1 mS
   _nvicSetup();
+
+  UsbSerial::initialize();
 
   Dmx512Rx::initialize();
 
