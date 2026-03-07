@@ -25,58 +25,103 @@
 
 namespace kbxTubeClock {
 
-SetValueView::SetValueView() : _setValue(0), _maxValue(0), _relatedSetting(Settings::Setting::TimerResetValue) {}
+SetValueView::SetValueView()
+    : _descriptor{0, 0, Settings::SettingTransform::None},
+      _value{0, 0, 0, 0},
+      _relatedSetting(Settings::Setting::TimerResetValue),
+      _numSettings(1),
+      _selectedItem(0) {}
 
-void SetValueView::enter(uint8_t relatedSetting) {
+void SetValueView::enter(const Settings::SettingDescriptor *descriptor, uint8_t relatedSetting,
+                         uint8_t numSettings /* = 1 */) {
   _relatedSetting = relatedSetting;
+  _numSettings = numSettings;
+  _descriptor = *descriptor;
 
-  _setValue = Application::getSettingsPtr()->getRawSetting(_relatedSetting);
-  _maxValue = Settings::cSettingData[_relatedSetting];
+  Settings *pSettings = Application::getSettingsPtr();
+
+  if (numSettings > 1) {
+    _selectedItem = static_cast<int8_t>(Application::getViewMode());
+    for (uint8_t i = 0; i < numSettings; i++) {
+      _value[i] = pSettings->getRawSetting(relatedSetting + i);
+    }
+  } else {
+    _selectedItem = 0;
+    _value[0] = pSettings->getRawSetting(relatedSetting);
+  }
 }
 
 bool SetValueView::keyHandler(Keys::Key key) {
   bool tick = true;
 
   if (key == Keys::Key::A) {
-    Application::getSettingsPtr()->setRawSetting(_relatedSetting, _setValue);
-    Application::notifySettingChanged(_relatedSetting);
-
+    Settings *pSettings = Application::getSettingsPtr();
+    for (uint8_t i = 0; i < _numSettings; i++) {
+      pSettings->setRawSetting(_relatedSetting + i, _value[i]);
+      Application::notifySettingChanged(_relatedSetting + i);
+    }
     DisplayManager::blink();
   }
 
-  if (key == Keys::Key::B) {
-    if (_setValue == 1) {
-      tick = false;
-    } else {
-      _setValue = 1;
-    }
-  }
-
-  if (key == Keys::Key::C) {
-    if (_setValue == _maxValue) {
-      tick = false;
-    } else {
-      _setValue = _maxValue;
-    }
-  }
-
-  if (key == Keys::Key::D) {
-    if (--_setValue > _maxValue) {
-      _setValue = 0;
-      tick = false;
+  if (_numSettings == 1) {
+    if (key == Keys::Key::B) {
+      if (_value[0] == _descriptor.minValue) {
+        tick = false;
+      } else {
+        _value[0] = _descriptor.minValue;
+      }
     }
 
-    if (!_setValue && (_maxValue == 12 || _maxValue == 4))  // it's a month or an ordinal
-    {
-      _setValue = 1;
-      tick = false;
+    if (key == Keys::Key::C) {
+      if (_value[0] == _descriptor.maxOrMask) {
+        tick = false;
+      } else {
+        _value[0] = _descriptor.maxOrMask;
+      }
     }
-  }
 
-  if (key == Keys::Key::U) {
-    if (++_setValue > _maxValue) {
-      _setValue = _maxValue;
-      tick = false;
+    if (key == Keys::Key::D) {
+      if (--_value[0] > _descriptor.maxOrMask || _value[0] < _descriptor.minValue) {
+        _value[0] = _descriptor.minValue;
+        tick = false;
+      }
+    }
+
+    if (key == Keys::Key::U) {
+      if (++_value[0] > _descriptor.maxOrMask) {
+        _value[0] = _descriptor.maxOrMask;
+        tick = false;
+      }
+    }
+  } else {
+    if (key == Keys::Key::B) {
+      if (--_selectedItem < 0) {
+        _selectedItem = static_cast<int8_t>(_numSettings) - 1;
+      }
+      Application::setViewMode(static_cast<ViewMode>(_selectedItem));
+    }
+
+    if (key == Keys::Key::C) {
+      if (++_selectedItem >= static_cast<int8_t>(_numSettings)) {
+        _selectedItem = 0;
+      }
+      Application::setViewMode(static_cast<ViewMode>(_selectedItem));
+    }
+
+    if (key == Keys::Key::D) {
+      if (_value[_selectedItem] > _descriptor.minValue) {
+        _value[_selectedItem]--;
+      } else {
+        tick = false;
+      }
+    }
+
+    if (key == Keys::Key::U) {
+      if (_value[_selectedItem] < _descriptor.maxOrMask) {
+        _value[_selectedItem]++;
+      } else {
+        tick = false;
+      }
     }
   }
 
@@ -88,42 +133,77 @@ bool SetValueView::keyHandler(Keys::Key key) {
 }
 
 void SetValueView::loop() {
-  int16_t offsetInMinutes = (_setValue - 56) * 15;
-  uint32_t dotsBitmap = 0;
-  auto displayedValue = _setValue;
-  DateTime offsetTime(2001, 1, 1);  // ensure date after 2000/1/1 in case of subtraction
   NixieGlyph dot(NixieGlyph::cGlyphMaximumIntensity);
 
-  switch (_relatedSetting) {
-    // this is because DMX-512 starts counting at one and not at zero
-    case Settings::Setting::DmxAddress:
-      displayedValue += 1;
-      break;
+  if (_numSettings == 1) {
+    uint32_t dotsBitmap = 0;
+    uint16_t displayedValue = _value[0];
+    DateTime offsetTime(2001, 1, 1);  // ensure date after 2000/1/1 in case of subtraction
 
-    // make time zone display logical
-    case Settings::Setting::TimeZone:
-      if (offsetInMinutes < 0) {
-        dotsBitmap = 0b0001;    // negative value/offset indicator
-        offsetInMinutes *= -1;  // ensure correct display of the offset when it's negative
+    switch (_descriptor.transform) {
+      case Settings::SettingTransform::PlusOne:
+        displayedValue += 1;
+        break;
+
+      case Settings::SettingTransform::TimeZone: {
+        int16_t offsetInMinutes = (static_cast<int16_t>(_value[0]) - 56) * 15;
+        if (offsetInMinutes < 0) {
+          dotsBitmap = 0b0001;    // negative value/offset indicator
+          offsetInMinutes *= -1;  // ensure correct display of the offset when it's negative
+        }
+        offsetTime = offsetTime.addSeconds(offsetInMinutes * 60);
+        displayedValue = (offsetTime.hour() * 100) + offsetTime.minute();
+        break;
       }
 
-      offsetTime = offsetTime.addSeconds(offsetInMinutes * 60);
+      default:
+        break;
+    }
 
-      displayedValue = (offsetTime.hour() * 100) + offsetTime.minute();
+    Display tcDisp(displayedValue);
+    tcDisp.setDots(dotsBitmap, dot);
 
-      break;
+    tcDisp.setMsdTubesOff();
 
-    default:
-      break;
+    if (displayedValue < 10000) {  // if value fits in 4 digits, show the setting number in tubes 4 and 5
+      auto menuItemDisplayNumber = Application::getModeDisplayNumber(Application::getOperatingMode());
+      tcDisp.setTubeToValue(4, menuItemDisplayNumber % 10);
+      tcDisp.setTubeToValue(5, menuItemDisplayNumber / 10 % 10);
+      tcDisp.setTubeIntensity(4, NixieGlyph::cGlyphMaximumIntensity);
+      tcDisp.setTubeIntensity(5, NixieGlyph::cGlyphMaximumIntensity);
+      tcDisp.setDot(1, NixieGlyph(NixieGlyph::cGlyphMaximumIntensity));
+    }
+
+    DisplayManager::writeDisplay(tcDisp);
+    return;
   }
 
-  // now we can create a new display object with the right colors and bitmask
-  Display tcDisp(displayedValue);
-  tcDisp.setDots(dotsBitmap, dot);
+  _selectedItem = static_cast<int8_t>(Application::getViewMode());
 
-  if (Application::getSettingsPtr()->getSetting(Settings::Setting::SystemOptions,
-                                                Settings::SystemOptionsBits::MSDsOff) == true) {
-    tcDisp.setMsdTubesOff();
+  uint8_t itemNumber = static_cast<uint8_t>(_selectedItem) + 1;
+  Display tcDisp;
+
+  if (_descriptor.transform == Settings::SettingTransform::Calibration) {
+    int16_t signedValue = static_cast<int16_t>(_value[_selectedItem]) - Settings::cCalibrationMidpoint;
+    bool negative = (signedValue < 0);
+    uint16_t absValue = negative ? static_cast<uint16_t>(-signedValue) : static_cast<uint16_t>(signedValue);
+
+    // Dots: left colon (bits 0-1), right upper dot (bit 2) for negative
+    uint32_t dotsBitmap = negative ? 0b0111 : 0b0011;
+
+    tcDisp.setDisplayFromWord(absValue);
+    tcDisp.setTubeToValue(5, 0);
+    tcDisp.setTubeToValue(4, itemNumber);
+    // Tubes 0, 1, 4, 5 on; tubes 2, 3 off
+    tcDisp.setTubeIntensities(NixieGlyph::cGlyphMaximumIntensity, 0, 0b110011);
+    tcDisp.setDots(dotsBitmap, dot, true);
+  } else {
+    tcDisp.setDisplayFromWord(_value[_selectedItem]);
+    tcDisp.setTubeToValue(5, 0);
+    tcDisp.setTubeToValue(4, itemNumber);
+    // All tubes on: tube 5 = 0, tube 4 = item number, tubes 3-0 = value
+    tcDisp.setTubeIntensities(NixieGlyph::cGlyphMaximumIntensity, 0, 0b111111);
+    tcDisp.setDots(0b0011, dot, true);
   }
 
   DisplayManager::writeDisplay(tcDisp);

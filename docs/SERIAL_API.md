@@ -114,27 +114,28 @@ The response includes the current operating mode number. If the view mode (sub-p
 | 10 | SlotBeepConfig | Per-slot beep enable/disable |
 | 11 | SlotBlinkConfig | Per-slot blink enable/disable |
 | 12 | SlotOnOffConfig | Per-slot color change enable/disable |
-| 13 | SetDurationClock | Clock display duration |
-| 14 | SetDurationDate | Date display duration |
-| 15 | SetDurationTemp | Temperature display duration |
-| 16 | SetDurationFade | Digit fade duration |
-| 17 | DstBeginMonth | DST start month |
-| 18 | DstBeginDowOrdinal | DST start day ordinal |
-| 19 | DstEndMonth | DST end month |
-| 20 | DstEndDowOrdinal | DST end day ordinal |
-| 21 | DstSwitchDayOfWeek | DST switch day of week |
-| 22 | DstSwitchHour | DST switch hour |
-| 23 | SetEffectDuration | Display effect duration |
-| 24 | SetEffectFrequency | Display effect frequency |
-| 25 | SetMinimumIntensity | Minimum display intensity |
-| 26 | SetBeeperVolume | Beeper volume |
-| 27 | SetTempCalibration | Temperature calibration |
-| 28 | SetDisplayRefreshInterval | Display refresh interval |
-| 29 | SetDateFormat | Date format |
-| 30 | SetTimeZone | Time zone |
-| 31 | SetColonBehavior | Colon/separator behavior |
-| 32 | SetDMX512Address | DMX-512 address |
-| 33-40 | Slot1Time-Slot8Time | Set slot 1-8 time |
+| 13 | SlotPMIndicatorRGBConfig | PM indicator LED RGB color |
+| 14 | SetDurationClock | Clock display duration |
+| 15 | SetDurationDate | Date display duration |
+| 16 | SetDurationTemp | Temperature display duration |
+| 17 | SetDurationFade | Digit fade duration |
+| 18 | DstBeginMonth | DST start month |
+| 19 | DstBeginDowOrdinal | DST start day ordinal |
+| 20 | DstEndMonth | DST end month |
+| 21 | DstEndDowOrdinal | DST end day ordinal |
+| 22 | DstSwitchDayOfWeek | DST switch day of week |
+| 23 | DstSwitchHour | DST switch hour |
+| 24 | SetEffectDuration | Display effect duration |
+| 25 | SetEffectFrequency | Display effect frequency |
+| 26 | SetMinimumIntensity | Minimum display intensity |
+| 27 | SetBeeperVolume | Beeper volume |
+| 28 | SetTempCalibration | Temperature calibration |
+| 29 | SetIdleTimeout | Idle timeout |
+| 30 | SetDateFormat | Date format |
+| 31 | SetTimeZone | Time zone |
+| 32 | SetColonBehavior | Colon/separator behavior |
+| 33 | SetDMX512Address | DMX-512 address |
+| 34-41 | Slot1Time-Slot8Time | Set slot 1-8 time |
 
 #### View Mode (Sub-Page) Values
 
@@ -148,6 +149,8 @@ The response includes the current operating mode number. If the view mode (sub-p
 | 5 | ViewMode5 |
 | 6 | ViewMode6 |
 | 7 | ViewMode7 |
+| 8 | ViewMode8 |
+| 9 | ViewMode9 |
 
 The meaning of each view mode is context-dependent on the active operating mode.
 
@@ -363,7 +366,7 @@ Setting a temperature value automatically sets the temperature source to `Extern
 
 Returns the active temperature sensor type as a decimal integer (see table below).
 
-Example: `$TCSMS4*XX\n` (LM74 is the active source).
+Example: `$TCSMS4*XX\n` (ExternalSerial is the active source).
 
 #### Set Temperature Source
 
@@ -552,7 +555,7 @@ Get or set individual clock settings by index number.
 
 Returns the current value of setting `nn`.
 
-Example: `$TCCS7*XX\n` queries setting 7 (FadeDuration); response: `$TCSS7,500*XX\n`.
+Example: `$TCCS10*XX\n` queries setting 10 (FadeDuration); response: `$TCSS10,500*XX\n`.
 
 #### Set Setting
 
@@ -563,7 +566,7 @@ Example: `$TCCS7*XX\n` queries setting 7 (FadeDuration); response: `$TCSS7,500*X
 
 Sets setting `nn` to `value` (unsigned 16-bit integer). The response confirms the new value. After setting a value, the clock's active settings are refreshed immediately.
 
-Example: `$TCCS17,5*XX\n` sets BeeperVolume (17) to 5.
+Example: `$TCCS20,5*XX\n` sets BeeperVolume (20) to 5.
 
 **Note:** Set Setting updates the in-memory settings only. Use Save Settings to persist changes across power cycles.
 
@@ -603,30 +606,33 @@ Example: `$TCSSERASE1*XX\n` — settings flash erased.
 | 1 | BeepStates | Per-slot beep enable bitmask |
 | 2 | BlinkStates | Per-slot blink enable bitmask |
 | 3 | OnOffStates | Per-slot on/off enable bitmask |
-| 4 | TimeDisplayDuration | Duration of time display (toggle mode) |
-| 5 | DateDisplayDuration | Duration of date display (toggle mode) |
-| 6 | TemperatureDisplayDuration | Duration of temperature display (toggle mode) |
-| 7 | FadeDuration | Digit crossfade duration |
-| 8 | DstBeginMonth | DST start month |
-| 9 | DstBeginDowOrdinal | DST start day-of-week ordinal |
-| 10 | DstEndMonth | DST end month |
-| 11 | DstEndDowOrdinal | DST end day-of-week ordinal |
-| 12 | DstSwitchDayOfWeek | DST switch day of week |
-| 13 | DstSwitchHour | DST switch hour |
-| 14 | EffectDuration | Display effect duration |
-| 15 | EffectFrequency | Display effect frequency |
-| 16 | MinimumIntensity | Minimum display intensity |
-| 17 | BeeperVolume | Beeper volume |
-| 18 | TemperatureCalibrationSTM32 | Temperature calibration offset (STM32 internal ADC) |
-| 19 | TemperatureCalibrationDS3234 | Temperature calibration offset (DS3234) |
-| 20 | TemperatureCalibrationDS1722 | Temperature calibration offset (DS1722) |
-| 21 | TemperatureCalibrationLM74 | Temperature calibration offset (LM74) |
-| 22 | DisplayRefreshInterval | Display refresh interval |
-| 23 | DateFormat | Date format |
-| 24 | TimeZone | Time zone offset |
-| 25 | ColonBehavior | Colon/separator behavior during time display |
-| 26 | TimerResetValue | Timer/counter reset value |
-| 27 | DmxAddress | DMX-512 base address |
+| 4 | PMIndicatorRedValue | PM indicator LED red channel (0–4095) |
+| 5 | PMIndicatorGreenValue | PM indicator LED green channel (0–4095) |
+| 6 | PMIndicatorBlueValue | PM indicator LED blue channel (0–4095) |
+| 7 | TimeDisplayDuration | Duration of time display (toggle mode) |
+| 8 | DateDisplayDuration | Duration of date display (toggle mode) |
+| 9 | TemperatureDisplayDuration | Duration of temperature display (toggle mode) |
+| 10 | FadeDuration | Digit crossfade duration |
+| 11 | DstBeginMonth | DST start month |
+| 12 | DstBeginDowOrdinal | DST start day-of-week ordinal |
+| 13 | DstEndMonth | DST end month |
+| 14 | DstEndDowOrdinal | DST end day-of-week ordinal |
+| 15 | DstSwitchDayOfWeek | DST switch day of week |
+| 16 | DstSwitchHour | DST switch hour |
+| 17 | EffectDuration | Display effect duration |
+| 18 | EffectFrequency | Display effect frequency |
+| 19 | MinimumIntensity | Minimum display intensity |
+| 20 | BeeperVolume | Beeper volume |
+| 21 | TemperatureCalibrationSTM32 | Temperature calibration offset (STM32 internal ADC) |
+| 22 | TemperatureCalibrationDS3234 | Temperature calibration offset (DS3234) |
+| 23 | TemperatureCalibrationDS1722 | Temperature calibration offset (DS1722) |
+| 24 | TemperatureCalibrationLM74 | Temperature calibration offset (LM74) |
+| 25 | IdleTimeout | Idle timeout (seconds, 10–600) |
+| 26 | DateFormat | Date format |
+| 27 | TimeZone | Time zone offset |
+| 28 | ColonBehavior | Colon/separator behavior during time display |
+| 29 | TimerResetValue | Timer/counter reset value |
+| 30 | DmxAddress | DMX-512 base address |
 
 #### SystemOptions Bit Flags (Setting 0)
 
@@ -683,7 +689,7 @@ Pauses the timer at its current value.
 <- $TCSRR,<value>*XX\n
 ```
 
-Reloads the timer from the `TimerResetValue` setting (index 26): if counting up, resets to 0; if counting down, resets to the setting value. Same behavior as pressing key C. The response state will be `R` briefly (timer is in reset sub-mode), then the view transitions to stopped.
+Reloads the timer from the `TimerResetValue` setting (index 29): if counting up, resets to 0; if counting down, resets to the setting value. Same behavior as pressing key C. The response state will be `R` briefly (timer is in reset sub-mode), then the view transitions to stopped.
 
 #### Reset to N Seconds
 

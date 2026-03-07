@@ -35,7 +35,8 @@ namespace kbxTubeClock {
 
 SystemStatusView::SystemStatusView() : _selectedView(0) {}
 
-void SystemStatusView::enter(uint8_t /*relatedSetting*/) { DisplayManager::setStatusLedAutoRefreshing(true); }
+void SystemStatusView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                             uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) { DisplayManager::setStatusLedAutoRefreshing(true); }
 
 bool SystemStatusView::keyHandler(Keys::Key key) {
   bool tick = false;

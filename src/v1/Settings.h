@@ -33,30 +33,33 @@ class Settings {
     BeepStates = 1,
     BlinkStates = 2,
     OnOffStates = 3,
-    TimeDisplayDuration = 4,
-    DateDisplayDuration = 5,
-    TemperatureDisplayDuration = 6,
-    FadeDuration = 7,
-    DstBeginMonth = 8,
-    DstBeginDowOrdinal = 9,
-    DstEndMonth = 10,
-    DstEndDowOrdinal = 11,
-    DstSwitchDayOfWeek = 12,
-    DstSwitchHour = 13,
-    EffectDuration = 14,
-    EffectFrequency = 15,
-    MinimumIntensity = 16,
-    BeeperVolume = 17,
-    TemperatureCalibrationSTM32 = 18,
-    TemperatureCalibrationDS3234 = 19,
-    TemperatureCalibrationDS1722 = 20,
-    TemperatureCalibrationLM74 = 21,
-    DisplayRefreshInterval = 22,
-    DateFormat = 23,
-    TimeZone = 24,
-    ColonBehavior = 25,
-    TimerResetValue = 26,
-    DmxAddress = 27
+    PMIndicatorRedValue = 4,
+    PMIndicatorGreenValue = 5,
+    PMIndicatorBlueValue = 6,
+    TimeDisplayDuration = 7,
+    DateDisplayDuration = 8,
+    TemperatureDisplayDuration = 9,
+    FadeDuration = 10,
+    DstBeginMonth = 11,
+    DstBeginDowOrdinal = 12,
+    DstEndMonth = 13,
+    DstEndDowOrdinal = 14,
+    DstSwitchDayOfWeek = 15,
+    DstSwitchHour = 16,
+    EffectDuration = 17,
+    EffectFrequency = 18,
+    MinimumIntensity = 19,
+    BeeperVolume = 20,
+    TemperatureCalibrationSTM32 = 21,
+    TemperatureCalibrationDS3234 = 22,
+    TemperatureCalibrationDS1722 = 23,
+    TemperatureCalibrationLM74 = 24,
+    IdleTimeout = 25,
+    DateFormat = 26,
+    TimeZone = 27,
+    ColonBehavior = 28,
+    TimerResetValue = 29,
+    DmxAddress = 30
   };
 
   /// @brief Settings we keep
@@ -101,9 +104,26 @@ class Settings {
   ///
   static const uint32_t cSettingsFlashAddress;
 
-  /// @brief Bits used in each settings class
+  /// @brief How a setting's raw value is transformed for display/input
   ///
-  static const uint16_t cSettingData[];
+  enum class SettingTransform : uint8_t {
+    None = 0,
+    PlusOne,      ///< stored 0-based, displayed 1-based (e.g. DmxAddress: stored 0-504, shown 1-512)
+    TimeZone,     ///< stored 0-112 (x15 min), displayed as signed ±HH:MM offset
+    Calibration   ///< stored 0-198, displayed as signed offset from midpoint 99
+  };
+
+  /// @brief Describes valid range and display behavior of a setting
+  ///
+  struct SettingDescriptor {
+    uint16_t        maxOrMask;   ///< max value for numerics; bitmask for bitfields
+    uint8_t         minValue;    ///< minimum valid value (0 for most; 1 for months/ordinals)
+    SettingTransform transform;  ///< how to interpret/display the value
+  };
+
+  /// @brief Descriptor for each setting (indexed by Setting enum)
+  ///
+  static const SettingDescriptor cSettingDescriptors[];
 
   /// @brief Midpoint value for signed temperature calibration encoding
   ///  stored = cCalibrationMidpoint + offsetCx10; offsetCx10 = stored - cCalibrationMidpoint

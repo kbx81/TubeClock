@@ -27,11 +27,12 @@ namespace kbxTubeClock {
 SetBitsView::SetBitsView()
     : _setBits(0), _bitsMask(0), _selectedBit(0), _relatedSetting(Settings::Setting::SystemOptions) {}
 
-void SetBitsView::enter(uint8_t relatedSetting) {
+void SetBitsView::enter(const Settings::SettingDescriptor* descriptor,
+                        uint8_t relatedSetting, uint8_t /*numSettings*/) {
   _relatedSetting = relatedSetting;
 
   _setBits = Application::getSettingsPtr()->getRawSetting(_relatedSetting);
-  _bitsMask = Settings::cSettingData[_relatedSetting];
+  _bitsMask = descriptor->maxOrMask;
 
   _selectedBit = 0;
 }

@@ -32,7 +32,8 @@ namespace kbxTubeClock {
 
 Dmx512View::Dmx512View() : _mode(Application::OperatingMode::OperatingModeDmx512Display) {}
 
-void Dmx512View::enter(uint8_t /*relatedSetting*/) {
+void Dmx512View::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                       uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   _mode = Application::getOperatingMode();
 
   // Application should handle this but we'll do it here, too, for consistency

@@ -45,7 +45,8 @@ class SetTimeDateView : public View {
   ///
  public:  // Implement the SetTimeDateView class
   SetTimeDateView();
-  virtual void enter(uint8_t relatedSetting) override;
+  virtual void enter(const Settings::SettingDescriptor* descriptor,
+                     uint8_t relatedSetting, uint8_t numSettings = 1) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 

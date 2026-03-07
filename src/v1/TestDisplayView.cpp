@@ -32,7 +32,8 @@ const uint8_t TestDisplayView::cMaxColor = 2;
 TestDisplayView::TestDisplayView()
     : _displayedColor(0), _intensity(0), _mode(Application::OperatingMode::OperatingModeTestDisplay) {}
 
-void TestDisplayView::enter(uint8_t /*relatedSetting*/) {
+void TestDisplayView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                            uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   _mode = Application::getOperatingMode();
 
   DisplayManager::setStatusLedAutoRefreshing(true);

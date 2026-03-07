@@ -124,10 +124,6 @@ static uint8_t _masterIntensity = 255;
 //
 volatile static bool _refreshIntensitiesNow = false;
 
-// Hardware refresh interval
-//
-static uint8_t _driverRefreshInterval = 0;
-
 // Non-blocking blink() state machine
 // _blinkPhasesRemaining counts the number of timed phase transitions remaining.
 // The initial blank is set immediately by blink(); each subsequent phase
@@ -379,10 +375,6 @@ void setDisplayBlanking(const bool blank) {
     Hardware::setDisplayHardwareBlanking(false);
   }
 }
-
-uint8_t getDisplayRefreshInterval() { return _driverRefreshInterval; }
-
-void setDisplayRefreshInterval(const uint8_t interval) { _driverRefreshInterval = interval; }
 
 void blink(uint8_t count) {
   // Start the animation: blank immediately, then schedule 2n-1 timed phase transitions.

@@ -64,6 +64,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
+    1280,           // PMIndicatorRedValue
+    496,            // PMIndicatorGreenValue
+    112,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -82,7 +85,7 @@ static const SettingsProfile cActiveProfile = {{
     79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    0,              // DisplayRefreshInterval
+    120,            // IdleTimeout (120 seconds)
     2,              // DateFormat (MM.DD.YY)
     32,             // TimeZone
     0,              // ColonBehavior
@@ -96,6 +99,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
+    1280,           // PMIndicatorRedValue
+    496,            // PMIndicatorGreenValue
+    112,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -114,7 +120,7 @@ static const SettingsProfile cActiveProfile = {{
     79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    0,              // DisplayRefreshInterval
+    120,            // IdleTimeout (120 seconds)
     1,              // DateFormat (DD.MM.YY)
     56,             // TimeZone
     0,              // ColonBehavior
@@ -128,6 +134,9 @@ static const SettingsProfile cActiveProfile = {{
     0b00000000000,  // BeepStates: all disabled
     0b00000000000,  // BlinkStates: all disabled
     0b11111111,     // OnOffStates
+    1280,           // PMIndicatorRedValue
+    496,            // PMIndicatorGreenValue
+    112,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -146,7 +155,7 @@ static const SettingsProfile cActiveProfile = {{
     79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    0,              // DisplayRefreshInterval
+    120,            // IdleTimeout (120 seconds)
     0,              // DateFormat (YY.MM.DD)
     56,             // TimeZone
     0,              // ColonBehavior
@@ -160,6 +169,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
+    1280,           // PMIndicatorRedValue
+    496,            // PMIndicatorGreenValue
+    112,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -178,7 +190,7 @@ static const SettingsProfile cActiveProfile = {{
     79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    0,              // DisplayRefreshInterval
+    120,            // IdleTimeout (120 seconds)
     0,              // DateFormat (YY.MM.DD)
     32,             // TimeZone
     0,              // ColonBehavior
@@ -192,36 +204,39 @@ static const SettingsProfile cActiveProfile = {{
 // where settings will be read/written in FLASH
 const uint32_t Settings::cSettingsFlashAddress = reinterpret_cast<uint32_t>(&__settings_flash_start);
 
-// conatins a mask for bitfields and a maximum value for other types of data
-const uint16_t Settings::cSettingData[] = {
-    0x03ff,   // SystemOptions
-    0x07ff,   // BeepStates
-    0x07ff,   // BlinkStates
-    0x00ff,   // OnOffStates
-    300,      // TimeDisplayDuration
-    300,      // DateDisplayDuration
-    300,      // TemperatureDisplayDuration
-    1000,     // FadeDuration
-    12,       // DstBeginMonth
-    4,        // DstBeginDowOrdinal
-    12,       // DstEndMonth
-    4,        // DstEndDowOrdinal
-    6,        // DstSwitchDayOfWeek
-    23,       // DstSwitchHour
-    1000,     // EffectDuration
-    43200,    // EffectFrequency
-    1000,     // MinimumIntensity
-    7,        // BeeperVolume
-    198,      // TemperatureCalibrationSTM32 (midpoint 99: 0=-99Cx10, 198=+99Cx10)
-    198,      // TemperatureCalibrationDS3234
-    198,      // TemperatureCalibrationDS1722
-    198,      // TemperatureCalibrationLM74
-    100,      // DisplayRefreshInterval
-    2,        // DateFormat
-    112,      // TimeZone
-    5,        // ColonBehavior
-    65535,    // TimerResetValue
-    512 - 8,  // DmxAddress
+// Descriptor for each setting: max/mask, min value, display transform
+const Settings::SettingDescriptor Settings::cSettingDescriptors[] = {
+    {0x03ff, 0, Settings::SettingTransform::None},   // SystemOptions
+    {0x07ff, 0, Settings::SettingTransform::None},   // BeepStates
+    {0x07ff, 0, Settings::SettingTransform::None},   // BlinkStates
+    {0x00ff, 0, Settings::SettingTransform::None},   // OnOffStates
+    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorRedValue
+    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorGreenValue
+    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorBlueValue
+    {300,    0, Settings::SettingTransform::None},   // TimeDisplayDuration
+    {300,    0, Settings::SettingTransform::None},   // DateDisplayDuration
+    {300,    0, Settings::SettingTransform::None},   // TemperatureDisplayDuration
+    {1000,   0, Settings::SettingTransform::None},   // FadeDuration
+    {12,     1, Settings::SettingTransform::None},   // DstBeginMonth (1-12)
+    {4,      1, Settings::SettingTransform::None},   // DstBeginDowOrdinal (1-4)
+    {12,     1, Settings::SettingTransform::None},   // DstEndMonth (1-12)
+    {4,      1, Settings::SettingTransform::None},   // DstEndDowOrdinal (1-4)
+    {6,      0, Settings::SettingTransform::None},   // DstSwitchDayOfWeek
+    {23,     0, Settings::SettingTransform::None},   // DstSwitchHour
+    {1000,   0, Settings::SettingTransform::None},   // EffectDuration
+    {43200,  0, Settings::SettingTransform::None},   // EffectFrequency
+    {1000,   0, Settings::SettingTransform::None},   // MinimumIntensity
+    {7,      0, Settings::SettingTransform::None},   // BeeperVolume
+    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationSTM32 (midpoint 99)
+    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS3234
+    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS1722
+    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationLM74
+    {600,   10, Settings::SettingTransform::None},   // IdleTimeout (10-600 seconds)
+    {2,      0, Settings::SettingTransform::None},   // DateFormat
+    {112,    0, Settings::SettingTransform::TimeZone},     // TimeZone (0-112, x15 min, displayed ±HH:MM)
+    {5,      0, Settings::SettingTransform::None},   // ColonBehavior
+    {65535,  0, Settings::SettingTransform::None},   // TimerResetValue
+    {512-8,  0, Settings::SettingTransform::PlusOne},      // DmxAddress (stored 0-504, shown 1-512)
 };
 
 Settings::Settings() : _crc(0) { initialize(); }

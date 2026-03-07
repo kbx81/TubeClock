@@ -33,7 +33,6 @@
 #include "RtttlPlayer.h"
 #include "SerialRemote.h"
 #include "SetBitsView.h"
-#include "SetTempCalibrationView.h"
 #include "SetTimeDateView.h"
 #include "Settings.h"
 #include "SetValueView.h"
@@ -61,10 +60,10 @@ const RgbLed red(RgbLed::cLedMaxIntensity, 0, 0), orange(RgbLed::cLedMaxIntensit
 
 // An array with all views for the application; must correspond with ViewEnum!
 //
-static View *const cModeViews[] = {new MainMenuView(),   new TimeDateTempView(),       new TimerCounterView(),
-                                   new Dmx512View(),     new SetTimeDateView(),        new SetBitsView(),
-                                   new SetValueView(),   new SetTempCalibrationView(), new SystemStatusView(),
-                                   new TestDisplayView()};
+static View *const cModeViews[] = {
+    new MainMenuView(), new TimeDateTempView(), new TimerCounterView(), new Dmx512View(),      new SetTimeDateView(),
+    new SetBitsView(),  new SetValueView(),     new SystemStatusView(), new TestDisplayView(),
+};
 
 // Structure defining menu views
 //
@@ -72,61 +71,65 @@ struct viewDescriptor {
   uint8_t menuItemDisplayNumber;
   ViewEnum view;
   uint8_t relatedSettingNumber;
+  uint8_t numSettings;
 };
 
 // An array of mode display numbers and their corresponding views
 //
 static viewDescriptor const cViewDescriptor[] = {
-    {0, ViewEnum::MainMenuViewEnum, Settings::Setting::SystemOptions},      // OperatingModeMainMenu
-    {1, ViewEnum::TimeDateTempViewEnum, Settings::Setting::SystemOptions},  // OperatingModeFixedDisplay
-    {2, ViewEnum::TimeDateTempViewEnum, Settings::Setting::SystemOptions},  // OperatingModeToggleDisplay
-    {3, ViewEnum::TimerCounterViewEnum, Settings::Setting::SystemOptions},  // OperatingModeTimerCounter
-    {4, ViewEnum::Dmx512ViewEnum, Settings::Setting::SystemOptions},        // OperatingModeDmx512Display
-    {5, ViewEnum::SetTimeDateViewEnum, Settings::Setting::SystemOptions},   // OperatingModeSetClock
-    {6, ViewEnum::SetTimeDateViewEnum, Settings::Setting::SystemOptions},   // OperatingModeSetDate
-    {7, ViewEnum::SetValueViewEnum, Settings::Setting::TimerResetValue},
-    {8, ViewEnum::SystemStatusViewEnum, Settings::Setting::SystemOptions},
-    {10, ViewEnum::SetBitsViewEnum, Settings::Setting::SystemOptions},
-    {11, ViewEnum::SetBitsViewEnum, Settings::Setting::BeepStates},
-    {12, ViewEnum::SetBitsViewEnum, Settings::Setting::BlinkStates},
-    {13, ViewEnum::SetBitsViewEnum, Settings::Setting::OnOffStates},
-    {20, ViewEnum::SetValueViewEnum, Settings::Setting::TimeDisplayDuration},
-    {21, ViewEnum::SetValueViewEnum, Settings::Setting::DateDisplayDuration},
-    {22, ViewEnum::SetValueViewEnum, Settings::Setting::TemperatureDisplayDuration},
-    {23, ViewEnum::SetValueViewEnum, Settings::Setting::FadeDuration},
-    {24, ViewEnum::SetValueViewEnum, Settings::Setting::DstBeginMonth},
-    {25, ViewEnum::SetValueViewEnum, Settings::Setting::DstBeginDowOrdinal},
-    {26, ViewEnum::SetValueViewEnum, Settings::Setting::DstEndMonth},
-    {27, ViewEnum::SetValueViewEnum, Settings::Setting::DstEndDowOrdinal},
-    {28, ViewEnum::SetValueViewEnum, Settings::Setting::DstSwitchDayOfWeek},
-    {29, ViewEnum::SetValueViewEnum, Settings::Setting::DstSwitchHour},
-    {30, ViewEnum::SetValueViewEnum, Settings::Setting::EffectDuration},
-    {31, ViewEnum::SetValueViewEnum, Settings::Setting::EffectFrequency},
-    {32, ViewEnum::SetValueViewEnum, Settings::Setting::MinimumIntensity},
-    {33, ViewEnum::SetValueViewEnum, Settings::Setting::BeeperVolume},
-    {34, ViewEnum::SetTempCalibrationViewEnum, Settings::Setting::TemperatureCalibrationSTM32},
-    {35, ViewEnum::SetValueViewEnum, Settings::Setting::DisplayRefreshInterval},
-    {36, ViewEnum::SetValueViewEnum, Settings::Setting::DateFormat},
-    {37, ViewEnum::SetValueViewEnum, Settings::Setting::TimeZone},
-    {38, ViewEnum::SetValueViewEnum, Settings::Setting::ColonBehavior},
-    {39, ViewEnum::SetValueViewEnum, Settings::Setting::DmxAddress},
-    {40, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot1},
-    {41, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot2},
-    {42, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot3},
-    {43, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot4},
-    {44, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot5},
-    {45, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot6},
-    {46, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot7},
-    {47, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot8},
-    {98, ViewEnum::TestDisplayEnum, Settings::Setting::SystemOptions}};
+    {0, ViewEnum::MainMenuViewEnum, Settings::Setting::SystemOptions, 1},      // OperatingModeMainMenu
+    {1, ViewEnum::TimeDateTempViewEnum, Settings::Setting::SystemOptions, 1},  // OperatingModeFixedDisplay
+    {2, ViewEnum::TimeDateTempViewEnum, Settings::Setting::SystemOptions, 1},  // OperatingModeToggleDisplay
+    {3, ViewEnum::TimerCounterViewEnum, Settings::Setting::SystemOptions, 1},  // OperatingModeTimerCounter
+    {4, ViewEnum::Dmx512ViewEnum, Settings::Setting::SystemOptions, 1},        // OperatingModeDmx512Display
+    {5, ViewEnum::SetTimeDateViewEnum, Settings::Setting::SystemOptions, 1},   // OperatingModeSetClock
+    {6, ViewEnum::SetTimeDateViewEnum, Settings::Setting::SystemOptions, 1},   // OperatingModeSetDate
+    {7, ViewEnum::SetValueViewEnum, Settings::Setting::TimerResetValue, 1},
+    {8, ViewEnum::SystemStatusViewEnum, Settings::Setting::SystemOptions, 1},
+    {10, ViewEnum::SetBitsViewEnum, Settings::Setting::SystemOptions, 1},
+    {11, ViewEnum::SetBitsViewEnum, Settings::Setting::BeepStates, 1},
+    {12, ViewEnum::SetBitsViewEnum, Settings::Setting::BlinkStates, 1},
+    {13, ViewEnum::SetBitsViewEnum, Settings::Setting::OnOffStates, 1},
+    {14, ViewEnum::SetValueViewEnum, Settings::Setting::PMIndicatorRedValue, 3},
+    {20, ViewEnum::SetValueViewEnum, Settings::Setting::TimeDisplayDuration, 1},
+    {21, ViewEnum::SetValueViewEnum, Settings::Setting::DateDisplayDuration, 1},
+    {22, ViewEnum::SetValueViewEnum, Settings::Setting::TemperatureDisplayDuration, 1},
+    {23, ViewEnum::SetValueViewEnum, Settings::Setting::FadeDuration, 1},
+    {24, ViewEnum::SetValueViewEnum, Settings::Setting::DstBeginMonth, 1},
+    {25, ViewEnum::SetValueViewEnum, Settings::Setting::DstBeginDowOrdinal, 1},
+    {26, ViewEnum::SetValueViewEnum, Settings::Setting::DstEndMonth, 1},
+    {27, ViewEnum::SetValueViewEnum, Settings::Setting::DstEndDowOrdinal, 1},
+    {28, ViewEnum::SetValueViewEnum, Settings::Setting::DstSwitchDayOfWeek, 1},
+    {29, ViewEnum::SetValueViewEnum, Settings::Setting::DstSwitchHour, 1},
+    {30, ViewEnum::SetValueViewEnum, Settings::Setting::EffectDuration, 1},
+    {31, ViewEnum::SetValueViewEnum, Settings::Setting::EffectFrequency, 1},
+    {32, ViewEnum::SetValueViewEnum, Settings::Setting::MinimumIntensity, 1},
+    {33, ViewEnum::SetValueViewEnum, Settings::Setting::BeeperVolume, 1},
+    {34, ViewEnum::SetValueViewEnum, Settings::Setting::TemperatureCalibrationSTM32, 4},
+    {35, ViewEnum::SetValueViewEnum, Settings::Setting::IdleTimeout, 1},
+    {36, ViewEnum::SetValueViewEnum, Settings::Setting::DateFormat, 1},
+    {37, ViewEnum::SetValueViewEnum, Settings::Setting::TimeZone, 1},
+    {38, ViewEnum::SetValueViewEnum, Settings::Setting::ColonBehavior, 1},
+    {39, ViewEnum::SetValueViewEnum, Settings::Setting::DmxAddress, 1},
+    {40, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot1, 1},
+    {41, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot2, 1},
+    {42, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot3, 1},
+    {43, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot4, 1},
+    {44, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot5, 1},
+    {45, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot6, 1},
+    {46, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot7, 1},
+    {47, ViewEnum::SetTimeDateViewEnum, Settings::Slot::Slot8, 1},
+    {98, ViewEnum::TestDisplayEnum, Settings::Setting::SystemOptions, 1},
+};
 
-// The maximum idle time before the application switches back to the default view
+// The maximum idle time (in ms) before the application switches back to the default view
+//   Set from Settings::Setting::IdleTimeout (in seconds) via refreshSettings()
 //   Counter is incremented by tick()
-static const uint32_t cMaximumIdleCount = 120000;
+static uint32_t _maximumIdleCount = 0;
 
-// Idle cycle counter
-//
-volatile static auto _idleCounter = cMaximumIdleCount;
+// Idle cycle counter; starts at 1 so loop() triggers idle immediately on boot
+//   (refreshSettings() sets _maximumIdleCount and setOperatingMode() resets this to 0)
+volatile static uint32_t _idleCounter = 1;
 
 // minimum intensity (0-255 scale)
 //
@@ -198,7 +201,7 @@ void initialize() {
 
   Hardware::setHvState(true);
 
-  // we boot with _idleCounter = cMaximumIdleCount; idle mode results in calling
+  // we boot with _idleCounter=1 and _maximumIdleCount=0; idle mode results in calling
   //  setOperatingMode() from loop() right away, which will also refreshSettings()
 }
 
@@ -260,18 +263,16 @@ void setOperatingMode(OperatingMode mode) {
     return;
   }
 
-  const uint16_t writeLedIntensity = 1024;
-  bool blinkOnExit = false;
+  uint8_t blinkOnExit = 0;
   // first, write settings to FLASH, if needed
   if ((mode != OperatingMode::OperatingModeMainMenu) &&
       (mode < static_cast<uint8_t>(OperatingMode::OperatingModeSetSystemOptions)) && _settingsModified) {
     if (_settings.saveToFlashIfChanged()) {
       _settingsModified = false;
-      Hardware::setGreenLed(writeLedIntensity);
+      blinkOnExit = 2;
     } else {
-      Hardware::setRedLed(writeLedIntensity);
+      blinkOnExit = 8;
     }
-    blinkOnExit = true;
   }
   // ensure hardware is consistent with current settings
   // (this calls setDisplayBlanking(false), so blink() must come after)
@@ -281,13 +282,14 @@ void setOperatingMode(OperatingMode mode) {
   _viewMode = ViewMode::ViewMode0;
   const viewDescriptor &vd = cViewDescriptor[static_cast<uint8_t>(mode)];
   _currentView = cModeViews[static_cast<uint8_t>(vd.view)];
-  _currentView->enter(vd.relatedSettingNumber);
-  // reset idle counter so the auto-return doesn't immediately override this mode
-  _idleCounter = 0;
-  // this enables controller() immediately upon entering this mode
-  if (mode == OperatingMode::OperatingModeDmx512Display) {
-    _idleCounter = cMaximumIdleCount;
+  const Settings::SettingDescriptor *desc = nullptr;
+  if (vd.relatedSettingNumber <= static_cast<uint8_t>(Settings::Setting::DmxAddress)) {
+    desc = &Settings::cSettingDescriptors[vd.relatedSettingNumber];
   }
+  _currentView->enter(desc, vd.relatedSettingNumber, vd.numSettings);
+  // reset idle counter so the auto-return doesn't immediately override this mode, except for
+  //  OperatingModeDmx512Display which enables controller() immediately upon entering this mode
+  _idleCounter = (mode == OperatingMode::OperatingModeDmx512Display) ? _maximumIdleCount : 0;
 
   // Notify serial remote of mode change
   SerialRemote::notifyModeChange(static_cast<uint8_t>(_applicationMode), static_cast<uint8_t>(_viewMode));
@@ -295,7 +297,7 @@ void setOperatingMode(OperatingMode mode) {
   // Initiate non-blocking blink after all state changes so that
   // setDisplayBlanking(false) from refreshSettings() doesn't cancel it
   if (blinkOnExit) {
-    DisplayManager::blink();
+    DisplayManager::blink(blinkOnExit);
   }
 }
 
@@ -344,7 +346,7 @@ void refreshSettings() {
                                       (int16_t) _settings.getRawSetting(Settings::Setting::TemperatureCalibrationLM74) -
                                           Settings::cCalibrationMidpoint);
 
-  DisplayManager::setDisplayRefreshInterval(_settings.getRawSetting(Settings::Setting::DisplayRefreshInterval));
+  _maximumIdleCount = (uint32_t)_settings.getRawSetting(Settings::Setting::IdleTimeout) * 1000;
   DisplayManager::setDisplayBlanking(false);
 
   Animator::setAnimationDuration(_settings.getRawSetting(Settings::Setting::EffectDuration));
@@ -461,7 +463,7 @@ void setIntensity(const uint8_t intensity) {
 }
 
 void tick() {
-  if (_idleCounter <= cMaximumIdleCount) {
+  if (_idleCounter <= _maximumIdleCount) {
     _idleCounter++;
   }
 
@@ -551,7 +553,7 @@ void loop() {
     bool dmxSignalActive = Dmx512Rx::signalIsActive();
 
     // If the idle counter has maxed out, kick back to the appropriate display mode
-    if (_idleCounter >= cMaximumIdleCount) {
+    if (_idleCounter >= _maximumIdleCount) {
       // On transition to idle, set HV state based on current context
       if (!_wasIdle) {
         _wasIdle = true;
@@ -599,7 +601,7 @@ void loop() {
         _externalControlMode = ExternalControl::NoActiveExtControlEnum;
         Dmx512Controller::setDmx512Active(false);
         AlarmHandler::clearAlarm();  // just in case...
-        if (_idleCounter >= cMaximumIdleCount) {
+        if (_idleCounter >= _maximumIdleCount) {
           _setHvState(_settings.hvState() || (_applicationMode == OperatingMode::OperatingModeTimerCounter));
         }
       }

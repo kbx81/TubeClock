@@ -35,7 +35,8 @@ SetTimeDateView::SetTimeDateView()
       _mode(Application::OperatingMode::OperatingModeSetClock),
       _relatedSetting(0) {}
 
-void SetTimeDateView::enter(uint8_t relatedSetting) {
+void SetTimeDateView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                            uint8_t relatedSetting, uint8_t /*numSettings*/) {
   _mode = Application::getOperatingMode();
   _relatedSetting = relatedSetting;
 

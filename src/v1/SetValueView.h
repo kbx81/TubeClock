@@ -26,26 +26,21 @@
 namespace kbxTubeClock {
 
 class SetValueView : public View {
-  // The view which displays the UI for setting times and dates
-  //
- public:  // Implement the SetValue class
+ public:
+  static const uint8_t cMaxGroupSize = 4;
+
   SetValueView();
-  virtual void enter(uint8_t relatedSetting) override;
+  virtual void enter(const Settings::SettingDescriptor* descriptor,
+                     uint8_t relatedSetting, uint8_t numSettings = 1) override;
   virtual bool keyHandler(Keys::Key key) override;
   virtual void loop() override;
 
  private:
-  // values the user will set
-  //
-  uint16_t _setValue;
-
-  // maximum allowed values for each field
-  //
-  uint16_t _maxValue;
-
-  // the setting index this view is editing
-  //
-  uint8_t _relatedSetting;
+  Settings::SettingDescriptor _descriptor;  // copy of descriptor for active setting
+  uint16_t _value[cMaxGroupSize];           // raw setting values (as stored in Settings)
+  uint8_t  _relatedSetting;
+  uint8_t  _numSettings;
+  int8_t   _selectedItem;                   // current item index; always 0 when _numSettings == 1
 };
 
 }  // namespace kbxTubeClock

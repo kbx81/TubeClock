@@ -60,7 +60,8 @@ uint32_t TimerCounterView::getTimerValue() { return s_instance ? s_instance->_ti
 
 bool TimerCounterView::getCountUp() { return s_instance ? s_instance->_countUp : false; }
 
-void TimerCounterView::enter(uint8_t /*relatedSetting*/) {
+void TimerCounterView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                             uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   // we don't use the status LED, so turn it off in case it was left on
   DisplayManager::writeStatusLed(RgbLed());
 }

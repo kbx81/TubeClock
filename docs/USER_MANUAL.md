@@ -187,13 +187,21 @@ This view is used to modify settings that are either on/enabled/`1` or
 
 This view allows adjusting of various settings values. The existing value is
  shown when the view is entered and it appears on the right side of the display.
- The touch keys work as follows:
+ The mode number is shown on the left side of the display. The touch keys work
+ as follows:
 * `U` increases the displayed value
 * `D` decreases the displayed value
 * `C` sets the displayed value to the maximum allowed value for the setting
 * `B` sets the displayed value to the minimum allowed value for the setting
 * `A` applies (saves) the selected value
 * `E` exits to the main menu
+
+When this view is used for a group of related settings (e.g. RGB color channels
+ or temperature sensor calibrations), the item number appears on tube 4 and
+ `B`/`C` cycle through items rather than jumping to the minimum/maximum:
+* `C` selects the next item
+* `B` selects the previous item
+* `A` applies (saves) all values
 
 #### System Status View
 
@@ -329,7 +337,7 @@ This mode is where we configure a number of options that govern the clock's
  automatically adjust based on the ambient light level. If clear, manual
  adjustment is enabled when the time, date, or temperature is displayed.
 * Bit 6: Startup To Toggle - if set, the clock defaults to mode 2 when powered
- on or when left idle for more than one minute. Otherwise, mode 1 is the default.
+ on or when the idle timeout elapses (see mode 35). Otherwise, mode 1 is the default.
 * Bit 7: DMX-512 Extended mode - if set, additional DMX-512 channels are used
  enabling enhanced control of the clock via the control protocol.
 * Bit 8: MSDs Off - when set, Tubes that would otherwise be leading zeros are
@@ -353,6 +361,20 @@ Mode 11 allows enabling or disabling the audible alarms/beeping, mode 12 allows
 
 By default, the tubes remain on for all eight time slots while the audible
  alarms and display blinking are disabled for all eight time slots.
+
+#### Mode 14: PM Indicator Color
+
+View: Set Value View
+
+This mode allows adjusting the color of the status LED when it is used as a PM
+ indicator (see Bit 1 in mode 10). The item number appears on tube 4: channel 1
+ is red, channel 2 is green, and channel 3 is blue. The selected channel's
+ intensity value (0–4095) appears on tubes 0–3. Use the `B` and `C` keys to
+ cycle through the three channels and `U` and `D` to adjust the selected
+ channel's value.
+
+**Important:** You must touch the `A` key to save the values! If you do not,
+ the changes will be lost upon exiting.
 
 #### Modes 20 through 22: Time, Date, and Temperature display durations
 
@@ -422,16 +444,22 @@ This mode allows adjusting of the beeper volume. Higher numbers mean a louder
 
 View: Set Value View
 
-When using the STM32's internal temperature sensor, some calibration value is
- required as they're not all consistent. This mode allows the adjustment of this
- calibration value. Note that it is a **negative** value, so increasing the
- value will _decrease_ the temperature readout.
+This mode allows adjustment of the temperature calibration offset for each of
+ the supported temperature sensors. The sensor number appears on tube 4 (1–4
+ corresponding to STM32 ADC, DS3234, DS1722, and LM74) and the current sensor's
+ calibration offset appears on the right side of the display. The upper dot of
+ the right colon lights when the value is negative. Use the `B` and `C` keys to
+ cycle through sensors and `U` and `D` to adjust the offset (in tenths of a
+ degree Celsius).
 
-#### Mode 35: Display Hardware Refresh Interval
+#### Mode 35: Idle Timeout
 
 View: Set Value View
 
-The value assigned in this mode is not currently utilized.
+This mode allows adjusting of the idle timeout — the duration of inactivity (in
+ seconds) after which the clock automatically returns to the default display
+ view (mode 1 or 2). The value may be set from 10 to 600 seconds; the default
+ is 120 seconds (two minutes).
 
 #### Mode 36: Date Format
 

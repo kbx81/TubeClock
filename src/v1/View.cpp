@@ -18,7 +18,8 @@
 //
 #include "View.h"
 
-void View::enter(uint8_t /*relatedSetting*/) {
+void View::enter(const kbxTubeClock::Settings::SettingDescriptor* /*descriptor*/,
+                 uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   // do nothing by default
 }
 

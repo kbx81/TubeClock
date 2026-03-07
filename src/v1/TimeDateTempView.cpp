@@ -40,7 +40,8 @@ TimeDateTempView::TimeDateTempView()
       _mode(Application::OperatingMode::OperatingModeFixedDisplay),
       _prevDisplayItem(FixedDisplayItem::Time) {}
 
-void TimeDateTempView::enter(uint8_t /*relatedSetting*/) {
+void TimeDateTempView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                             uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   Settings *pSettings = Application::getSettingsPtr();
 
   _mode = Application::getOperatingMode();
@@ -136,7 +137,9 @@ void TimeDateTempView::loop() {
   if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm) == true) {
     // this will set the color and (more importantly) fade duration correctly
     if (_currentTime.isPM() == true) {
-      _setStatusLed(Application::nixieOrange);
+      _setStatusLed(RgbLed(pSettings->getRawSetting(Settings::Setting::PMIndicatorRedValue),
+                           pSettings->getRawSetting(Settings::Setting::PMIndicatorGreenValue),
+                           pSettings->getRawSetting(Settings::Setting::PMIndicatorBlueValue)));
     }
     // turn it off if we're not displaying the time (a bit silly but it works)
     if ((currentDisplayItem != FixedDisplayItem::Time) && (currentDisplayItem != FixedDisplayItem::TimeSeconds)) {

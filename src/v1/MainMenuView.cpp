@@ -26,7 +26,8 @@ namespace kbxTubeClock {
 
 MainMenuView::MainMenuView() : _selectedMode(0), _previousMode(0) {}
 
-void MainMenuView::enter(uint8_t /*relatedSetting*/) {
+void MainMenuView::enter(const Settings::SettingDescriptor* /*descriptor*/,
+                         uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   // correct the mode if it's out of range
   if ((_selectedMode == 0) || (_selectedMode > Application::OperatingMode::OperatingModeSlot8Time)) {
     _selectedMode = Application::OperatingMode::OperatingModeFixedDisplay;

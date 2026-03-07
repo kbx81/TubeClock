@@ -72,16 +72,6 @@ bool isBlinkActive();
 ///
 void setDisplayBlanking(const bool blank);
 
-/// @brief Gets the interval used for refreshing the tube driver registers
-/// @return interval at which refresh occurs; based on systick
-///
-uint8_t getDisplayRefreshInterval();
-
-/// @brief Set the interval for refreshing the tube driver registers
-/// @param interval Interval at which refresh occurs; based on systick
-///
-void setDisplayRefreshInterval(const uint8_t interval);
-
 /// @brief Blinks the display count times as a non-blocking animation.
 ///  The animation is driven by tick() and completes asynchronously (~100ms per blink).
 /// @param count Number of blinks (default 2)

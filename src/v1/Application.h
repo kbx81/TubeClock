@@ -43,6 +43,7 @@ enum OperatingMode : uint8_t {
   OperatingModeSlotBeepConfig,             ///< Enable/Disable beeping (alarm) per-slot
   OperatingModeSlotBlinkConfig,            ///< Enable/Disable display blinking per-slot
   OperatingModeSlotOnOffConfig,            ///< Enable/Disable color change per-slot
+  OperatingModeSlotPMIndicatorRGBConfig,   ///< Set RGB color for PM indicator
   OperatingModeSetDurationClock,           ///< Set duration of clock display mode
   OperatingModeSetDurationDate,            ///< Set duration of date display mode
   OperatingModeSetDurationTemp,            ///< Set duration of temperature display mode
@@ -58,7 +59,7 @@ enum OperatingMode : uint8_t {
   OperatingModeSetMinimumIntensity,        ///< Set minimum display intensity
   OperatingModeSetBeeperVolume,            ///< Set Beeper Volume
   OperatingModeSetTempCalibration,         ///< Set temperature calibration
-  OperatingModeSetDisplayRefreshInterval,  ///< Set display refresh interval
+  OperatingModeSetIdleTimeout,             ///< Set idle timeout
   OperatingModeSetDateFormat,              ///< Set Date Format
   OperatingModeSetTimeZone,                ///< Set Time Zone
   OperatingModeSetColonBehavior,           ///< Set Colon/Seperator behavior (time display)
@@ -84,9 +85,8 @@ enum ViewEnum : uint8_t {
   SetTimeDateViewEnum = 4,
   SetBitsViewEnum = 5,
   SetValueViewEnum = 6,
-  SetTempCalibrationViewEnum = 7,
-  SystemStatusViewEnum = 8,
-  TestDisplayEnum = 9
+  SystemStatusViewEnum = 7,
+  TestDisplayEnum = 8
 };
 
 /// @brief Enums for views

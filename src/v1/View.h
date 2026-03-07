@@ -41,9 +41,11 @@ enum ViewMode : uint8_t {
 class View {
  public:
   /// The method which is called before this view is displayed
+  /// @param descriptor Pointer to the descriptor for relatedSetting (nullptr for non-setting views)
   /// @param relatedSetting The setting index this view is responsible for editing
   ///
-  virtual void enter(uint8_t relatedSetting);
+  virtual void enter(const kbxTubeClock::Settings::SettingDescriptor* descriptor,
+                     uint8_t relatedSetting, uint8_t numSettings = 1);
 
   /// Called before loop for any pressed key
   ///
