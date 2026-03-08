@@ -188,14 +188,28 @@ static bool _previousDmxState = false;
 //
 static bool _settingsModified = false;
 
-// Set in initialize() when settings are loaded from flash
+// Set in initialize(): 0 = defaults used, 1 = loaded from flash, 2 = loaded from DS3234 SRAM
 //
-static bool _settingsLoadFromFlashResult = false;
+static uint8_t _settingsLoadFromFlashResult = 0;
 
 static bool _wasIdle = false;
 
 void initialize() {
-  _settingsLoadFromFlashResult = _settings.loadFromFlash();
+  if (_settings.loadFromFlash()) {
+    _settingsLoadFromFlashResult = 1;
+    _settings.saveToSram();  // keep DS3234 SRAM in sync so recovery works after next firmware update
+  } else if (_settings.loadFromSram()) {
+    _settingsLoadFromFlashResult = 2;
+  }
+
+  // If the STM32 backup domain was reset (counter == 0), try to restore the on-time counter
+  // from DS3234 SRAM. When settings came from SRAM we already know it's valid; otherwise
+  // validate via CRC before trusting the stored counter.
+  if (Hardware::onTimeSeconds() == 0) {
+    if (_settingsLoadFromFlashResult == 2 || _settings.sramIsValid()) {
+      Hardware::loadOnTimeCounterFromSram();
+    }
+  }
 
   GpsReceiver::initialize();
   SerialRemote::initialize();
@@ -280,6 +294,7 @@ void setOperatingMode(OperatingMode mode) {
   if ((mode != OperatingMode::OperatingModeMainMenu) &&
       (mode < static_cast<uint8_t>(OperatingMode::OperatingModeSetSystemOptions)) && _settingsModified) {
     if (_settings.saveToFlashIfChanged()) {
+      _settings.saveToSram();
       _settingsModified = false;
       blinkOnExit = 2;
     } else {
@@ -384,7 +399,13 @@ void notifySettingChanged(uint8_t settingNum) {
   notifySettingsChanged();
 }
 
-bool saveSettingsToFlash() { return _settings.saveToFlashIfChanged(); }
+bool saveSettingsToFlash() {
+  bool result = _settings.saveToFlashIfChanged();
+  if (result) {
+    _settings.saveToSram();
+  }
+  return result;
+}
 
 // Computes the DateTime of the Nth occurrence of a day-of-week in a given month/year,
 // then sets the time. On invalid settings (no matching day found), result is set to
@@ -482,7 +503,7 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust) {
 
 uint8_t getIntensity() { return _masterIntensity; }
 
-bool getStartupSettingsLoadResult() { return _settingsLoadFromFlashResult; }
+uint8_t getStartupSettingsLoadResult() { return _settingsLoadFromFlashResult; }
 
 void setIntensity(const uint8_t intensity) {
   _autoAdjustIntensities = false;

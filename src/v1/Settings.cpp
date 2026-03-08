@@ -36,11 +36,15 @@
 
 #include "Application.h"
 #include "DateTime.h"
+#include "DS3234.h"
 #include "Hardware.h"
 #include "Settings.h"
 
 // Linker-provided symbol for the settings flash address (must be outside namespace)
 extern "C" uint32_t __settings_flash_start;
+
+static_assert(sizeof(kbxTubeClock::Settings) <= kbxTubeClock::Hardware::cOnTimeCounterSramOffset,
+              "Settings struct overlaps DS3234 SRAM on-time counter slot; update cOnTimeCounterSramOffset");
 
 namespace kbxTubeClock {
 
@@ -263,6 +267,7 @@ bool Settings::loadFromFlash() {
 
     return false;
   }
+  _crc = loadedCrc;  // restore so struct is identical to what was stored
   return true;
 }
 
@@ -292,6 +297,45 @@ bool Settings::saveToFlashIfChanged() {
   }
 
   return saveToFlash() == 0;
+}
+
+bool Settings::loadFromSram() {
+  if (!DS3234::isConnected()) {
+    return false;
+  }
+
+  DS3234::readSram(0, reinterpret_cast<uint8_t *>(this), static_cast<uint8_t>(sizeof(Settings)));
+
+  uint32_t loadedCrc = _crc;
+  _crc = 0;
+
+  if (loadedCrc != Hardware::getCRC((uint32_t *)this, sizeof(Settings) / 4)) {
+    initialize();
+    return false;
+  }
+  _crc = loadedCrc;  // restore so struct is identical to what was stored
+  return true;
+}
+
+bool Settings::sramIsValid() const {
+  if (!DS3234::isConnected()) {
+    return false;
+  }
+
+  Settings temp;
+  DS3234::readSram(0, reinterpret_cast<uint8_t *>(&temp), static_cast<uint8_t>(sizeof(Settings)));
+
+  uint32_t loadedCrc = temp._crc;
+  temp._crc = 0;
+  return loadedCrc == Hardware::getCRC((uint32_t *)&temp, sizeof(Settings) / 4);
+}
+
+void Settings::saveToSram() {
+  if (!DS3234::isConnected()) {
+    return;
+  }
+
+  DS3234::writeSram(0, reinterpret_cast<uint8_t *>(this), static_cast<uint8_t>(sizeof(Settings)), true);
 }
 
 bool Settings::getSetting(const uint8_t setting, const uint8_t item) {

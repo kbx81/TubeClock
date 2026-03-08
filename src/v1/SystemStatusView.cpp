@@ -81,7 +81,7 @@ void SystemStatusView::loop() {
 
   auto voltageBatt = Hardware::voltageBatt(), voltageVddA = Hardware::voltageVddA();
   auto rtcStartupResult = Hardware::getRTCStartupResult();
-  bool settingsLoadResult = Application::getStartupSettingsLoadResult();
+  uint8_t settingsLoadResult = Application::getStartupSettingsLoadResult();
   uint32_t dotsBitmap = 0b0011;
   uint8_t tubeIntensityBitmap = 0b111111;
   RgbLed statusLed;
@@ -168,7 +168,7 @@ void SystemStatusView::loop() {
 
     case DisplayItem::StartupResult:
       tubeIntensityBitmap = 0b110101;
-      tcDisp.setTubeToValue(0, settingsLoadResult ? 1 : 0);
+      tcDisp.setTubeToValue(0, settingsLoadResult);
       tcDisp.setTubeToValue(2, static_cast<uint8_t>(rtcStartupResult));
       break;
 

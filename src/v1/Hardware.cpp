@@ -338,6 +338,10 @@ static uint8_t _onTimeLastSecond = 0;
 //
 static uint32_t _onTimeSecondsCounter = 0;
 
+// set true by _incrementOnTimeSecondsCounter(); cleared by refresh() after DS3234 SRAM write
+//
+static volatile bool _onTimeCounterDirty = false;
+
 // provides a way to calibrate the STM32 ADC temperature indication (Cx10)
 //
 static int16_t _temperatureAdjustmentADCCx10 = -90;
@@ -1040,11 +1044,7 @@ void _incrementOnTimeSecondsCounter() {
     pwr_enable_backup_domain_write_protect();
   }
 
-  // if connected, save to DS3234 RAM, also
-  // if (_externalRtcConnected == true)
-  // {
-  //   DS3234::writeSram(0x00, (uint8_t*)&_onTimeSecondsCounter, 4, false);
-  // }
+  _onTimeCounterDirty = true;
 }
 
 void _refreshTemp() {
@@ -1324,6 +1324,12 @@ void refresh() {
   // _refreshPeripherals();
   _syncRtcWithGps();
 
+  if (_onTimeCounterDirty && _externalRtcConnected) {
+    _onTimeCounterDirty = false;
+    DS3234::writeSram(cOnTimeCounterSramOffset, reinterpret_cast<uint8_t *>(&_onTimeSecondsCounter),
+                      sizeof(_onTimeSecondsCounter), false);
+  }
+
   DisplayManager::refresh();
 }
 
@@ -1518,6 +1524,17 @@ uint16_t lightLevel() {
 uint32_t onTimeSeconds() { return _onTimeSecondsCounter; }
 
 void onTimeSecondsReset() { _onTimeSecondsCounter = 0; }
+
+void loadOnTimeCounterFromSram() {
+  if (!DS3234::isConnected()) {
+    return;
+  }
+  DS3234::readSram(cOnTimeCounterSramOffset, reinterpret_cast<uint8_t *>(&_onTimeSecondsCounter),
+                   sizeof(_onTimeSecondsCounter));
+  pwr_disable_backup_domain_write_protect();
+  RTC_BKPXR(0) = _onTimeSecondsCounter;
+  pwr_enable_backup_domain_write_protect();
+}
 
 uint16_t voltageBatt() {
   _batteryMeasuringCounter = 0;

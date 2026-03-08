@@ -2,7 +2,6 @@
 
 ## TODO List
 
-- [ ] Use DS3234 SRAM for settings backup?
 - [ ] Write tube on-hours to flash?
 - [ ] Allow runtime user-defined IR remote control codes
 - [ ] Direct digit entry from IR remote

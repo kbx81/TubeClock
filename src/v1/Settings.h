@@ -147,6 +147,21 @@ class Settings {
   ///
   bool loadFromFlash();
 
+  /// @brief Loads settings from DS3234 SRAM; validates CRC
+  /// @return true if DS3234 connected and CRC valid, false otherwise (defaults set)
+  ///
+  bool loadFromSram();
+
+  /// @brief Saves current settings to DS3234 SRAM; no-op if DS3234 not connected
+  /// @note Caller must ensure _crc is valid (i.e. call after saveToFlash())
+  ///
+  void saveToSram();
+
+  /// @brief Checks whether DS3234 SRAM contains valid settings (CRC check only, does not modify *this)
+  /// @return true if DS3234 connected and SRAM CRC valid
+  ///
+  bool sramIsValid() const;
+
   /// @brief Saves settings to FLASH
   /// @return result of writeFlash()
   ///

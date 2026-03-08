@@ -64,6 +64,12 @@ enum TempSensorType : uint8_t { STM32ADC, DS3234, DS1722, LM74, ExternalSerial }
 //
 static const uint8_t cTempSensorCount = 5;
 
+// DS3234 SRAM layout: Settings struct occupies [0, cOnTimeCounterSramOffset),
+// on-time counter occupies [cOnTimeCounterSramOffset, cOnTimeCounterSramOffset + 4).
+// Must be >= sizeof(Settings) (132 bytes); enforced by static_assert in Settings.cpp.
+//
+static const uint8_t cOnTimeCounterSramOffset = 132;
+
 // Sentinel value for undetected/unavailable sensors (Cx10)
 //
 static const int32_t cTempSentinel = 32767;
@@ -242,6 +248,12 @@ uint32_t onTimeSeconds();
 /// @brief Resets the HV time-on counter
 ///
 void onTimeSecondsReset();
+
+/// @brief If DS3234 SRAM is available, loads the on-time counter from it.
+/// @note  Call only when settings were successfully restored from DS3234 SRAM,
+///        which confirms the SRAM contents are trustworthy.
+///
+void loadOnTimeCounterFromSram();
 
 /// @brief Returns the current battery voltage times 1000
 ///

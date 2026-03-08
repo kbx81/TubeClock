@@ -211,8 +211,8 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust = false);
 uint8_t getIntensity();
 
 /// @brief Returns the application's startup settings load result
-/// @return true if settings were loaded successfully, false if failure & defaults were set
-bool getStartupSettingsLoadResult();
+/// @return 0 = defaults used, 1 = loaded from flash, 2 = loaded from DS3234 SRAM
+uint8_t getStartupSettingsLoadResult();
 
 /// @brief Set the application's display intensity and disables automagic adjusting of the display intensity
 /// @param intensity New display intensity (0-255)
