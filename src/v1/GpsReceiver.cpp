@@ -39,7 +39,10 @@ enum GpsRxState : uint8_t {
   GpsRxTimeCompleted = 4,
   GpsRxWaitForDate = 5,
   GpsRxDate = 6,
-  GpsRxNumSatellites = 7
+  GpsRxNumSatellites = 7,
+  GpsRxWaitForChecksum = 8,  // GPRMC: eat trailing fields until '*'
+  GpsRxChecksumHigh = 9,     // read high hex nibble of checksum
+  GpsRxChecksumLow = 10      // read low hex nibble, validate, commit
 };
 
 /// @brief GPS Receiver sentence type
@@ -106,9 +109,20 @@ static DateTime _gpsTime;
 //
 static uint8_t _numSatellites = 0;
 
+// NMEA checksum state: running XOR accumulator and received checksum byte
+//
+static uint8_t _checksum = 0;
+static uint8_t _checksumRx = 0;
+
 // cached Usart pointer for GPS USART
 //
 static Usart *_gpsUsart = nullptr;
+
+// Decode one ASCII hex character to its 4-bit value
+//
+static uint8_t _hexNibble(const uint8_t c) {
+  return (c >= 'A') ? (c - 'A' + 10) : (c - '0');
+}
 
 void initialize() {
   _gpsUsart = Hardware::getUsart(0);  // USART1
@@ -150,6 +164,13 @@ void rxIsr() {
   }
 
   uint8_t rxChar = _gpsUsart->readByte();
+
+  // Accumulate XOR checksum for all bytes between '$' (exclusive) and '*' (exclusive).
+  // States GpsRxGettingHeader through GpsRxDate cover the header + all RMC payload fields.
+  // GpsRxWaitForChecksum handles bytes between the date field and '*' inline.
+  if (_rxState >= GpsRxState::GpsRxGettingHeader && _rxState <= GpsRxState::GpsRxDate) {
+    _checksum ^= rxChar;
+  }
 
   switch (_rxState) {
     // at this point, we've seen the "$GPRMC," characters and can expect the time or a sentence count next
@@ -198,15 +219,39 @@ void rxIsr() {
       }
       break;
 
-    // finally we get the date
+    // finally we get the date; defer commit until checksum validates
     case GpsRxState::GpsRxDate:
       _rxDateChar[_rxCharCount] = rxChar;
 
       if (++_rxCharCount >= cGpsDateTimeLength) {
-        _rxState = GpsRxState::GpsRxIdle;
+        _rxState = GpsRxState::GpsRxWaitForChecksum;
         _rxCharCount = 0;
+      }
+      break;
+
+    // eat trailing GPRMC fields until '*', accumulating them into the checksum
+    case GpsRxState::GpsRxWaitForChecksum:
+      if (rxChar == '*') {
+        _rxState = GpsRxState::GpsRxChecksumHigh;
+      } else {
+        _checksum ^= rxChar;
+      }
+      break;
+
+    // read high hex nibble of received checksum
+    case GpsRxState::GpsRxChecksumHigh:
+      _checksumRx = _hexNibble(rxChar) << 4;
+      _rxState = GpsRxState::GpsRxChecksumLow;
+      break;
+
+    // read low hex nibble, validate, and commit if checksum matches
+    case GpsRxState::GpsRxChecksumLow:
+      _checksumRx |= _hexNibble(rxChar);
+      if (_checksumRx == _checksum) {
         _rxRmcComplete();
       }
+      _rxState = GpsRxState::GpsRxIdle;
+      _rxCharCount = 0;
       break;
 
     // read in the two-digit number of satellites — accumulate directly to avoid buffer
@@ -245,6 +290,7 @@ void rxIsr() {
     // it starts here...we patiently wait for that money header tag! ('$')
     default:
       if (rxChar == '$') {
+        _checksum = 0;  // reset XOR accumulator for new sentence ('$' itself is not checksummed)
         _rxHeaderChar[_rxCharCount++] = rxChar;
         _rxState = GpsRxState::GpsRxGettingHeader;
       }

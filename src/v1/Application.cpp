@@ -56,13 +56,25 @@ const RgbLed red(RgbLed::cLedMaxIntensity, 0, 0), orange(RgbLed::cLedMaxIntensit
     white(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
     gray(RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8),
     darkGray(RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24),
-    nixieOrange(1280, 496, 112);
+    nixieOrange(1280, 496, 112);  // approximate orange color of neon-filled nixie tubes
+
+// View instances — statically allocated, avoiding heap dependency
+//
+static MainMenuView _viewMainMenu;
+static TimeDateTempView _viewTimeDateTemp;
+static TimerCounterView _viewTimerCounter;
+static Dmx512View _viewDmx512;
+static SetTimeDateView _viewSetTimeDate;
+static SetBitsView _viewSetBits;
+static SetValueView _viewSetValue;
+static SystemStatusView _viewSystemStatus;
+static TestDisplayView _viewTestDisplay;
 
 // An array with all views for the application; must correspond with ViewEnum!
 //
 static View *const cModeViews[] = {
-    new MainMenuView(), new TimeDateTempView(), new TimerCounterView(), new Dmx512View(),      new SetTimeDateView(),
-    new SetBitsView(),  new SetValueView(),     new SystemStatusView(), new TestDisplayView(),
+    &_viewMainMenu, &_viewTimeDateTemp, &_viewTimerCounter, &_viewDmx512,      &_viewSetTimeDate,
+    &_viewSetBits,  &_viewSetValue,     &_viewSystemStatus, &_viewTestDisplay,
 };
 
 // Structure defining menu views
@@ -320,7 +332,9 @@ ExternalControl getExternalControlState() { return _externalControlMode; }
 Settings *getSettingsPtr() { return &_settings; }
 
 void refreshSettings() {
-  int16_t timeZoneOffsetInMinutes = (_settings.getRawSetting(Settings::Setting::TimeZone) - 56) * 15;
+  int16_t timeZoneOffsetInMinutes =
+      ((int16_t) _settings.getRawSetting(Settings::Setting::TimeZone) - Settings::cTimeZoneUtcValue) *
+      Settings::cTimeZoneStepMinutes;
 
   // if ((_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::DstEnable) == true)
   //     && (isDst(_currentTime) == true))
@@ -346,7 +360,7 @@ void refreshSettings() {
                                       (int16_t) _settings.getRawSetting(Settings::Setting::TemperatureCalibrationLM74) -
                                           Settings::cCalibrationMidpoint);
 
-  _maximumIdleCount = (uint32_t)_settings.getRawSetting(Settings::Setting::IdleTimeout) * 1000;
+  _maximumIdleCount = (uint32_t) _settings.getRawSetting(Settings::Setting::IdleTimeout) * 1000;
   DisplayManager::setDisplayBlanking(false);
 
   Animator::setAnimationDuration(_settings.getRawSetting(Settings::Setting::EffectDuration));
@@ -372,34 +386,47 @@ void notifySettingChanged(uint8_t settingNum) {
 
 bool saveSettingsToFlash() { return _settings.saveToFlashIfChanged(); }
 
+// Computes the DateTime of the Nth occurrence of a day-of-week in a given month/year,
+// then sets the time. On invalid settings (no matching day found), result is set to
+// the default-constructed DateTime() to safely disable DST for the year.
+//
+static void _computeDstDate(DateTime &result, uint16_t year, uint16_t month, uint16_t dowOrdinal, uint16_t dow,
+                            uint16_t hour) {
+  uint8_t firstDay = ((dowOrdinal - 1) * 7) + 1;
+
+  do {
+    result.setDate(year, month, firstDay++);
+  } while ((result.dayOfWeek() != dow) && (firstDay <= 32));
+
+  if (firstDay > 32) {
+    // Settings yielded no valid date (e.g., 5th Sunday of a short month).
+    // Use epoch/zero to disable DST transitions for this year.
+    result = DateTime();
+    return;
+  }
+
+  result.setTime(hour, 0, 0);
+}
+
 // Handles DST date/time computation and setup
 //
 bool isDst(const DateTime &currentTime) {
-  uint8_t firstDay;
-
   if (_dstStart.year(false) != currentTime.year(false)) {
-    firstDay = ((_settings.getRawSetting(Settings::Setting::DstBeginDowOrdinal) - 1) * 7) + 1;
-
-    do {
-      _dstStart.setDate(currentTime.year(false), _settings.getRawSetting(Settings::Setting::DstBeginMonth), firstDay++);
-    } while ((_dstStart.dayOfWeek() != _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek)) &&
-             (firstDay <= 31));
-
-    _dstStart.setTime(_settings.getRawSetting(Settings::Setting::DstSwitchHour), 0, 0);
+    _computeDstDate(_dstStart, currentTime.year(false), _settings.getRawSetting(Settings::Setting::DstBeginMonth),
+                    _settings.getRawSetting(Settings::Setting::DstBeginDowOrdinal),
+                    _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek),
+                    _settings.getRawSetting(Settings::Setting::DstSwitchHour));
   }
 
   if (_dstEnd.year(false) != currentTime.year(false)) {
-    firstDay = ((_settings.getRawSetting(Settings::Setting::DstEndDowOrdinal) - 1) * 7) + 1;
-
-    do {
-      _dstEnd.setDate(currentTime.year(false), _settings.getRawSetting(Settings::Setting::DstEndMonth), firstDay++);
-    } while ((_dstEnd.dayOfWeek() != _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek)) &&
-             (firstDay <= 31));
+    _computeDstDate(_dstEnd, currentTime.year(false), _settings.getRawSetting(Settings::Setting::DstEndMonth),
+                    _settings.getRawSetting(Settings::Setting::DstEndDowOrdinal),
+                    _settings.getRawSetting(Settings::Setting::DstSwitchDayOfWeek),
+                    _settings.getRawSetting(Settings::Setting::DstSwitchHour));
 
     // Fall-back hour is specified as local DST (wall clock) time, but isDst() receives
     // standard time from the hardware RTC. Subtract the DST offset so the comparison
     // fires at the correct standard-time moment (e.g. 2:00 AM DST == 1:00 AM standard).
-    _dstEnd.setTime(_settings.getRawSetting(Settings::Setting::DstSwitchHour), 0, 0);
     _dstEnd = _dstEnd.addSeconds(-cDstOffsetSeconds);
   }
 

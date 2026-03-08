@@ -25,9 +25,8 @@
 
 namespace kbxTubeClock {
 
-// Percentage of configured LED color intensities used for lowlight
-//  (Percentages are times 100 -- e.g.: 2500 = 25.00%)
-const uint16_t SetTimeDateView::cLowlightPercentage = 2000;
+// Scale factor for non-selected digits/LED (20% of full intensity)
+const uint16_t SetTimeDateView::cLowlightPercentage = RgbLed::pct(20);
 
 SetTimeDateView::SetTimeDateView()
     : _selectedItem(0),
@@ -254,7 +253,7 @@ void SetTimeDateView::loop() {
   for (uint8_t t = 0; t < Display::cTubeCount; t++) {
     if ((t != highlightTube) && (t != highlightTube + 1)) {
       tube = tcDisp.getTubeRaw(t);
-      tube.adjustIntensity(cLowlightPercentage);
+      tube.adjustIntensityAll(cLowlightPercentage);
       tcDisp.setTubeFromRaw(t, tube);
     }
   }

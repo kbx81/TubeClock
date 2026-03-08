@@ -89,6 +89,10 @@ $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
+.PHONY: stats
+stats: $(BINARY).bin
+	arm-none-eabi-size $(BINARY).elf
+
 .PHONY: clean
 clean:
 	@#printf "  CLEAN\n"

@@ -129,6 +129,11 @@ class Settings {
   ///  stored = cCalibrationMidpoint + offsetCx10; offsetCx10 = stored - cCalibrationMidpoint
   static const int16_t cCalibrationMidpoint = 99;
 
+  /// @brief Timezone encoding constants: stored value for UTC+0, and minutes per step
+  ///  offsetMinutes = (stored - cTimeZoneUtcValue) * cTimeZoneStepMinutes
+  static const uint16_t cTimeZoneUtcValue = 56;
+  static const uint16_t cTimeZoneStepMinutes = 15;
+
   /// @brief Default constructor
   ///
   Settings();

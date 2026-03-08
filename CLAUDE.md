@@ -37,7 +37,7 @@ Output binary files are generated in `../../build/v1/`:
 - `TubeClock.bin` - Raw binary for flashing
 - `TubeClock.map` - Memory map file
 
-You can check the binary size from within the `src/v1` directory by running `arm-none-eabi-size ../../build/v1/TubeClock.elf`.
+Typically, just use `make stats` which will automatically run `arm-none-eabi-size` post-build to determine the binary's composition. Avoid using `git stash` for before/after build comparisons; instead, run the build before making changes, then again afterwards to compare.
 
 ## Important Implementation Notes
 
@@ -71,3 +71,32 @@ As this is ultimately a clock, time accuracy is critical. As such, hardware RTC 
 ### Hardware Versions
 
 There is currently only one hardware version (v1).
+
+### Fixed-Point Scale Convention for RgbLed and NixieTube
+
+Both classes use a **65536 = 100%** fixed-point scale for intensity and blend operations, shifted with `>> 16`. Do not use raw magic numbers — both classes provide a `pct()` helper that converts an integer percentage at compile time:
+
+```cpp
+led.adjustIntensity(RgbLed::pct(20));       // 20% of current intensity
+tube.adjustIntensityAll(NixieTube::pct(75)); // 75% of all glyph intensities
+```
+
+**NixieTube intensity API** — there is no single-argument `adjustIntensity`. Use:
+- `adjustIntensity(glyph, scaleFactor)` — scale one specific glyph
+- `adjustIntensityAll(scaleFactor)` — scale all glyphs (prefer this during crossfades where multiple glyphs may have non-zero intensity)
+
+**NixieTube LERP API:**
+- `lerpToward(blendFactor, target)` — interpolates `*this` toward `target`; `blendFactor=0` = no change, `65535` = fully `target`
+- `setFromLerp(blendFactor, from, to)` — sets `*this` to the interpolation of two other tubes; `blendFactor=0` = `from`, `65535` = `to`
+
+Note: since all blend/scale parameters are typed `uint16_t` (max 65535), a value of exactly 65536 can never be passed. Guards like `if (x >= 65536)` are unreachable — do not add them.
+
+### Static Objects with Virtual Destructors Require `_fini` Stub
+
+Static-duration objects with virtual destructors (common with polymorphic View classes) register via `__cxa_atexit`, which pulls in `__libc_fini_array`, which references `_fini`. On bare metal this symbol is not provided by the runtime. A stub is already present in `TubeClock.cpp`:
+
+```cpp
+extern "C" void _fini() {}
+```
+
+If new static polymorphic objects are added elsewhere and the linker complains about `_fini`, this is why. Do not add additional stubs — the one in `TubeClock.cpp` covers the whole binary.

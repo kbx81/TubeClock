@@ -37,7 +37,7 @@ class SetTimeDateView : public View {
     HourYear = 2,
   };
 
-  /// @brief Percentage of configured LED color intensities used for lowlight
+  /// @brief Scale factor applied to non-selected digits and the status LED (see RgbLed::pct / NixieTube::pct)
   ///
   static const uint16_t cLowlightPercentage;
 

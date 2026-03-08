@@ -298,63 +298,17 @@ uint16_t RgbLed::getBlue() const { return _blue; }
 
 uint32_t RgbLed::getDuration() const { return _duration; }
 
-void RgbLed::adjustIntensity(uint16_t percentageOfCurrentx100) {
+void RgbLed::adjustIntensity(uint16_t scaleFactor) {
   uint32_t top;
 
-  if (percentageOfCurrentx100 > cLed100Percent) {
-    percentageOfCurrentx100 = cLed100Percent;
-  }
+  top = _red * scaleFactor;
+  _red = top >> 16;
 
-  top = _red * percentageOfCurrentx100;
-  _red = top / cLed100Percent;
+  top = _green * scaleFactor;
+  _green = top >> 16;
 
-  top = _green * percentageOfCurrentx100;
-  _green = top / cLed100Percent;
-
-  top = _blue * percentageOfCurrentx100;
-  _blue = top / cLed100Percent;
-}
-
-void RgbLed::mergeWithRgbLed(uint16_t percentageOfOriginalLedx100, const RgbLed &led) {
-  int32_t intensity;
-
-  if (percentageOfOriginalLedx100 > cLed100Percent) {
-    percentageOfOriginalLedx100 = cLed100Percent;
-  }
-
-  // new intensity = led0 - ((led0 - led1) * percentage)
-  intensity = _red - led.getRed();
-  intensity = _red - ((intensity * percentageOfOriginalLedx100) / cLed100Percent);
-  _red = intensity;
-
-  intensity = _green - led.getGreen();
-  intensity = _green - ((intensity * percentageOfOriginalLedx100) / cLed100Percent);
-  _green = intensity;
-
-  intensity = _blue - led.getBlue();
-  intensity = _blue - ((intensity * percentageOfOriginalLedx100) / cLed100Percent);
-  _blue = intensity;
-}
-
-void RgbLed::setFromMergedRgbLeds(uint16_t percentageOfLed0x100, const RgbLed &led0, const RgbLed &led1) {
-  int32_t intensity;
-
-  if (percentageOfLed0x100 > cLed100Percent) {
-    percentageOfLed0x100 = cLed100Percent;
-  }
-
-  // new intensity = led0 - ((led0 - led1) * percentage)
-  intensity = led0.getRed() - led1.getRed();
-  intensity = led0.getRed() - ((intensity * percentageOfLed0x100) / cLed100Percent);
-  _red = intensity;
-
-  intensity = led0.getGreen() - led1.getGreen();
-  intensity = led0.getGreen() - ((intensity * percentageOfLed0x100) / cLed100Percent);
-  _green = intensity;
-
-  intensity = led0.getBlue() - led1.getBlue();
-  intensity = led0.getBlue() - ((intensity * percentageOfLed0x100) / cLed100Percent);
-  _blue = intensity;
+  top = _blue * scaleFactor;
+  _blue = top >> 16;
 }
 
 void RgbLed::gammaCorrect12bit() {

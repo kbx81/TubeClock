@@ -50,6 +50,12 @@ void __verbose_terminate_handler() {
 }
 }  // namespace __gnu_cxx
 
+// Stub for the C runtime 'finish' routine. Called by __libc_fini_array during
+// shutdown, which is pulled in when static C++ objects with non-trivial
+// (virtual) destructors register via __cxa_atexit. The firmware never exits,
+// so this is never actually called.
+extern "C" void _fini() {}
+
 /* ADC DMA */
 void dma1_channel1_isr(void) { Hardware::dmaCh1Isr(); }
 

@@ -36,8 +36,13 @@ class RgbLed {
  public:
   /// Important constants
   ///
-  static const uint16_t cLed100Percent = 10000;
+  static const uint32_t cLed100Percent   = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
   static const uint16_t cLedMaxIntensity = 4095;
+
+  /// @brief Convert an integer percentage (0–100) to the fixed-point scale used by this class.
+  /// @param p Percentage (0–100); pct(0) = 0, pct(50) ≈ 32767, pct(100) = 65535
+  ///
+  static constexpr uint16_t pct(uint8_t p) { return static_cast<uint16_t>((uint32_t(p) * 65535) / 100); }
 
   /// @brief Compare this RgbLed to another
   /// @param LED to compare with
@@ -74,20 +79,10 @@ class RgbLed {
   ///
   uint32_t getDuration() const;
 
-  /// @brief Adjusts the RGB LED to a percentage of original values.
-  /// @param percentageOfCurrentx100 percentage of original intensity. Percentages are times 100 -- e.g.: 8765 = 87.65%
+  /// @brief Adjusts the RGB LED to a fraction of its original values.
+  /// @param scaleFactor Scale factor: 0 = off, 32768 = 50%, 65535 = ~100%. Use pct() to convert from a percentage.
   ///
-  void adjustIntensity(uint16_t percentageOfCurrentx100);
-
-  /// @brief Merges the RGB LED with another.
-  /// @param percentageOfOriginalLedx100 percentage of original RgbLed. Percentages are times 100 -- e.g.: 8765 = 87.65%
-  ///
-  void mergeWithRgbLed(uint16_t percentageOfOriginalLedx100, const RgbLed &led);
-
-  /// @brief Sets the RGB LED to values obtained by merging two other RgbLed objects.
-  /// @param percentageOfLed0x100 percentage of first RgbLed. Percentages are times 100 -- e.g.: 8765 = 87.65%
-  ///
-  void setFromMergedRgbLeds(uint16_t percentageOfLed0x100, const RgbLed &led0, const RgbLed &led1);
+  void adjustIntensity(uint16_t scaleFactor);
 
   /// @brief Gamma corrects the RgbLed object (based on 12-bit values only).
   ///
