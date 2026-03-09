@@ -2,6 +2,12 @@
 
 Nixie Clock project files - PCB and source
 
+[![Nixie clocks!](media/meetup_header.jpg)](media/meetup.jpg)
+
+[![IN-18](media/in-18_header.jpg)](media/in-18.jpg)
+
+For more pictures, see the [gallery](media/).
+
 ## Another nixie tube clock? Why?
 
 I have to start by giving credit where credit is due. The
