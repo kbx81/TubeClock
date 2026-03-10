@@ -184,6 +184,7 @@ static int32_t _prevTempValues[Hardware::cTempSensorCount] = {Hardware::cTempSen
                                                               Hardware::cTempSentinel};
 
 static RgbLed _prevLed;
+static bool _prevLedAutoAdjust = false;
 static uint16_t _prevAdcLight = 0;
 static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
@@ -329,11 +330,15 @@ static void _txSendTempStatus() {
 static void _txSendLedStatus() {
   RgbLed led = DisplayManager::getStatusLed();
   _txBeginResponse("L");
+  _txAppendDecimal(led.getIntensity(), 1);
+  _txAppendChar(',');
   _txAppendDecimal(led.getRed() / 16, 1);
   _txAppendChar(',');
   _txAppendDecimal(led.getGreen() / 16, 1);
   _txAppendChar(',');
   _txAppendDecimal(led.getBlue() / 16, 1);
+  _txAppendChar(',');
+  _txAppendChar(Application::getLedIntensityAutoAdjust() ? '1' : '0');
   _txSendResponse();
 }
 
@@ -770,11 +775,13 @@ void process() {
     }
   }
 
-  // Check for LED color changes
+  // Check for LED color/intensity changes or LED auto-adjust state changes
   {
     RgbLed currentLed = DisplayManager::getStatusLed();
-    if (currentLed != _prevLed) {
+    bool ledAutoAdjust = Application::getLedIntensityAutoAdjust();
+    if (currentLed != _prevLed || ledAutoAdjust != _prevLedAutoAdjust) {
       _prevLed = currentLed;
+      _prevLedAutoAdjust = ledAutoAdjust;
       _enqueueNotification(NotificationType::Led);
     }
   }
@@ -1067,6 +1074,7 @@ static void _handleCommand(const char *payload, uint8_t length) {
       if (length >= 7 && payload[2] == 'E' && payload[3] == 'R' && payload[4] == 'A' && payload[5] == 'S' &&
           payload[6] == 'E') {
         uint32_t result = Hardware::eraseFlash(Settings::cSettingsFlashAddress);
+        Application::getSettingsPtr()->invalidateSram();
         QueueEntry e;
         e.type = NotificationType::CmdSettingsErased;
         e.data.saveOk = (result == 0);
@@ -1101,9 +1109,18 @@ static void _handleCommand(const char *payload, uint8_t length) {
 
     // --- Status LED ---
     case 'L': {
-      if (length > 2) {
-        // "$TCCL<r>,<g>,<b>" -- set LED color
+      if (length >= 3 && payload[2] == 'A') {
+        // "$TCCLA<0|1>" -- set LED auto-adjust flag only
+        if (length >= 4) {
+          Application::setLedIntensityAutoAdjust(payload[3] == '1');
+        }
+      } else if (length > 2) {
+        // "$TCCL<i>,<r>,<g>,<b>[,<0|1>]" -- set LED intensity and color, optionally set auto-adjust
         uint8_t idx = 2;
+        int32_t i = _parseDecimal(payload, idx, length);
+        if (idx < length && payload[idx] == ',') {
+          idx++;
+        }
         int32_t r = _parseDecimal(payload, idx, length);
         if (idx < length && payload[idx] == ',') {
           idx++;
@@ -1114,9 +1131,21 @@ static void _handleCommand(const char *payload, uint8_t length) {
         }
         int32_t b = _parseDecimal(payload, idx, length);
 
+        uint8_t ledIntensity = DisplayManager::getStatusLed().getIntensity();
+        if (i >= 0 && i <= 255) {
+          ledIntensity = static_cast<uint8_t>(i);
+          Application::setLedIntensity(ledIntensity);
+        }
         if (r >= 0 && r <= 255 && g >= 0 && g <= 255 && b >= 0 && b <= 255) {
-          DisplayManager::writeStatusLed(
-              RgbLed(static_cast<uint16_t>(r) * 16, static_cast<uint16_t>(g) * 16, static_cast<uint16_t>(b) * 16));
+          RgbLed newLed(static_cast<uint16_t>(r) * 16, static_cast<uint16_t>(g) * 16, static_cast<uint16_t>(b) * 16);
+          newLed.setIntensity(ledIntensity);
+          DisplayManager::writeStatusLed(newLed);
+        }
+        if (idx < length && payload[idx] == ',') {
+          idx++;
+          if (idx < length) {
+            Application::setLedIntensityAutoAdjust(payload[idx] == '1');
+          }
         }
       }
 

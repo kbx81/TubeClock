@@ -48,15 +48,7 @@ void *__dso_handle;
 namespace kbxTubeClock::Application {
 
 // Color constant definitions (declared extern in Application.h)
-const RgbLed red(RgbLed::cLedMaxIntensity, 0, 0), orange(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity / 4, 0),
-    yellow(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, 0), green(0, RgbLed::cLedMaxIntensity, 0),
-    cyan(0, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity), blue(0, 0, RgbLed::cLedMaxIntensity),
-    violet(RgbLed::cLedMaxIntensity / 8, 0, RgbLed::cLedMaxIntensity),
-    magenta(RgbLed::cLedMaxIntensity, 0, RgbLed::cLedMaxIntensity),
-    white(RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity, RgbLed::cLedMaxIntensity),
-    gray(RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8, RgbLed::cLedMaxIntensity / 8),
-    darkGray(RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24, RgbLed::cLedMaxIntensity / 24),
-    nixieOrange(1280, 496, 112);  // approximate orange color of neon-filled nixie tubes
+const RgbLed red(RgbLed::cLedMaxIntensity, 0, 0), green(0, RgbLed::cLedMaxIntensity, 0);
 
 // View instances — statically allocated, avoiding heap dependency
 //
@@ -179,6 +171,10 @@ static View *_currentView = cModeViews[static_cast<uint8_t>(ViewEnum::TimeDateTe
 // determines if display intensity is adjusted in real-time
 //
 static bool _autoAdjustIntensities = false;
+
+// determines if status LED intensity is adjusted in real-time (independent of tube auto-adjust)
+//
+static bool _autoAdjustLedIntensity = false;
 
 // DMX-512 signal status the last time we checked
 //
@@ -384,8 +380,10 @@ void refreshSettings() {
 
   // Convert stored setting (0-255) to master intensity scale (0-255)
   _minimumIntensity = _settings.getRawSetting(Settings::Setting::MinimumIntensity);
-  setIntensityAutoAdjust(
-      _settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity), true);
+  bool autoAdjust =
+      _settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity);
+  setIntensityAutoAdjust(autoAdjust, true);
+  _autoAdjustLedIntensity = autoAdjust;
 }
 
 void notifySettingsChanged() {
@@ -471,6 +469,9 @@ void _updateIntensityPercentage(const bool quick = false) {
   if (quick) {
     // Quick mode: snap immediately to target
     _masterIntensity = currentIntensity;
+    if (_autoAdjustLedIntensity) {
+      DisplayManager::setStatusLedIntensity(currentIntensity);
+    }
   } else {
     // Smooth mode with deadband and adaptive step size
     int16_t error = currentIntensity - _masterIntensity;
@@ -486,6 +487,9 @@ void _updateIntensityPercentage(const bool quick = false) {
       _masterIntensity -= step;
     }
     // Within deadband: do nothing (prevents flickering)
+    if (_autoAdjustLedIntensity) {
+      DisplayManager::setStatusLedIntensity(_masterIntensity);
+    }
   }
 }
 
@@ -501,13 +505,26 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust) {
   }
 }
 
+bool getLedIntensityAutoAdjust() { return _autoAdjustLedIntensity; }
+
+void setLedIntensityAutoAdjust(const bool enable) {
+  _autoAdjustLedIntensity = enable;
+}
+
 uint8_t getIntensity() { return _masterIntensity; }
+
+uint8_t getLedIntensity() { return DisplayManager::getStatusLed().getIntensity(); }
 
 uint8_t getStartupSettingsLoadResult() { return _settingsLoadFromFlashResult; }
 
 void setIntensity(const uint8_t intensity) {
   _autoAdjustIntensities = false;
   _masterIntensity = intensity;  // 0-255 scale, no clamping needed for uint8_t
+}
+
+void setLedIntensity(const uint8_t intensity) {
+  _autoAdjustLedIntensity = false;
+  DisplayManager::setStatusLedIntensity(intensity);
 }
 
 void tick() {

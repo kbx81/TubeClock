@@ -99,6 +99,11 @@ class TimeDateTempView : public View {
   //
   FixedDisplayItem _prevDisplayItem;
 
+  // tracks previous pmOn state to detect transitions and manage LED auto-adjust
+  //
+  bool _prevPmOn = false;
+  bool _pmOnStale = true;  // true forces LED auto-adjust resync on next loop()
+
   // true if status LED should be refreshed by the next loop iteration
   //
   bool _refreshStatusLed = false;

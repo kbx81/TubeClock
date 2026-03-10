@@ -35,8 +35,10 @@ namespace kbxTubeClock {
 
 SystemStatusView::SystemStatusView() : _selectedView(0) {}
 
-void SystemStatusView::enter(const Settings::SettingDescriptor* /*descriptor*/,
-                             uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) { DisplayManager::setStatusLedAutoRefreshing(true); }
+void SystemStatusView::enter(const Settings::SettingDescriptor * /*descriptor*/, uint8_t /*relatedSetting*/,
+                             uint8_t /*numSettings*/) {
+  DisplayManager::setStatusLedAutoRefreshing(true);
+}
 
 bool SystemStatusView::keyHandler(Keys::Key key) {
   bool tick = false;
@@ -100,7 +102,10 @@ void SystemStatusView::loop() {
       // If the PPS trigger is selected, light the status LED when the PPS signal is high
       if (Hardware::getPeripheralRefreshTrigger() == Hardware::PeripheralRefreshTrigger::PpsExti) {
         if (Hardware::getPpsInputState() == true) {
-          statusLed = Application::nixieOrange;
+          Settings *pSettings = Application::getSettingsPtr();
+          statusLed.setRGB(pSettings->getRawSetting(Settings::Setting::PMIndicatorRedValue),
+                           pSettings->getRawSetting(Settings::Setting::PMIndicatorGreenValue),
+                           pSettings->getRawSetting(Settings::Setting::PMIndicatorBlueValue));
         }
       }
       break;
@@ -204,6 +209,7 @@ void SystemStatusView::loop() {
   }
   tcDisp.setTubeIntensities(NixieGlyph::cGlyphMaximumIntensity, 0, tubeIntensityBitmap);
   tcDisp.setDots(dotsBitmap, dot, true);
+  DisplayManager::setStatusLedIntensity(Application::getIntensity());
   DisplayManager::writeDisplay(tcDisp, statusLed);
 }
 

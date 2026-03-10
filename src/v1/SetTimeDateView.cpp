@@ -34,8 +34,8 @@ SetTimeDateView::SetTimeDateView()
       _mode(Application::OperatingMode::OperatingModeSetClock),
       _relatedSetting(0) {}
 
-void SetTimeDateView::enter(const Settings::SettingDescriptor* /*descriptor*/,
-                            uint8_t relatedSetting, uint8_t /*numSettings*/) {
+void SetTimeDateView::enter(const Settings::SettingDescriptor * /*descriptor*/, uint8_t relatedSetting,
+                            uint8_t /*numSettings*/) {
   _mode = Application::getOperatingMode();
   _relatedSetting = relatedSetting;
 
@@ -239,7 +239,9 @@ void SetTimeDateView::loop() {
     tcDisp.setDisplayFromDateTime(_workingDateTime, dateTimeItem);
   } else if (display12Hour == true) {
     if (_workingDateTime.isPM() == true) {
-      statusLed = Application::nixieOrange;
+      statusLed.setRGB(pSettings->getRawSetting(Settings::Setting::PMIndicatorRedValue),
+                       pSettings->getRawSetting(Settings::Setting::PMIndicatorGreenValue),
+                       pSettings->getRawSetting(Settings::Setting::PMIndicatorBlueValue));
     } else {
       statusLed = RgbLed();
     }

@@ -43,7 +43,7 @@ void MainMenuView::enter(const Settings::SettingDescriptor* /*descriptor*/,
 
   DisplayManager::setStatusLedAutoRefreshing(true);
   // Make sure the status LEDs are off
-  DisplayManager::writeStatusLed(RgbLed());
+  DisplayManager::setStatusLedIntensity(0);
 }
 
 bool MainMenuView::keyHandler(Keys::Key key) {
@@ -54,10 +54,11 @@ bool MainMenuView::keyHandler(Keys::Key key) {
     DisplayManager::writeStatusLed(Application::red);
 
     Hardware::eraseFlash(Settings::cSettingsFlashAddress);
+    Application::getSettingsPtr()->invalidateSram();
     _selectedMode = 1;
 
     DisplayManager::blink(4);
-    DisplayManager::writeStatusLed(RgbLed());
+    DisplayManager::setStatusLedIntensity(0);
   }
 
   if (key == Keys::Key::B) {

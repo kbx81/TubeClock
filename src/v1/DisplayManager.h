@@ -86,13 +86,19 @@ void blink(uint8_t count = 2);
 void writeDisplay(const Display &display);
 void writeDisplay(const Display &display, const RgbLed &statusLed);
 
-/// @brief Sets the status LED's state
-/// @param statusLed New status LED state
+/// @brief Sets the status LED's color and intensity from the passed RgbLed object.
+///  Any change to color or intensity triggers a hardware update.
+/// @param statusLed New status LED state (color + intensity both applied)
 ///
 void writeStatusLed(const RgbLed &statusLed);
 
+/// @brief Sets the status LED's master intensity (0–255) without changing its color
+/// @param intensity New master intensity
+///
+void setStatusLedIntensity(uint8_t intensity);
+
 /// @brief Returns the current status LED state as stored in the DisplayManager
-/// @return Current RgbLed value
+/// @return Current RgbLed value (includes master intensity)
 ///
 RgbLed getStatusLed();
 

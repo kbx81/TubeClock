@@ -68,9 +68,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
-    1280,           // PMIndicatorRedValue
-    496,            // PMIndicatorGreenValue
-    112,            // PMIndicatorBlueValue
+    1638,           // PMIndicatorRedValue
+    704,            // PMIndicatorGreenValue
+    164,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -103,9 +103,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
-    1280,           // PMIndicatorRedValue
-    496,            // PMIndicatorGreenValue
-    112,            // PMIndicatorBlueValue
+    1638,           // PMIndicatorRedValue
+    704,            // PMIndicatorGreenValue
+    164,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -138,9 +138,9 @@ static const SettingsProfile cActiveProfile = {{
     0b00000000000,  // BeepStates: all disabled
     0b00000000000,  // BlinkStates: all disabled
     0b11111111,     // OnOffStates
-    1280,           // PMIndicatorRedValue
-    496,            // PMIndicatorGreenValue
-    112,            // PMIndicatorBlueValue
+    1638,           // PMIndicatorRedValue
+    704,            // PMIndicatorGreenValue
+    164,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -173,9 +173,9 @@ static const SettingsProfile cActiveProfile = {{
     0b11100000000,  // BeepStates
     0b11100000000,  // BlinkStates
     0b11111111,     // OnOffStates
-    1280,           // PMIndicatorRedValue
-    496,            // PMIndicatorGreenValue
-    112,            // PMIndicatorBlueValue
+    1638,           // PMIndicatorRedValue
+    704,            // PMIndicatorGreenValue
+    164,            // PMIndicatorBlueValue
     26,             // TimeDisplayDuration
     2,              // DateDisplayDuration
     2,              // TemperatureDisplayDuration
@@ -210,37 +210,37 @@ const uint32_t Settings::cSettingsFlashAddress = reinterpret_cast<uint32_t>(&__s
 
 // Descriptor for each setting: max/mask, min value, display transform
 const Settings::SettingDescriptor Settings::cSettingDescriptors[] = {
-    {0x03ff, 0, Settings::SettingTransform::None},   // SystemOptions
-    {0x07ff, 0, Settings::SettingTransform::None},   // BeepStates
-    {0x07ff, 0, Settings::SettingTransform::None},   // BlinkStates
-    {0x00ff, 0, Settings::SettingTransform::None},   // OnOffStates
-    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorRedValue
-    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorGreenValue
-    {4095,   0, Settings::SettingTransform::None},   // PMIndicatorBlueValue
-    {300,    0, Settings::SettingTransform::None},   // TimeDisplayDuration
-    {300,    0, Settings::SettingTransform::None},   // DateDisplayDuration
-    {300,    0, Settings::SettingTransform::None},   // TemperatureDisplayDuration
-    {1000,   0, Settings::SettingTransform::None},   // FadeDuration
-    {12,     1, Settings::SettingTransform::None},   // DstBeginMonth (1-12)
-    {4,      1, Settings::SettingTransform::None},   // DstBeginDowOrdinal (1-4)
-    {12,     1, Settings::SettingTransform::None},   // DstEndMonth (1-12)
-    {4,      1, Settings::SettingTransform::None},   // DstEndDowOrdinal (1-4)
-    {6,      0, Settings::SettingTransform::None},   // DstSwitchDayOfWeek
-    {23,     0, Settings::SettingTransform::None},   // DstSwitchHour
-    {1000,   0, Settings::SettingTransform::None},   // EffectDuration
-    {43200,  0, Settings::SettingTransform::None},   // EffectFrequency
-    {1000,   0, Settings::SettingTransform::None},   // MinimumIntensity
-    {7,      0, Settings::SettingTransform::None},   // BeeperVolume
-    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationSTM32 (midpoint 99)
-    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS3234
-    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS1722
-    {198,    0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationLM74
-    {600,   10, Settings::SettingTransform::None},   // IdleTimeout (10-600 seconds)
-    {2,      0, Settings::SettingTransform::None},   // DateFormat
-    {112,    0, Settings::SettingTransform::TimeZone},     // TimeZone (0-112, x15 min, displayed ±HH:MM)
-    {5,      0, Settings::SettingTransform::None},   // ColonBehavior
-    {65535,  0, Settings::SettingTransform::None},   // TimerResetValue
-    {512-8,  0, Settings::SettingTransform::PlusOne},      // DmxAddress (stored 0-504, shown 1-512)
+    {0x03ff, 0, Settings::SettingTransform::None},      // SystemOptions
+    {0x07ff, 0, Settings::SettingTransform::None},      // BeepStates
+    {0x07ff, 0, Settings::SettingTransform::None},      // BlinkStates
+    {0x00ff, 0, Settings::SettingTransform::None},      // OnOffStates
+    {4095, 0, Settings::SettingTransform::None},        // PMIndicatorRedValue
+    {4095, 0, Settings::SettingTransform::None},        // PMIndicatorGreenValue
+    {4095, 0, Settings::SettingTransform::None},        // PMIndicatorBlueValue
+    {300, 0, Settings::SettingTransform::None},         // TimeDisplayDuration
+    {300, 0, Settings::SettingTransform::None},         // DateDisplayDuration
+    {300, 0, Settings::SettingTransform::None},         // TemperatureDisplayDuration
+    {1000, 0, Settings::SettingTransform::None},        // FadeDuration
+    {12, 1, Settings::SettingTransform::None},          // DstBeginMonth (1-12)
+    {4, 1, Settings::SettingTransform::None},           // DstBeginDowOrdinal (1-4)
+    {12, 1, Settings::SettingTransform::None},          // DstEndMonth (1-12)
+    {4, 1, Settings::SettingTransform::None},           // DstEndDowOrdinal (1-4)
+    {6, 0, Settings::SettingTransform::None},           // DstSwitchDayOfWeek
+    {23, 0, Settings::SettingTransform::None},          // DstSwitchHour
+    {1000, 0, Settings::SettingTransform::None},        // EffectDuration
+    {43200, 0, Settings::SettingTransform::None},       // EffectFrequency
+    {1000, 0, Settings::SettingTransform::None},        // MinimumIntensity
+    {7, 0, Settings::SettingTransform::None},           // BeeperVolume
+    {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationSTM32 (midpoint 99)
+    {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS3234
+    {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS1722
+    {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationLM74
+    {600, 10, Settings::SettingTransform::None},        // IdleTimeout (10-600 seconds)
+    {2, 0, Settings::SettingTransform::None},           // DateFormat
+    {112, 0, Settings::SettingTransform::TimeZone},     // TimeZone (0-112, x15 min, displayed ±HH:MM)
+    {5, 0, Settings::SettingTransform::None},           // ColonBehavior
+    {65535, 0, Settings::SettingTransform::None},       // TimerResetValue
+    {512 - 8, 0, Settings::SettingTransform::PlusOne},  // DmxAddress (stored 0-504, shown 1-512)
 };
 
 Settings::Settings() : _crc(0) { initialize(); }
@@ -309,7 +309,7 @@ bool Settings::loadFromSram() {
   uint32_t loadedCrc = _crc;
   _crc = 0;
 
-  if (loadedCrc != Hardware::getCRC((uint32_t *)this, sizeof(Settings) / 4)) {
+  if (loadedCrc != Hardware::getCRC((uint32_t *) this, sizeof(Settings) / 4)) {
     initialize();
     return false;
   }
@@ -327,7 +327,7 @@ bool Settings::sramIsValid() const {
 
   uint32_t loadedCrc = temp._crc;
   temp._crc = 0;
-  return loadedCrc == Hardware::getCRC((uint32_t *)&temp, sizeof(Settings) / 4);
+  return loadedCrc == Hardware::getCRC((uint32_t *) &temp, sizeof(Settings) / 4);
 }
 
 void Settings::saveToSram() {
@@ -336,6 +336,15 @@ void Settings::saveToSram() {
   }
 
   DS3234::writeSram(0, reinterpret_cast<uint8_t *>(this), static_cast<uint8_t>(sizeof(Settings)), true);
+}
+
+void Settings::invalidateSram() {
+  if (!DS3234::isConnected()) {
+    return;
+  }
+
+  uint8_t zero = 0;
+  DS3234::writeSram(0, &zero, 1, true);
 }
 
 bool Settings::getSetting(const uint8_t setting, const uint8_t item) {

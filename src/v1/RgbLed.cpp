@@ -260,15 +260,16 @@ const uint16_t RgbLed::cGammaTable[4096] = {
     4073, 4075, 4077, 4080, 4082, 4084, 4086, 4088, 4091, 4093, 4095};
 
 RgbLed::RgbLed(const uint16_t red, const uint16_t green, const uint16_t blue, const uint32_t duration)
-    : _red(red), _green(green), _blue(blue), _duration(duration) {}
+    : _duration(duration), _red(red), _green(green), _blue(blue) {}
 
 bool RgbLed::operator==(const RgbLed &other) const {
-  return _red == other._red && _green == other._green && _blue == other._blue && _duration == other._duration;
+  return _red == other._red && _green == other._green && _blue == other._blue && _duration == other._duration &&
+         _intensity == other._intensity;
 }
 
-bool RgbLed::operator!=(const RgbLed &other) const {
-  return _red != other._red || _green != other._green || _blue != other._blue || _duration != other._duration;
-}
+bool RgbLed::operator!=(const RgbLed &other) const { return !(*this == other); }
+
+void RgbLed::setIntensity(const uint8_t intensity) { _intensity = intensity; }
 
 void RgbLed::setRed(const uint16_t intensityRed) { _red = intensityRed; }
 
@@ -289,6 +290,8 @@ void RgbLed::setOff() {
 }
 
 void RgbLed::setDuration(const uint32_t duration) { _duration = duration; }
+
+uint8_t RgbLed::getIntensity() const { return _intensity; }
 
 uint16_t RgbLed::getRed() const { return _red; }
 

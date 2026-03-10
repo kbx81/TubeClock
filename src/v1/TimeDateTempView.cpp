@@ -40,8 +40,8 @@ TimeDateTempView::TimeDateTempView()
       _mode(Application::OperatingMode::OperatingModeFixedDisplay),
       _prevDisplayItem(FixedDisplayItem::Time) {}
 
-void TimeDateTempView::enter(const Settings::SettingDescriptor* /*descriptor*/,
-                             uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
+void TimeDateTempView::enter(const Settings::SettingDescriptor * /*descriptor*/, uint8_t /*relatedSetting*/,
+                             uint8_t /*numSettings*/) {
   Settings *pSettings = Application::getSettingsPtr();
 
   _mode = Application::getOperatingMode();
@@ -53,6 +53,8 @@ void TimeDateTempView::enter(const Settings::SettingDescriptor* /*descriptor*/,
   _switchElapsed = 0;
 
   _prevDisplayItem = static_cast<FixedDisplayItem>(Application::getViewMode());
+
+  _pmOnStale = true;
 
   DisplayManager::setStatusLedAutoRefreshing(
       pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm));
@@ -135,16 +137,20 @@ void TimeDateTempView::loop() {
   }
   // set status LED to appropriate color if enabled as AM/PM indicator
   if (pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm) == true) {
-    // this will set the color and (more importantly) fade duration correctly
-    if (_currentTime.isPM() == true) {
-      _setStatusLed(RgbLed(pSettings->getRawSetting(Settings::Setting::PMIndicatorRedValue),
-                           pSettings->getRawSetting(Settings::Setting::PMIndicatorGreenValue),
-                           pSettings->getRawSetting(Settings::Setting::PMIndicatorBlueValue)));
+    RgbLed pmLed(pSettings->getRawSetting(Settings::Setting::PMIndicatorRedValue),
+                 pSettings->getRawSetting(Settings::Setting::PMIndicatorGreenValue),
+                 pSettings->getRawSetting(Settings::Setting::PMIndicatorBlueValue));
+    bool pmOn = _currentTime.isPM() == true &&
+                (currentDisplayItem == FixedDisplayItem::Time || currentDisplayItem == FixedDisplayItem::TimeSeconds);
+    if (_pmOnStale || pmOn != _prevPmOn) {
+      // When PM indicator turns on, LED auto-adjust follows tube auto-adjust.
+      // When it turns off, LED auto-adjust is disabled so auto-brightness can't turn it back on.
+      Application::setLedIntensityAutoAdjust(pmOn && Application::getIntensityAutoAdjust());
+      _prevPmOn = pmOn;
+      _pmOnStale = false;
     }
-    // turn it off if we're not displaying the time (a bit silly but it works)
-    if ((currentDisplayItem != FixedDisplayItem::Time) && (currentDisplayItem != FixedDisplayItem::TimeSeconds)) {
-      _setStatusLed(RgbLed());
-    }
+    pmLed.setIntensity(pmOn ? Application::getIntensity() : 0);
+    _setStatusLed(pmLed);
   }
 
   _setDisplay(&tcDisp, currentDisplayItem);

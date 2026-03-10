@@ -36,7 +36,7 @@ class RgbLed {
  public:
   /// Important constants
   ///
-  static const uint32_t cLed100Percent   = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
+  static const uint32_t cLed100Percent = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
   static const uint16_t cLedMaxIntensity = 4095;
 
   /// @brief Convert an integer percentage (0–100) to the fixed-point scale used by this class.
@@ -88,13 +88,19 @@ class RgbLed {
   ///
   void gammaCorrect12bit();
 
+  /// @brief Set/get the master intensity of this LED (0–255 scale, applied by DisplayManager)
+  ///
+  void setIntensity(uint8_t intensity);
+  uint8_t getIntensity() const;
+
  private:
   /// 4096-step (12 bit) brightness table: gamma = 2.2
   ///
   static const uint16_t cGammaTable[4096];
 
-  uint16_t _red, _green, _blue;  ///< Intensities for Red, Green, and Blue elements
   uint32_t _duration;            ///< Duration over which this LED should transition
+  uint16_t _red, _green, _blue;  ///< Intensities for Red, Green, and Blue elements
+  uint8_t _intensity = 255;      ///< Master intensity (0–255); applied by DisplayManager::refresh()
 };
 
 }  // namespace kbxTubeClock

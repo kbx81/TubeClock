@@ -157,6 +157,10 @@ class Settings {
   ///
   void saveToSram();
 
+  /// @brief Invalidates the DS3234 SRAM copy of settings so it won't be used on next load; no-op if DS3234 not connected
+  ///
+  void invalidateSram();
+
   /// @brief Checks whether DS3234 SRAM contains valid settings (CRC check only, does not modify *this)
   /// @return true if DS3234 connected and SRAM CRC valid
   ///

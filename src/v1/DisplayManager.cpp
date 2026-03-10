@@ -231,12 +231,13 @@ void refresh() {
     Hardware::setStatusLed(RgbLed());
   } else if (_refreshStatusLed) {
     RgbLed status = _statusLed;
-    // Apply master intensity in full 12-bit precision, then gamma-correct for
-    // perceptually linear brightness. This gives: perceived ∝ master/255 linearly,
+    // Apply LED master intensity in full 12-bit precision, then gamma-correct for
+    // perceptually linear brightness. This gives: perceived ∝ intensity/255 linearly,
     // and preserves color ratios across the full dimming range without quantization.
-    status.setRed(((uint32_t) status.getRed() * _masterIntensity + 127) / 255);
-    status.setGreen(((uint32_t) status.getGreen() * _masterIntensity + 127) / 255);
-    status.setBlue(((uint32_t) status.getBlue() * _masterIntensity + 127) / 255);
+    const uint8_t ledIntensity = _statusLed.getIntensity();
+    status.setRed(((uint32_t) status.getRed() * ledIntensity + 127) / 255);
+    status.setGreen(((uint32_t) status.getGreen() * ledIntensity + 127) / 255);
+    status.setBlue(((uint32_t) status.getBlue() * ledIntensity + 127) / 255);
     status.gammaCorrect12bit();
     Hardware::setStatusLed(status);
   }
@@ -411,11 +412,18 @@ void writeDisplay(const Display &display, const RgbLed &statusLed) {
 }
 
 void writeStatusLed(const RgbLed &statusLed) {
-  // _crossfader[Display::cPixelCount].startNewFade(statusLed);
   if (_statusLed == statusLed) {
     return;
   }
   _statusLed = statusLed;
+  _refreshStatusLed = true;
+}
+
+void setStatusLedIntensity(const uint8_t intensity) {
+  if (_statusLed.getIntensity() == intensity) {
+    return;
+  }
+  _statusLed.setIntensity(intensity);
   _refreshStatusLed = true;
 }
 

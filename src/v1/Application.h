@@ -30,49 +30,49 @@ namespace kbxTubeClock::Application {
 /// @brief Application operating modes
 ///
 enum OperatingMode : uint8_t {
-  OperatingModeMainMenu,                   ///< Main Menu mode
-  OperatingModeFixedDisplay,               ///< Fixed display mode
-  OperatingModeToggleDisplay,              ///< Toggling display mode
-  OperatingModeTimerCounter,               ///< Timer/counter mode
-  OperatingModeDmx512Display,              ///< DMX-512 display mode
-  OperatingModeSetClock,                   ///< Set timeclock mode
-  OperatingModeSetDate,                    ///< Set date mode
-  OperatingModeSetTimerResetValue,         ///< Set timer/counter reset value
-  OperatingModeSystemStatusView,           ///< System status view mode
-  OperatingModeSetSystemOptions,           ///< Set Binary/BCD and 24 hour bits mode
-  OperatingModeSlotBeepConfig,             ///< Enable/Disable beeping (alarm) per-slot
-  OperatingModeSlotBlinkConfig,            ///< Enable/Disable display blinking per-slot
-  OperatingModeSlotOnOffConfig,            ///< Enable/Disable color change per-slot
-  OperatingModeSlotPMIndicatorRGBConfig,   ///< Set RGB color for PM indicator
-  OperatingModeSetDurationClock,           ///< Set duration of clock display mode
-  OperatingModeSetDurationDate,            ///< Set duration of date display mode
-  OperatingModeSetDurationTemp,            ///< Set duration of temperature display mode
-  OperatingModeSetDurationFade,            ///< Set duration of fading for digits
-  OperatingModeDstBeginMonth,              ///< Set first month of DST
-  OperatingModeDstBeginDowOrdinal,         ///< Set which given day DST begins
-  OperatingModeDstEndMonth,                ///< Set last month of DST
-  OperatingModeDstEndDowOrdinal,           ///< Set which given day DST ends
-  OperatingModeDstSwitchDayOfWeek,         ///< Set which day of week DST begins/ends
-  OperatingModeDstSwitchHour,              ///< Set hour at which DST begins/ends
-  OperatingModeSetEffectDuration,          ///< Set duration of display effects
-  OperatingModeSetEffectFrequency,         ///< Set frequency of display effects
-  OperatingModeSetMinimumIntensity,        ///< Set minimum display intensity
-  OperatingModeSetBeeperVolume,            ///< Set Beeper Volume
-  OperatingModeSetTempCalibration,         ///< Set temperature calibration
-  OperatingModeSetIdleTimeout,             ///< Set idle timeout
-  OperatingModeSetDateFormat,              ///< Set Date Format
-  OperatingModeSetTimeZone,                ///< Set Time Zone
-  OperatingModeSetColonBehavior,           ///< Set Colon/Seperator behavior (time display)
-  OperatingModeSetDMX512Address,           ///< Set DMX-512 address mode
-  OperatingModeSlot1Time,                  ///< Set slot 1 time mode
-  OperatingModeSlot2Time,                  ///< Set slot 2 time mode
-  OperatingModeSlot3Time,                  ///< Set slot 3 time mode
-  OperatingModeSlot4Time,                  ///< Set slot 4 time mode
-  OperatingModeSlot5Time,                  ///< Set slot 5 time mode
-  OperatingModeSlot6Time,                  ///< Set slot 6 time mode
-  OperatingModeSlot7Time,                  ///< Set slot 7 time mode
-  OperatingModeSlot8Time,                  ///< Set slot 8 time mode
-  OperatingModeTestDisplay                 ///< Test display mode
+  OperatingModeMainMenu,                  ///< Main Menu mode
+  OperatingModeFixedDisplay,              ///< Fixed display mode
+  OperatingModeToggleDisplay,             ///< Toggling display mode
+  OperatingModeTimerCounter,              ///< Timer/counter mode
+  OperatingModeDmx512Display,             ///< DMX-512 display mode
+  OperatingModeSetClock,                  ///< Set timeclock mode
+  OperatingModeSetDate,                   ///< Set date mode
+  OperatingModeSetTimerResetValue,        ///< Set timer/counter reset value
+  OperatingModeSystemStatusView,          ///< System status view mode
+  OperatingModeSetSystemOptions,          ///< Set Binary/BCD and 24 hour bits mode
+  OperatingModeSlotBeepConfig,            ///< Enable/Disable beeping (alarm) per-slot
+  OperatingModeSlotBlinkConfig,           ///< Enable/Disable display blinking per-slot
+  OperatingModeSlotOnOffConfig,           ///< Enable/Disable color change per-slot
+  OperatingModeSlotPMIndicatorRGBConfig,  ///< Set RGB color for PM indicator
+  OperatingModeSetDurationClock,          ///< Set duration of clock display mode
+  OperatingModeSetDurationDate,           ///< Set duration of date display mode
+  OperatingModeSetDurationTemp,           ///< Set duration of temperature display mode
+  OperatingModeSetDurationFade,           ///< Set duration of fading for digits
+  OperatingModeDstBeginMonth,             ///< Set first month of DST
+  OperatingModeDstBeginDowOrdinal,        ///< Set which given day DST begins
+  OperatingModeDstEndMonth,               ///< Set last month of DST
+  OperatingModeDstEndDowOrdinal,          ///< Set which given day DST ends
+  OperatingModeDstSwitchDayOfWeek,        ///< Set which day of week DST begins/ends
+  OperatingModeDstSwitchHour,             ///< Set hour at which DST begins/ends
+  OperatingModeSetEffectDuration,         ///< Set duration of display effects
+  OperatingModeSetEffectFrequency,        ///< Set frequency of display effects
+  OperatingModeSetMinimumIntensity,       ///< Set minimum display intensity
+  OperatingModeSetBeeperVolume,           ///< Set Beeper Volume
+  OperatingModeSetTempCalibration,        ///< Set temperature calibration
+  OperatingModeSetIdleTimeout,            ///< Set idle timeout
+  OperatingModeSetDateFormat,             ///< Set Date Format
+  OperatingModeSetTimeZone,               ///< Set Time Zone
+  OperatingModeSetColonBehavior,          ///< Set Colon/Seperator behavior (time display)
+  OperatingModeSetDMX512Address,          ///< Set DMX-512 address mode
+  OperatingModeSlot1Time,                 ///< Set slot 1 time mode
+  OperatingModeSlot2Time,                 ///< Set slot 2 time mode
+  OperatingModeSlot3Time,                 ///< Set slot 3 time mode
+  OperatingModeSlot4Time,                 ///< Set slot 4 time mode
+  OperatingModeSlot5Time,                 ///< Set slot 5 time mode
+  OperatingModeSlot6Time,                 ///< Set slot 6 time mode
+  OperatingModeSlot7Time,                 ///< Set slot 7 time mode
+  OperatingModeSlot8Time,                 ///< Set slot 8 time mode
+  OperatingModeTestDisplay                ///< Test display mode
 };
 
 /// @brief Enums for views
@@ -104,7 +104,7 @@ static const int16_t cDstOffsetSeconds = 60 * 60;
 
 /// @brief Common colors used throughout
 ///
-extern const RgbLed red, orange, yellow, green, cyan, blue, violet, magenta, white, gray, darkGray, nixieOrange;
+extern const RgbLed red, green;
 
 /// @brief Initialize the application
 ///
@@ -196,19 +196,32 @@ bool saveSettingsToFlash();
 /// @return true if DST is active based on passed DateTime object
 bool isDst(const DateTime &currentTime);
 
-/// @brief Returns state of automatic display intensity adjustments
-/// @return True if automatic intensity adjustment is enabled
+/// @brief Returns state of automatic tube intensity adjustments
+/// @return True if automatic tube intensity adjustment is enabled
 bool getIntensityAutoAdjust();
 
-/// @brief Enables/disables automagic adjusting of the display intensity based
+/// @brief Enables/disables automatic adjusting of the tube display intensity based
 ///  on ambient light seen by the phototransistor
 /// @param enable Enables automatic adjustments if true
 /// @param quickAdjust Perform an immediate update of the intensity
 void setIntensityAutoAdjust(const bool enable, const bool quickAdjust = false);
 
+/// @brief Returns state of automatic status LED intensity adjustments
+/// @return True if automatic LED intensity adjustment is enabled
+bool getLedIntensityAutoAdjust();
+
+/// @brief Enables/disables automatic adjusting of the status LED intensity based
+///  on ambient light. Independent of tube auto-adjust.
+/// @param enable Enables automatic LED adjustments if true
+void setLedIntensityAutoAdjust(const bool enable);
+
 /// @brief Returns the application's current display intensity
 /// @return current display intensity (0-255)
 uint8_t getIntensity();
+
+/// @brief Returns the status LED's current master intensity
+/// @return current LED intensity (0-255)
+uint8_t getLedIntensity();
 
 /// @brief Returns the application's startup settings load result
 /// @return 0 = defaults used, 1 = loaded from flash, 2 = loaded from DS3234 SRAM
@@ -218,6 +231,12 @@ uint8_t getStartupSettingsLoadResult();
 /// @param intensity New display intensity (0-255)
 ///
 void setIntensity(const uint8_t intensity);
+
+/// @brief Set the status LED's master intensity independently of the nixie display intensity.
+///        Disables LED auto-adjust; tube auto-adjust is unaffected.
+/// @param intensity New LED intensity (0-255)
+///
+void setLedIntensity(const uint8_t intensity);
 
 /// @brief Refreshs master display intensity. Call at fixed intervals.
 ///

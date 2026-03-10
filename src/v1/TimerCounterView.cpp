@@ -63,7 +63,7 @@ bool TimerCounterView::getCountUp() { return s_instance ? s_instance->_countUp :
 void TimerCounterView::enter(const Settings::SettingDescriptor* /*descriptor*/,
                              uint8_t /*relatedSetting*/, uint8_t /*numSettings*/) {
   // we don't use the status LED, so turn it off in case it was left on
-  DisplayManager::writeStatusLed(RgbLed());
+  DisplayManager::setStatusLedIntensity(0);
 }
 
 bool TimerCounterView::keyHandler(Keys::Key key) {

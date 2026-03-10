@@ -394,33 +394,52 @@ Example: `$TCCMS0*XX\n` switches to the internal STM32 ADC.
 
 ### L -- Status LED
 
-Get or set the RGB status LED color. Values are 0–255 per channel; internally the LED uses 12-bit resolution (0–4095), so the serial interface scales by a factor of 16 in each direction.
+Get or set the RGB status LED color, master intensity, and auto-brightness state. Color values are 0–255 per channel; internally the LED uses 12-bit resolution (0–4095), so the serial interface scales by a factor of 16 in each direction. Intensity is 0–255. The LED has its own auto-brightness flag, independent of the nixie tube auto-brightness (see [I -- Intensity](#i----intensity)).
 
-#### Get LED Color
+#### Get LED State
 
 ```
 -> $TCCL*XX\n
-<- $TCSL<r>,<g>,<b>*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
 ```
 
-Returns the current red, green, and blue channel values (0–255 each).
+Returns five comma-separated values:
+- **i**: LED master intensity (0–255)
+- **r**, **g**, **b**: Red, green, blue channel values (0–255 each)
+- **auto**: LED auto-adjust enabled (`1`) or disabled (`0`)
 
-Example: `$TCSL0,0,0*XX\n` (LED off).
+Example: `$TCSL128,255,0,0,0*XX\n` (red LED at intensity 128, auto-adjust off).
 
-#### Set LED Color
+#### Set LED State
 
 ```
--> $TCCL<r>,<g>,<b>*XX\n
-<- $TCSL<r>,<g>,<b>*XX\n
+-> $TCCL<i>,<r>,<g>,<b>[,<auto>]*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
 ```
 
-Sets the LED to the specified color. The response confirms the new state.
+Sets the LED master intensity and color. The optional trailing `<auto>` byte (`0` or `1`) sets the LED auto-brightness flag. The response confirms the new state.
 
-Example: `$TCCL255,128,0*XX\n` sets the LED to orange.
+Example: `$TCCL255,255,128,0*XX\n` sets the LED to orange at full intensity.
+Example: `$TCCL50,0,255,0,1*XX\n` sets the LED to green at intensity 50 with auto-adjust enabled.
 
-**Note:** The LED color set via this command persists until a view that manages the LED internally changes it (e.g. a PM indicator transition in `TimeDateTempView`, or entering `MainMenuView`). The clock minimizes unnecessary LED writes, so the externally set color is preserved as long as the active view's own desired LED color does not change.
+**Note:** Setting the LED intensity with this command disables LED auto-adjust (unless the optional `<auto>` field is included and set to `1`). Tube auto-adjust is not affected.
 
-This response is also sent as an **unsolicited status notification** whenever the LED color changes from any source (internal views or external commands).
+#### Set LED Auto-Adjust
+
+```
+-> $TCCLA<0|1>*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
+```
+
+Enables (`1`) or disables (`0`) automatic LED intensity adjustment based on ambient light. This flag is independent of tube auto-adjust (`$TCCIA`). The response reports the current LED state.
+
+Example: `$TCCLA1*XX\n` enables LED auto-adjust.
+
+**Note:** When LED auto-adjust is enabled, the LED intensity tracks the nixie tube intensity as the ambient light changes. When the AM/PM indicator feature is enabled (`StatusLedAsAmPm` system option), the clock manages LED auto-adjust automatically: it is enabled during PM time and disabled when the indicator is off (AM or non-time display), preventing auto-brightness from turning the LED on when it should be off.
+
+**Note:** The LED color and intensity set via this command persist until a view that manages the LED internally changes the color (e.g. a PM indicator transition in `TimeDateTempView`, or entering `MainMenuView`).
+
+This response is also sent as an **unsolicited status notification** whenever the LED color, intensity, or auto-adjust state changes from any source (internal views, external commands, or auto-brightness).
 
 ---
 
@@ -501,7 +520,7 @@ Sent as an unsolicited notification when RTTTL playback completes. This fires wh
 
 ### I -- Intensity
 
-Get or set the display brightness.
+Get or set the nixie tube display brightness. The status LED has its own independent master intensity and auto-brightness flag, both controlled via the [L -- Status LED](#l----status-led) command.
 
 #### Get Intensity
 
@@ -527,6 +546,8 @@ Sets the display intensity to `nnn` (0-255). The response confirms the new state
 
 Example: `$TCCI200*XX\n` sets intensity to 200.
 
+**Note:** Setting intensity with this command disables automatic brightness adjustment (`auto` will be `0` in the response). Use `$TCCIA1*XX\n` to re-enable it.
+
 #### Set Auto-Adjust
 
 ```
@@ -538,7 +559,7 @@ Enables (`1`) or disables (`0`) automatic intensity adjustment based on ambient 
 
 Example: `$TCCIA1*XX\n` enables auto-adjust.
 
-**Note:** When auto-adjust is active and the intensity changes automatically, an unsolicited `$TCSI` notification is sent. See [Intensity Change](#intensity-change) in the Unsolicited Notifications section.
+**Note:** `$TCCIA` controls tube auto-adjust only. For LED auto-adjust, use `$TCCLA`. When tube auto-adjust is active and the intensity changes automatically, an unsolicited `$TCSI` notification is sent. See [Intensity Change](#intensity-change) in the Unsolicited Notifications section.
 
 ---
 
@@ -782,13 +803,13 @@ Example sequence for pressing U, then also pressing E, then releasing U:
 <- $TCSK0*XX\n      (E released)
 ```
 
-### LED Color Change
+### LED State Change
 
 ```
-<- $TCSL<r>,<g>,<b>*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
 ```
 
-Sent whenever the LED color changes, whether from an external `$TCCL` command or from an internal view (e.g. AM/PM indicator). Values are 0–255 per channel.
+Sent whenever the LED color, master intensity, or auto-adjust state changes, whether from an external `$TCCL`/`$TCCLA` command, an internal view (e.g. AM/PM indicator), or automatic brightness adjustment. Format is identical to the `L` command response. See the L command for field descriptions.
 
 ### Temperature Change
 
