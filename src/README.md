@@ -26,7 +26,7 @@ The code is written for the STM32F072 microcontroller used on the Tube
  that if you do so, it may be necessary to tweak some paths in the Makefile(s),
  but otherwise things should work without much trouble. You'll also (of course)
  need a (gcc) compiler to build the code base. (At the time of this writing,
- I've been building it with gcc on macOS 10.14 aka Mojave.)
+ I've been building it with gcc on macOS.)
 
 The STM32F072 microcontroller is a rich device with a lot of peripherals. Many
  of these peripherals are leveraged in the code to enable it work as efficiently
@@ -50,13 +50,21 @@ The STM32F072 microcontroller is a rich device with a lot of peripherals. Many
 * Timers - Timers 1 and 3 are used to generate PWM for the buzzer and for the
   status LEDs, respectively. Timers 15 and 16 are used to supervise DMX-512
   communication. Timer 7 times pulses from the IR receiver and timer 2 generates
-  an interrupt (at 5 KHz) to trigger a refresh of the tubes, emulating PWM and
-  thus enabling the digit dimming/fading effect.
+  an interrupt (at ~15.4 KHz) to trigger a refresh of the tubes, emulating PWM
+  and thus enabling the digit dimming/fading effect.
 * TSC - the touch sensing controller is used to sense touches on the touch keys.
-* USARTs - USART1 is a general serial interface and is used to communicate with
-  an attached GPS module. USART2 is connected to an RS-485 transceiver. This
-  firmware enables a DMX-512 signal to be received on USART2 so that the tubes
-  can be individually controlled remotely.
+* USARTs:
+  * USART1 is a general serial interface connected to an optional GPS module; it
+    also participates in the serial remote control protocol (see below).
+  * USART2 is connected to an RS-485 transceiver; the firmware receives DMX-512
+    signals on USART2 so that the tubes can be individually controlled remotely.
+  * USART3 (RX) and USART4 (TX) form a secondary serial interface which supports
+    the clock's bidirectional serial remote control protocol.
+  * Serial remote commands and responses are handled on both the USART1 and
+    USART3/4 interfaces simultaneously. The same serial remote control protocol
+    is also accessible via a USB CDC-ACM (virtual serial port) interface. See
+    the [Serial Remote Control API](../docs/SERIAL_API.md) for the full protocol
+    reference.
 
 ## Important!
 When compiling (with gcc), you'll need to add `-DHARDWARE_VERSION=X` to the

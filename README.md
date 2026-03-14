@@ -41,8 +41,10 @@ First, I brought the touchkey design over from the binary clock. That seemed
  [module](https://www.adafruit.com/product/746) from
  [Adafruit](https://www.adafruit.com). How about an infrared remote control so
  you can turn off the display from across the room while you're watching a
- movie? Or rather, if you don't want to do that, it'll still do that cool
- display-dimming thing that I did with the
+ movie? Or connect a serial device and control it via a serial remote protocol
+ over RS-232, or even plug in a USB cable and use it as a virtual serial port
+ from your PC. Or rather, if you don't want to do any of that, it'll still do
+ that cool display-dimming thing that I did with the
  [binary clock](https://github.com/kbx81/RGBBinaryClock). These tubes can be
  pretty bright in a dark room. :)
 
@@ -51,7 +53,9 @@ Also, just like the binary clock, it can do more than just tell the time --
  mode. What's more, you can choose the format for it all: the clock can display
  in a 12 or 24 hour format, the temperature can display in degrees Celsius or
  degrees Fahrenheit, and (most importantly) you are able to choose the formats
- you prefer and they can be changed easily at any time.
+ you prefer and they can be changed easily at any time. The display smoothly
+ crossfades between digits as they change, and a variety of display animations
+ and effects can be configured to keep things interesting.
 
 As mentioned above, it has a phototransistor which is used to determine the
  amount of ambient light around it and the display will dim smoothly as the
@@ -68,9 +72,10 @@ Finally--and one could argue that no clock is complete without one--it has an
  There is also an hourly chime that one can enable which will beep out each hour
  in binary using high and/or low pitch tones...so you can hear the time when
  you're in another room! The display can be configured to blink when an alarm
- occurs. Finally, unused microcontroller pins from the STM32 are brought out to
- a pin header, some pins of which can be used as inputs to trigger the alarm
- from an external device -- or connect other hardware of your own!
+ occurs. The beeper can even play melodies in RTTTL format! Finally, unused
+ microcontroller pins from the STM32 are brought out to a pin header, some pins
+ of which can be used as inputs to trigger the alarm from an external device --
+ or connect other hardware of your own!
 
 ## Great, but what makes it tick?
 
@@ -95,26 +100,32 @@ Why footprints for both temperature sensors and the RTCs? The DS3234 is somewhat
 Beyond the MCU itself, the display boards have up to three (depending on the
  tubes/board) HV5622 high-voltage driver ICs on them to light up the beautiful
  tubes. The MCU uses its SPI1 to communicate with these drivers. There is a
- single RGB LED is used as a "status" LED and it is connected (through FET
+ single RGB LED used as a "status" LED and it is connected (through FET
  drivers) to GPIO pins on the MCU. These pins double as timer output channels,
  meaning they can also generate a PWM signal, enabling the dimming of the status
  LED elements, as well.
 
 The beeper is connected (also through a FET driver) to yet another GPIO pin
  that doubles as a timer output channel; this enables the beeper to generate a
- wide range of tones or even play a tune!
+ wide range of tones or even play a (RTTTL) tune!
 
 The phototransistor is connected to the MCU's ADC channel ten.
 
-Two USARTs are exposed via pin headers on the right side of the board: USART1
- is brought out on a standard six pin header as is commonly found on many
- devices; it is also connected to the optional GPS module (solder jumpers allow
- easy disconnection of the module should it be necessary for troubleshooting).
- USART2 is connected to an RS-485 line driver enabling communication on an
- RS-485 bus. Through this interface, the application is able to receive a
- DMX-512 signal so the tubes can each be individually controlled from an
- entertainment lighting console (or other application that speaks this
- protocol), enabling another whole realm of possibilities...
+Several USARTs and a USB port round out the communication picture. USART1 is
+ brought out on a standard six-pin header as is commonly found on many devices;
+ it is also connected to the optional GPS module (solder jumpers allow easy
+ disconnection of the module should it be necessary for troubleshooting). USART2
+ is connected to an RS-485 line driver enabling communication on an RS-485 bus.
+ Through this interface, the application is able to receive a DMX-512 signal so
+ the tubes can each be individually controlled from an entertainment lighting
+ console (or other application that speaks this protocol) -- both a standard
+ 7-channel mode and an extended 34-channel mode (with per-tube intensity and dot
+ controls) are supported. USART3 and USART4 are dedicated to a bidirectional
+ serial remote control protocol, allowing an external device to get and set time,
+ read sensor data, control the display, and more. This same protocol is also
+ accessible via a USB CDC-ACM (virtual serial port) interface, so all of the
+ above can be done from a PC with nothing more than a USB cable -- enabling
+ another whole realm of possibilities...
 
 ## How do I get or build one?
 
