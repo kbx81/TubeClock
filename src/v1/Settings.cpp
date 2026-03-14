@@ -186,9 +186,9 @@ static const SettingsProfile cActiveProfile = {{
     1,              // DstEndDowOrdinal (1st occurrence)
     0,              // DstSwitchDayOfWeek (Sunday)
     2,              // DstSwitchHour (2 AM)
-    500,            // EffectDuration
-    300,            // EffectFrequency
-    8,              // MinimumIntensity
+    800,            // EffectDuration
+    13,             // EffectFrequency
+    2,              // MinimumIntensity
     2,              // BeeperVolume
     4,              // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
     79,             // TemperatureCalibrationDS3234 (79 = -2.0C)

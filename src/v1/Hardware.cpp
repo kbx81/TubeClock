@@ -1521,6 +1521,8 @@ uint16_t lightLevel() {
   return _cachedLightLevel;
 }
 
+uint16_t lightLevelRaw() { return _bufferADC[cAdcPhototransistor]; }
+
 uint32_t onTimeSeconds() { return _onTimeSecondsCounter; }
 
 void onTimeSecondsReset() { _onTimeSecondsCounter = 0; }
@@ -1546,12 +1548,20 @@ uint16_t voltageBatt() {
   return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / adcSampleAverage;
 }
 
+uint16_t voltageBattRaw() {
+  _batteryMeasuringCounter = 0;
+  adc_enable_vbat_sensor();
+  return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / _bufferADC[cAdcVbat];
+}
+
 uint16_t voltageVddA() {
   // Use IIR filtered VddA voltage (downscale to actual ADC range)
   int32_t adcSampleAverage = _adcFilteredVoltageVddA >> cAdcFilterUpscale;
   // Determine the voltage as it affects the temperature calculation
   return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / adcSampleAverage;
 }
+
+uint16_t voltageVddARaw() { return cVddCalibrationVoltage * (int32_t) ST_VREFINT_CAL / _bufferADC[cAdcVref]; }
 
 bool adcValuesUpdated() {
   if (_adcValuesUpdated) {

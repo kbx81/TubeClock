@@ -39,7 +39,7 @@
 
 namespace kbxTubeClock {
 
-NixieGlyph::NixieGlyph(const uint8_t intensity, const uint32_t duration) : _intensity(intensity), _duration(duration) {}
+NixieGlyph::NixieGlyph(const uint8_t intensity, const uint32_t duration) : _duration(duration), _intensity(intensity) {}
 
 bool NixieGlyph::operator==(const NixieGlyph &other) const {
   return _intensity == other._intensity && _duration == other._duration;

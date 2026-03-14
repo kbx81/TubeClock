@@ -76,8 +76,8 @@ class NixieGlyph {
                                   const NixieGlyph &target);
 
  private:
-  uint8_t _intensity;  ///< Intensity of the glyph (0-255)
   uint32_t _duration;  ///< Duration over which this glyph should transition
+  uint8_t _intensity;  ///< Intensity of the glyph (0-255)
 };
 
 }  // namespace kbxTubeClock

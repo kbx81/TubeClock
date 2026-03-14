@@ -756,6 +756,122 @@ $TCSRS,0*XX\n     (stopped at 0)
 
 ---
 
+### D -- Diagnostics
+
+Read-only queries for system health and identity. These commands return live state at the time the response is sent; none modify any clock state except `DOTR` (on-time reset).
+
+#### Get Firmware Version
+
+```
+-> $TCCDF*XX\n
+<- $TCSDF<version>,<build>*XX\n
+```
+
+Returns the firmware version string and build number. The response fields are identical to those in the `$TCSBOOT` notification sent at startup.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | string | Calendar-based version `"YY.MM.PP"` (always 8 characters, zero-padded) |
+| `build` | decimal | Monotonically incrementing build counter (uint16) |
+
+Example:
+```
+-> $TCCDF*5C\n
+<- $TCSDF26.03.01,42*XX\n
+```
+
+#### Get HV On-Time (Tube Lifetime)
+
+```
+-> $TCCDOT*XX\n
+<- $TCSDOT<seconds>*XX\n
+```
+
+Returns the total number of seconds the HV (high-voltage nixie tube supply) has been active. The counter persists across power cycles via the RTC backup register and DS3234 SRAM (if available). Can be reset with `$TCCDOTR`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `seconds` | decimal | Accumulated HV on-time in seconds (uint32) |
+
+Example:
+```
+-> $TCCDOT*XX\n
+<- $TCSDOT432000*XX\n   (120 hours)
+```
+
+#### Reset HV On-Time Counter
+
+```
+-> $TCCDOTR*XX\n
+<- $TCSDOTR*XX\n
+```
+
+Resets the HV on-time counter to zero and acknowledges the reset. This is the same reset triggered by pressing C in the System Status view.
+
+#### Get RTC Info
+
+```
+-> $TCCDRTC*XX\n
+<- $TCSDRTC<type>,<startResult>*XX\n
+```
+
+Returns the active RTC source and the result of RTC initialization at startup.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | decimal | Active RTC: `0` = STM32 internal, `1` = DS323x external |
+| `startResult` | decimal | Startup result: `0` = UnknownError, `1` = Ok, `2` = OscStopped (reinitialized), `3` = OscTimeout |
+
+Example (DS3234 found, started normally):
+```
+-> $TCCDRTC*XX\n
+<- $TCSDRTC1,1*XX\n
+```
+
+#### Get Settings Load Source
+
+```
+-> $TCCDS*XX\n
+<- $TCSDS<source>*XX\n
+```
+
+Returns which source settings were loaded from at the last boot.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `source` | decimal | `0` = Compiled-in defaults (no stored settings found), `1` = Flash, `2` = DS3234 SRAM |
+
+Example:
+```
+-> $TCCDS*XX\n
+<- $TCSDS1*XX\n   (loaded from flash)
+```
+
+#### Get GPS Status
+
+```
+-> $TCCDGPS*XX\n
+<- $TCSDGPS<connected>,<valid>,<sats>*XX\n
+```
+
+Returns detailed GPS receiver status. `connected` indicates the module is responding (GPRMC sentences received); `valid` indicates an active position fix with a valid date/time. Note: this is a more granular view of the GPS data already partially exposed via `$TCCHCON`.
+
+This response is also sent as an **unsolicited status notification** whenever any GPS status field changes. See [GPS Status Change](#gps-status-change) in the Unsolicited Notifications section.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `connected` | `0`/`1` | GPS module is responding (valid or invalid fix character received) |
+| `valid` | `0`/`1` | GPS has a valid fix and date/time (`GPRMC` status `A`) |
+| `sats` | decimal | Number of satellites currently in view (uint8) |
+
+Example (connected, fix acquired, 8 satellites):
+```
+-> $TCCDGPS*XX\n
+<- $TCSDGPS1,1,8*XX\n
+```
+
+---
+
 ## Unsolicited Notifications
 
 The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are buffered in a transmit queue and sent when the TX path becomes idle (after both USART output channels finish transmitting the previous message). Unsolicited notification types are coalesced — at most one pending entry per type is kept in the queue, so only the latest state is sent when the queue drains. Key events are an exception and are never coalesced; each press and release is individually queued. If the queue is full (capacity 8), new entries are silently dropped. The external MCU can always poll for current state if a notification is missed.
@@ -866,6 +982,16 @@ Sent whenever a setting is changed via the clock's local UI (capacitive touch ke
 Unlike other unsolicited notifications, setting change events are **not coalesced**: each setting that changes produces its own notification. The value reflects the live setting state at the time the notification is transmitted. If the notification queue is full, entries are silently dropped (see [TX notification queue](#implementation-notes)).
 
 **Note:** This notification is not sent for settings changed via the serial `$TCCS` command — those are confirmed by the command response.
+
+### GPS Status Change
+
+```
+<- $TCSDGPS<connected>,<valid>,<sats>*XX\n
+```
+
+Sent whenever any GPS status field changes: `connected` (module responding), `valid` (fix active), or `sats` (satellite count). Format is identical to the `D/GPS` command response. See the D command for field descriptions. This notification is coalesced.
+
+---
 
 ### Alarm Active
 

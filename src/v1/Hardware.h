@@ -241,6 +241,10 @@ bool temperatureUpdated();
 ///
 uint16_t lightLevel();
 
+/// @brief Returns the raw (unfiltered) light level from the phototransistor ADC
+///
+uint16_t lightLevelRaw();
+
 /// @brief Returns the time HV has been on in seconds
 ///
 uint32_t onTimeSeconds();
@@ -259,9 +263,17 @@ void loadOnTimeCounterFromSram();
 ///
 uint16_t voltageBatt();
 
+/// @brief Returns the raw (unfiltered) battery voltage times 1000
+///
+uint16_t voltageBattRaw();
+
 /// @brief Returns the current input voltage (VddA) times 1000
 ///
 uint16_t voltageVddA();
+
+/// @brief Returns the raw (unfiltered) input voltage (VddA) times 1000
+///
+uint16_t voltageVddARaw();
 
 /// @brief Returns true if ADC filtered values have been updated since last call
 ///  Clears the flag on read.

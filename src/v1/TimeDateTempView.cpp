@@ -56,6 +56,8 @@ void TimeDateTempView::enter(const Settings::SettingDescriptor * /*descriptor*/,
 
   _pmOnStale = true;
 
+  _refreshStatusLed = true;
+
   DisplayManager::setStatusLedAutoRefreshing(
       pSettings->getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::StatusLedAsAmPm));
 }

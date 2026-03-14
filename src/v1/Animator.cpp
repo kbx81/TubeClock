@@ -30,7 +30,7 @@ namespace kbxTubeClock::Animator {
 
 // Number
 //
-const uint8_t cMaxAnimationId = 13;
+const uint8_t cMaxAnimationId = 17;
 
 // Per-tube stagger offsets (0-5) for the staggered-start animation
 //
@@ -40,13 +40,13 @@ static const uint8_t cBaseStagger[Display::cTubeCount] = {3, 0, 5, 1, 4, 2};
 //
 uint16_t _animationId = 0;
 
-// Bitmask of animations not yet played in the current shuffle cycle (bits 0-12)
+// Bitmask of animations not yet played in the current shuffle cycle (bits 0-17)
 //
-uint16_t _animationsRemaining = (1u << (cMaxAnimationId + 1)) - 1u;
+uint32_t _animationsRemaining = (1u << (cMaxAnimationId + 1)) - 1u;
 
 // Bitmask of wipe digits not yet used in the current shuffle cycle (bits 0-9)
 //
-uint16_t _wipeRemaining = (1u << 10) - 1u;
+uint32_t _wipeRemaining = (1u << 10) - 1u;
 
 // Transition digit (0-9) used for wipe animations
 //
@@ -111,14 +111,14 @@ static uint32_t _rand() {
 // Picks a random value from a shuffle pool bitmask, resetting it when exhausted.
 //  pool covers bits 0..maxIdx; a set bit means that value has not yet been returned this cycle.
 //
-static uint8_t _pickFromPool(uint16_t &pool, const uint8_t maxIdx) {
+static uint8_t _pickFromPool(uint32_t &pool, const uint8_t maxIdx) {
   if (pool == 0) {
     pool = (1u << (maxIdx + 1)) - 1u;
   }
 
   // Count set bits
   uint8_t count = 0;
-  for (uint16_t tmp = pool; tmp; tmp >>= 1) {
+  for (uint32_t tmp = pool; tmp; tmp >>= 1) {
     count += (tmp & 1u);
   }
 
@@ -312,23 +312,31 @@ Display _frameGenerator6() {
   return frame;
 }
 
-// Shared helper for pair animations. outerFirst=true: pairs roll inward (outer first);
-//  outerFirst=false: pairs roll outward (inner first).
-//  Each pair's turn order is determined by comparing its index to the current phase (0-2).
+// Pair tables for all LUT-based pair roll animations
+//  Adjacent: (0,1), (2,3), (4,5)
+//  Mirror: (0,5), (1,4), (2,3)  — inward/outward
+//  Spread:   (0,3), (1,4), (2,5)
 //
-static Display _frameGeneratorPairs(const bool outerFirst) {
+static const uint8_t cPairsAdjA[3] = {0, 2, 4};
+static const uint8_t cPairsAdjB[3] = {1, 3, 5};
+static const uint8_t cPairsSequentialA[3] = {0, 1, 2};  // shared by mirror and spread
+static const uint8_t cPairsMirrorB[3] = {5, 4, 3};
+static const uint8_t cPairsSpreadB[3] = {3, 4, 5};
+
+// Shared helper for LUT-based pair roll animations.
+//  pairA[p]/pairB[p] are the two tube indices in pair p (0-2).
+//  fromLeft=true: pair 0 rolls first; fromLeft=false: pair 2 rolls first.
+//
+static Display _frameGeneratorPairsLUT(const uint8_t pairA[3], const uint8_t pairB[3], const bool fromLeft) {
   Display frame;
-  uint8_t frameNumber = _currentFrame(10 * 3);    // 10 digits by 3 groups
-  uint8_t phase = (frameNumber * 0xCCCDu) >> 19,  // group 0, 1, or 2
-      workingValue = frameNumber - phase * 10,    // 0 - 9
-      t = 0, f = 0;
+  uint8_t frameNumber = _currentFrame(10 * 3),  // 10 digits by 3 groups
+      phase = (frameNumber * 0xCCCDu) >> 19,    // group 0, 1, or 2
+      workingValue = frameNumber - phase * 10;  // 0 - 9
 
-  for (t = 0; t < Display::cTubeCount / 2; t++) {
-    f = Display::cTubeCount - 1 - t;
-
-    // outerFirst: order is 0,1,2 for t=0,1,2  (outer pair rolls first)
-    // innerFirst: order is 2,1,0 for t=0,1,2  (inner pair rolls first)
-    const uint8_t order = outerFirst ? t : (Display::cTubeCount / 2 - 1 - t);
+  for (uint8_t p = 0; p < 3; p++) {
+    const uint8_t t = pairA[p];
+    const uint8_t f = pairB[p];
+    const uint8_t order = fromLeft ? p : (2u - p);
 
     if (order < phase)  // this pair already rolled
     {
@@ -356,16 +364,32 @@ static Display _frameGeneratorPairs(const bool outerFirst) {
 
 // Pairs of digits roll inward  --><--
 //
-Display _frameGenerator7() { return _frameGeneratorPairs(true); }
+Display _frameGenerator7() { return _frameGeneratorPairsLUT(cPairsSequentialA, cPairsMirrorB, true); }
 
 // Pairs of digits roll outward  <-->
 //
-Display _frameGenerator8() { return _frameGeneratorPairs(false); }
+Display _frameGenerator8() { return _frameGeneratorPairsLUT(cPairsSequentialA, cPairsMirrorB, false); }
+
+// Adjacent pairs (1/2, 3/4, 5/6) roll left-to-right
+//
+Display _frameGenerator9() { return _frameGeneratorPairsLUT(cPairsAdjA, cPairsAdjB, true); }
+
+// Adjacent pairs (5/6, 3/4, 1/2) roll right-to-left
+//
+Display _frameGenerator10() { return _frameGeneratorPairsLUT(cPairsAdjA, cPairsAdjB, false); }
+
+// Spread pairs (1/4, 2/5, 3/6) roll left-to-right
+//
+Display _frameGenerator11() { return _frameGeneratorPairsLUT(cPairsSequentialA, cPairsSpreadB, true); }
+
+// Spread pairs (3/6, 2/5, 1/4) roll right-to-left
+//
+Display _frameGenerator12() { return _frameGeneratorPairsLUT(cPairsSequentialA, cPairsSpreadB, false); }
 
 // Variable-speed roll: each tube rolls at speed proportional to distance to its final digit;
 //  all tubes finish simultaneously
 //
-Display _frameGenerator9() {
+Display _frameGenerator13() {
   Display frame;
   const uint8_t f = _currentFrame(9);  // 0 to 9
 
@@ -385,7 +409,7 @@ Display _frameGenerator9() {
 
 // Staggered start: each tube begins its roll at a pseudo-random time
 //
-Display _frameGenerator10() {
+Display _frameGenerator14() {
   Display frame;
   const uint8_t currentPhase = _currentFrame(15);  // 0 to 15 (6 stagger slots + 9 roll frames)
 
@@ -410,7 +434,7 @@ Display _frameGenerator10() {
 
 // Slot machine deceleration: fast roll slowing to a stop on final digits (quadratic ease-out)
 //
-Display _frameGenerator11() {
+Display _frameGenerator15() {
   Display frame;
   // tn = normalized time 0..256; i = 19*tn*(512-tn)>>16 maps 0..256 -> 0..19 with ease-out
   // tube shows (final + 19 - i) % 10: rolls 1.9 turns, decelerating to final digit
@@ -485,11 +509,11 @@ static Display _frameGeneratorWipe(const bool fromLeft) {
 
 // Wipe right-to-left: initial scrolls left/X scrolls in from right, then X scrolls left/final scrolls in from right
 //
-Display _frameGenerator12() { return _frameGeneratorWipe(false); }
+Display _frameGenerator16() { return _frameGeneratorWipe(false); }
 
 // Wipe left-to-right: initial scrolls right/X scrolls in from left, then X scrolls right/final scrolls in from left
 //
-Display _frameGenerator13() { return _frameGeneratorWipe(true); }
+Display _frameGenerator17() { return _frameGeneratorWipe(true); }
 
 void initialize() { _rngState ^= RTC_SSR; }
 
@@ -570,6 +594,18 @@ void loop() {
       break;
     case 13:
       tcDisp = _frameGenerator13();
+      break;
+    case 14:
+      tcDisp = _frameGenerator14();
+      break;
+    case 15:
+      tcDisp = _frameGenerator15();
+      break;
+    case 16:
+      tcDisp = _frameGenerator16();
+      break;
+    case 17:
+      tcDisp = _frameGenerator17();
       break;
     default:
       tcDisp = _frameGenerator0();

@@ -61,9 +61,9 @@ class Usart {
   /// @brief Structure defining USART transfer requests
   ///
   struct UsartTransferReq {
-    UsartReqAck state;
     uint8_t *buffer;
     uint16_t length;
+    UsartReqAck state;
   };
 
  public:

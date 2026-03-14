@@ -158,6 +158,14 @@ enum class NotificationType : uint8_t {
   CmdTimerStatus,  // R command response: timer state + value
   CmdAlarmClear,   // RA command response: alarm clear acknowledgement
   AlarmActive,     // Unsolicited: any alarm went active (rising edge)
+
+  // Diagnostics command responses (D command)
+  CmdDiagFirmware,      // Firmware version + build number
+  CmdDiagOnTime,        // HV on-time counter (tube lifetime)
+  CmdDiagOnTimeReset,   // Reset HV on-time counter (acknowledgement)
+  CmdDiagRtc,           // Active RTC type + startup result
+  CmdDiagSettingsLoad,  // Settings load source at boot
+  CmdDiagGps,           // GPS connection/fix status + satellite count
 };
 
 struct QueueEntry {
@@ -183,12 +191,15 @@ static int32_t _prevTempValues[Hardware::cTempSensorCount] = {Hardware::cTempSen
                                                               Hardware::cTempSentinel, Hardware::cTempSentinel,
                                                               Hardware::cTempSentinel};
 
-static RgbLed _prevLed;
-static bool _prevLedAutoAdjust = false;
 static uint16_t _prevAdcLight = 0;
 static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
+static RgbLed _prevLed;
+static bool _prevLedAutoAdjust = false;
 static bool _prevAlarmActive = false;
+static bool _prevGpsConnected = false;
+static bool _prevGpsValid = false;
+static uint8_t _prevGpsSats = 0;
 
 // --- Helper: convert nibble to hex char ---
 static char _toHex(uint8_t nibble) { return (nibble < 10) ? ('0' + nibble) : ('A' + nibble - 10); }
@@ -306,11 +317,11 @@ static void _txSendPageStatus() {
 // --- Helper: send current ADC values ---
 static void _txSendAdcStatus() {
   _txBeginResponse("HADC");
-  _txAppendDecimal(Hardware::lightLevel(), 1);
+  _txAppendDecimal(Hardware::lightLevelRaw(), 1);
   _txAppendChar(',');
-  _txAppendDecimal(Hardware::voltageVddA(), 1);
+  _txAppendDecimal(Hardware::voltageVddARaw(), 1);
   _txAppendChar(',');
-  _txAppendDecimal(Hardware::voltageBatt(), 1);
+  _txAppendDecimal(Hardware::voltageBattRaw(), 1);
   _txSendResponse();
 }
 
@@ -339,6 +350,52 @@ static void _txSendLedStatus() {
   _txAppendDecimal(led.getBlue() / 16, 1);
   _txAppendChar(',');
   _txAppendChar(Application::getLedIntensityAutoAdjust() ? '1' : '0');
+  _txSendResponse();
+}
+
+// --- Diagnostics (D category) response helpers ---
+
+static void _txSendDiagFirmware() {
+  _txBeginResponse("DF");
+  _txAppendString(kFirmwareVersion);
+  _txAppendChar(',');
+  _txAppendDecimal(kFirmwareBuild, 1);
+  _txSendResponse();
+}
+
+static void _txSendDiagOnTime() {
+  _txBeginResponse("DOT");
+  _txAppendDecimal(Hardware::onTimeSeconds(), 1);
+  _txSendResponse();
+}
+
+static void _txSendDiagOnTimeReset() {
+  Hardware::onTimeSecondsReset();
+  _txBeginResponse("DOTR");
+  _txSendResponse();
+}
+
+static void _txSendDiagRtc() {
+  _txBeginResponse("DRTC");
+  _txAppendDecimal(static_cast<uint8_t>(Hardware::getRTCType()), 1);
+  _txAppendChar(',');
+  _txAppendDecimal(static_cast<uint8_t>(Hardware::getRTCStartupResult()), 1);
+  _txSendResponse();
+}
+
+static void _txSendDiagSettingsLoad() {
+  _txBeginResponse("DS");
+  _txAppendDecimal(Application::getStartupSettingsLoadResult(), 1);
+  _txSendResponse();
+}
+
+static void _txSendDiagGps() {
+  _txBeginResponse("DGPS");
+  _txAppendDecimal(GpsReceiver::isConnected() ? 1 : 0, 1);
+  _txAppendChar(',');
+  _txAppendDecimal(GpsReceiver::isValid() ? 1 : 0, 1);
+  _txAppendChar(',');
+  _txAppendDecimal(GpsReceiver::getSatellitesInView(), 1);
   _txSendResponse();
 }
 
@@ -599,6 +656,25 @@ static void _txProcessQueue() {
       _txSendResponse();
       break;
 
+    case NotificationType::CmdDiagFirmware:
+      _txSendDiagFirmware();
+      break;
+    case NotificationType::CmdDiagOnTime:
+      _txSendDiagOnTime();
+      break;
+    case NotificationType::CmdDiagOnTimeReset:
+      _txSendDiagOnTimeReset();
+      break;
+    case NotificationType::CmdDiagRtc:
+      _txSendDiagRtc();
+      break;
+    case NotificationType::CmdDiagSettingsLoad:
+      _txSendDiagSettingsLoad();
+      break;
+    case NotificationType::CmdDiagGps:
+      _txSendDiagGps();
+      break;
+
     default:
       break;
   }
@@ -788,9 +864,9 @@ void process() {
 
   // Check for ADC value changes
   if (Hardware::adcValuesUpdated()) {
-    uint16_t light = Hardware::lightLevel();
-    uint16_t vdda = Hardware::voltageVddA();
-    uint16_t vbatt = Hardware::voltageBatt();
+    uint16_t light = Hardware::lightLevelRaw();
+    uint16_t vdda = Hardware::voltageVddARaw();
+    uint16_t vbatt = Hardware::voltageBattRaw();
 
     if (light != _prevAdcLight || vdda != _prevAdcVddA || vbatt != _prevAdcVbatt) {
       _prevAdcLight = light;
@@ -803,6 +879,19 @@ void process() {
   // Check for RTTTL playback completion
   if (RtttlPlayer::playingFinished()) {
     _enqueueNotification(NotificationType::RtttlDone);
+  }
+
+  // Check for GPS status changes
+  {
+    bool connected = GpsReceiver::isConnected();
+    bool valid = GpsReceiver::isValid();
+    uint8_t sats = GpsReceiver::getSatellitesInView();
+    if (connected != _prevGpsConnected || valid != _prevGpsValid || sats != _prevGpsSats) {
+      _prevGpsConnected = connected;
+      _prevGpsValid = valid;
+      _prevGpsSats = sats;
+      _enqueueNotification(NotificationType::CmdDiagGps);
+    }
   }
 
   // Check for alarm activation (rising edge only)
@@ -1245,6 +1334,49 @@ static void _handleCommand(const char *payload, uint8_t length) {
       {
         QueueEntry e;
         e.type = NotificationType::CmdTimerStatus;
+        _queueEnqueue(e);
+      }
+      break;
+    }
+
+    // --- Diagnostics ---
+    case 'D': {
+      if (length < 3) {
+        break;
+      }
+      char s0 = payload[2];
+
+      if (s0 == 'F') {
+        // "$TCCDF" -- firmware version + build number
+        QueueEntry e;
+        e.type = NotificationType::CmdDiagFirmware;
+        _queueEnqueue(e);
+      } else if (s0 == 'O' && length >= 4 && payload[3] == 'T') {
+        if (length >= 5 && payload[4] == 'R') {
+          // "$TCCDOTR" -- reset on-time counter
+          QueueEntry e;
+          e.type = NotificationType::CmdDiagOnTimeReset;
+          _queueEnqueue(e);
+        } else {
+          // "$TCCDOT" -- query HV on-time (tube lifetime)
+          QueueEntry e;
+          e.type = NotificationType::CmdDiagOnTime;
+          _queueEnqueue(e);
+        }
+      } else if (s0 == 'R' && length >= 5 && payload[3] == 'T' && payload[4] == 'C') {
+        // "$TCCDRTC" -- active RTC type + startup result
+        QueueEntry e;
+        e.type = NotificationType::CmdDiagRtc;
+        _queueEnqueue(e);
+      } else if (s0 == 'S') {
+        // "$TCCDS" -- settings load source at boot
+        QueueEntry e;
+        e.type = NotificationType::CmdDiagSettingsLoad;
+        _queueEnqueue(e);
+      } else if (s0 == 'G' && length >= 5 && payload[3] == 'P' && payload[4] == 'S') {
+        // "$TCCDGPS" -- GPS connection/fix/satellite status
+        QueueEntry e;
+        e.type = NotificationType::CmdDiagGps;
         _queueEnqueue(e);
       }
       break;
