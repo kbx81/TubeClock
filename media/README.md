@@ -27,3 +27,7 @@
 ## Features
 
 [![](intensity_thumb.jpg)](intensity.jpg)
+
+[![](wifi_pcb_bottom_thumb.jpg)](wifi_pcb_bottom.jpg) [![](wifi_pcb_top_thumb.jpg)](wifi_pcb_top.jpg) [![](wifi_pcbs_thumb.jpg)](wifi_pcbs.jpg)
+
+[![](wifi_pcb_installed_thumb.jpg)](wifi_pcb_installed.jpg) [![](wifi_pcb_installed_2_thumb.jpg)](wifi_pcb_installed_2.jpg)
