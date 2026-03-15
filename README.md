@@ -6,7 +6,7 @@ Nixie Clock project files - PCB and source
 
 [![IN-18](media/in-18_header.jpg)](media/in-18.jpg)
 
-For more pictures, see the [gallery](media/).
+For more pictures, see the [gallery](GALLERY.md).
 
 ## Another nixie tube clock? Why?
 
