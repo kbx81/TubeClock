@@ -102,4 +102,14 @@ void setStatusLedIntensity(uint8_t intensity);
 ///
 RgbLed getStatusLed();
 
+/// @brief Returns true if the stored status LED color is already gamma-corrected
+/// @return true if gamma correction is bypassed in refresh(), false if applied
+///
+bool getStatusLedPreCorrected();
+
+/// @brief Sets whether the stored status LED color should bypass gamma correction
+/// @param preCorrect true = skip gammaCorrect12bit() in refresh(); false = apply it (default)
+///
+void setStatusLedPreCorrected(bool preCorrect);
+
 }  // namespace kbxTubeClock::DisplayManager

@@ -101,6 +101,10 @@ static uint32_t _displayBufferOut[cPwmNumberOfDevices] __attribute__((aligned(4)
 //
 static RgbLed _statusLed;
 
+// true if _statusLed already has gamma correction applied (skips gammaCorrect12bit() in refresh())
+//
+static bool _statusLedPreCorrected = false;
+
 // LED crossfaders (main display + status LED)
 //
 static NixieGlyphCrossfader _crossfader[cGlyphCount];
@@ -238,7 +242,9 @@ void refresh() {
     status.setRed(((uint32_t) status.getRed() * ledIntensity + 127) / 255);
     status.setGreen(((uint32_t) status.getGreen() * ledIntensity + 127) / 255);
     status.setBlue(((uint32_t) status.getBlue() * ledIntensity + 127) / 255);
-    status.gammaCorrect12bit();
+    if (!_statusLedPreCorrected) {
+      status.gammaCorrect12bit();
+    }
     Hardware::setStatusLed(status);
   }
 }
@@ -412,6 +418,7 @@ void writeDisplay(const Display &display, const RgbLed &statusLed) {
 }
 
 void writeStatusLed(const RgbLed &statusLed) {
+  _statusLedPreCorrected = false;
   if (_statusLed == statusLed) {
     return;
   }
@@ -428,5 +435,14 @@ void setStatusLedIntensity(const uint8_t intensity) {
 }
 
 RgbLed getStatusLed() { return _statusLed; }
+
+bool getStatusLedPreCorrected() { return _statusLedPreCorrected; }
+
+void setStatusLedPreCorrected(const bool preCorrect) {
+  _statusLedPreCorrected = preCorrect;
+  if (preCorrect) {
+    _refreshStatusLed = true;
+  }
+}
 
 }  // namespace kbxTubeClock::DisplayManager

@@ -1,6 +1,6 @@
 # Serial Remote Control API
 
-This document describes the serial protocol used to monitor and control the TubeClock from an external microcontroller (e.g. ESP32, RP2040). The interface enables remote access to all major clock functions: display mode selection, time/date, temperature, intensity, settings, hardware status, and key events.
+This document describes the serial protocol used to monitor and control the TubeClock from an external microcontroller (for example, ESP32 or RP2040). The interface enables remote access to all major clock functions: display mode selection, time/date, temperature, intensity, settings, hardware status, and key events.
 
 ## Physical Layer
 
@@ -60,9 +60,36 @@ Result: `$TCCP*04\n`
 
 Sentences received without a checksum (terminated by `\n` before `*`) are also accepted.
 
+### Error Responses
+
+When a `$TC` command is received but the category character is not recognized, or the payload is too short to parse, the clock sends an error response:
+
+```
+$TCSE<category>*XX\n
+```
+
+where `<category>` is the unrecognized category character echoed back. If the payload is too short to contain a category, `?` is used instead.
+
+Examples:
+```
+-> $TCCZTEST*XX\n      (unknown category 'Z')
+<- $TCSE Z*XX\n
+
+-> $TCC*XX\n           (payload too short)
+<- $TCSE?*XX\n
+```
+
+If a checksum is present but does not match, the clock sends a checksum error response:
+
+```
+$TCSECHK*XX\n
+```
+
+Malformed headers and other framing errors are silently discarded with no response.
+
 ### Numeric Values
 
-All numeric values in commands and responses are decimal ASCII. Leading zeros may be present in fixed-width fields (e.g. time: `093015` for 09:30:15). Negative values are prefixed with `-`.
+All numeric values in commands and responses are decimal ASCII. Leading zeros may be present in fixed-width fields (for example, time: `093015` for 09:30:15). Negative values are prefixed with `-`.
 
 ## Command Reference
 
@@ -267,7 +294,7 @@ re-flashed via USART1 (PA9 TX / PA10 RX) or USART2 (PA14 TX / PA15 RX)
 using the standard STM32 bootloader protocol.
 
 - **BOOT0** clears the bootloader flag, cancelling a previously armed BOOT1.
-- **BOOT1** arms the flag. The clock operates normally until the next reset (e.g.
+- **BOOT1** arms the flag. The clock operates normally until the next reset (for example,
   via the external MCU asserting NRST), at which point it jumps to the bootloader
   instead of running the application.
 - **BOOT2** arms the flag and triggers a system reset immediately after the ACK
@@ -307,7 +334,7 @@ The payload must contain exactly 14 digits starting at the data position:
 - `HH` -- Hours (00-23)
 - `MM` -- Minutes (00-59)
 - `SS` -- Seconds (00-59)
-- `YYYY` -- Year (e.g. 2026)
+- `YYYY` -- Year (for example, 2026)
 - `MM` -- Month (01-12)
 - `DD` -- Day (01-31)
 
@@ -394,41 +421,50 @@ Example: `$TCCMS0*XX\n` switches to the internal STM32 ADC.
 
 ### L -- Status LED
 
-Get or set the RGB status LED color, master intensity, and auto-brightness state. Color values are 0–255 per channel; internally the LED uses 12-bit resolution (0–4095), so the serial interface scales by a factor of 16 in each direction. Intensity is 0–255. The LED has its own auto-brightness flag, independent of the nixie tube auto-brightness (see [I -- Intensity](#i----intensity)).
+Get or set the RGB status LED color, intensity, gamma mode, and auto-brightness state. Color values are 0–255 per channel; internally the LED uses 12-bit resolution (0–4095), so the serial interface scales by a factor of 16 in each direction. Intensity is 0–255. The LED has its own auto-brightness flag, independent of the nixie tube auto-brightness (see [I -- Intensity](#i----intensity)).
 
 #### Get LED State
 
 ```
 -> $TCCL*XX\n
-<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<gamma>,<auto>*XX\n
 ```
 
-Returns five comma-separated values:
-- **i**: LED master intensity (0–255)
+Returns six comma-separated values:
+- **i**: LED intensity (0–255)
 - **r**, **g**, **b**: Red, green, blue channel values (0–255 each)
+- **gamma**: Gamma correction mode — `1` = firmware applies gamma correction; `0` = values are already gamma-corrected (correction skipped)
 - **auto**: LED auto-adjust enabled (`1`) or disabled (`0`)
 
-Example: `$TCSL128,255,0,0,0*XX\n` (red LED at intensity 128, auto-adjust off).
+Example: `$TCSL128,255,0,0,1,0*XX\n` (red LED at intensity 128, gamma correction on, auto-adjust off).
 
 #### Set LED State
 
 ```
--> $TCCL<i>,<r>,<g>,<b>[,<auto>]*XX\n
-<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
+-> $TCCL<i>,<r>,<g>,<b>[,<gamma>[,<auto>]]*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<gamma>,<auto>*XX\n
 ```
 
-Sets the LED master intensity and color. The optional trailing `<auto>` byte (`0` or `1`) sets the LED auto-brightness flag. The response confirms the new state.
+Sets the LED intensity and color. The optional `<gamma>` field (`0` or `1`) controls whether the firmware applies gamma correction to the received values. The optional trailing `<auto>` field (`0` or `1`) sets the LED auto-brightness flag. The response confirms the new state.
 
-Example: `$TCCL255,255,128,0*XX\n` sets the LED to orange at full intensity.
-Example: `$TCCL50,0,255,0,1*XX\n` sets the LED to green at intensity 50 with auto-adjust enabled.
+- `gamma=1` (default when omitted): color values are linear; the firmware applies `gammaCorrect12bit()` during rendering for perceptually linear brightness.
+- `gamma=0`: color values are already gamma-corrected; the firmware skips its internal gamma correction step. Use this when your controller has pre-applied gamma (for example, from a lighting control system).
+
+**Note:** The gamma flag applies only to the values in this command. Any subsequent write to the LED — from an internal view or a new TCCL command — resets to `gamma=1` (apply correction) unless explicitly specified otherwise.
+
+Example: `$TCCL255,255,128,0*XX\n` sets the LED to orange at full intensity (gamma applied by firmware).
+Example: `$TCCL200,186,0,0,0*XX\n` sets the LED to red at intensity 200 with pre-corrected values (firmware skips gamma).
+Example: `$TCCL50,0,255,0,1,1*XX\n` sets the LED to green at intensity 50, gamma on, auto-adjust enabled.
 
 **Note:** Setting the LED intensity with this command disables LED auto-adjust (unless the optional `<auto>` field is included and set to `1`). Tube auto-adjust is not affected.
+
+**Breaking change:** The `<auto>` field has shifted from position 5 to position 6. Senders using the old `$TCCL<i>,<r>,<g>,<b>,<auto>` form must insert the `<gamma>` field before `<auto>`.
 
 #### Set LED Auto-Adjust
 
 ```
 -> $TCCLA<0|1>*XX\n
-<- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
+<- $TCSL<i>,<r>,<g>,<b>,<gamma>,<auto>*XX\n
 ```
 
 Enables (`1`) or disables (`0`) automatic LED intensity adjustment based on ambient light. This flag is independent of tube auto-adjust (`$TCCIA`). The response reports the current LED state.
@@ -437,9 +473,9 @@ Example: `$TCCLA1*XX\n` enables LED auto-adjust.
 
 **Note:** When LED auto-adjust is enabled, the LED intensity tracks the nixie tube intensity as the ambient light changes. When the AM/PM indicator feature is enabled (`StatusLedAsAmPm` system option), the clock manages LED auto-adjust automatically: it is enabled during PM time and disabled when the indicator is off (AM or non-time display), preventing auto-brightness from turning the LED on when it should be off.
 
-**Note:** The LED color and intensity set via this command persist until a view that manages the LED internally changes the color (e.g. a PM indicator transition in `TimeDateTempView`, or entering `MainMenuView`).
+**Note:** The LED color and intensity set via this command persist until a view that manages the LED internally changes the color (for example, a PM indicator transition in `TimeDateTempView`, or entering `MainMenuView`).
 
-This response is also sent as an **unsolicited status notification** whenever the LED color, intensity, or auto-adjust state changes from any source (internal views, external commands, or auto-brightness).
+This response is also sent as an **unsolicited status notification** whenever the LED color, intensity, gamma mode, or auto-adjust state changes from any source (internal views, external commands, or auto-brightness).
 
 ---
 
@@ -493,7 +529,7 @@ Stops RTTTL playback immediately. The current note (already in the hardware tone
 <- $TCSBP*XX\n
 ```
 
-Plays the hourly chime melody. With no argument, uses the current displayed hour — identical to the chime that fires automatically at the top of each hour. With an explicit `hh` argument (0–23), encodes that hour as the chime; the 12-hour display setting is applied when active (e.g. `0` → 12, `13` → 1).
+Plays the hourly chime melody. With no argument, uses the current displayed hour — identical to the chime that fires automatically at the top of each hour. With an explicit `hh` argument (0–23), encodes that hour as the chime; the 12-hour display setting is applied when active (for example, `0` → 12, `13` → 1).
 
 The chime encodes the hour as a binary sequence of beeps (LSb first): a low note for a 0-bit and a high note for a 1-bit, with 16th-note rests between notes. Hour 0 produces a single low beep.
 
@@ -520,7 +556,7 @@ Sent as an unsolicited notification when RTTTL playback completes. This fires wh
 
 ### I -- Intensity
 
-Get or set the nixie tube display brightness. The status LED has its own independent master intensity and auto-brightness flag, both controlled via the [L -- Status LED](#l----status-led) command.
+Get or set the nixie tube display brightness. The status LED has its own independent intensity and auto-brightness flag, both controlled via the [L -- Status LED](#l----status-led) command.
 
 #### Get Intensity
 
@@ -669,6 +705,43 @@ Example: `$TCSSERASE1*XX\n` — settings flash erased.
 | 7 | DmxExtended | DMX-512 extended mode |
 | 8 | MSDsOff | Turn off most-significant digits when zero |
 | 9 | TriggerEffectOnRotate | Trigger display effect on time/date/temperature toggling |
+
+---
+
+### A -- Alarm Slot Time
+
+Get or set the time for alarm slots 1–8. These are the time-of-day triggers used by `AlarmHandler`. Only the time portion (HH, MM, SS) is stored; the date is ignored during alarm comparison.
+
+#### Get Alarm Slot Time
+
+```
+-> $TCCA<n>*XX\n
+<- $TCSA<n>,<HHMMSS>*XX\n
+```
+
+Returns the current alarm time for slot `n` (1–8) as 6 digits.
+
+Example: `$TCCA1*XX\n` → `$TCSA1,013000*XX\n` (slot 1 set to 01:30:00)
+
+#### Set Alarm Slot Time
+
+```
+-> $TCCA<n>,<HHMMSS>*XX\n
+<- $TCSA<n>,<HHMMSS>*XX\n
+```
+
+Sets the alarm time for slot `n` (1–8). The response confirms the new value.
+
+- `n`: Slot number, 1–8
+- `HH`: Hours (00–23)
+- `MM`: Minutes (00–59)
+- `SS`: Seconds (00–59)
+
+Invalid slot numbers or out-of-range time values produce no response.
+
+Example: `$TCCA3,083000*XX\n` sets slot 3 to 08:30:00.
+
+**Note:** This command updates in-memory settings only. Use `$TCCSSW*XX\n` to persist changes across power cycles. Whether each slot triggers a beep and/or display blink is controlled by the `BeepStates` (setting 1) and `BlinkStates` (setting 2) bitmasks.
 
 ---
 
@@ -895,7 +968,7 @@ Example: `$TCSBOOT26.03.01,12*XX\n`
 <- $TCSP<nn>P<m>*XX\n     (with non-zero view mode)
 ```
 
-Sent when the operating mode or view mode changes (e.g. user navigates menus, alarm triggers a mode switch).
+Sent when the operating mode or view mode changes (for example, user navigates menus, alarm triggers a mode switch).
 
 ### Key Event
 
@@ -925,7 +998,7 @@ Example sequence for pressing U, then also pressing E, then releasing U:
 <- $TCSL<i>,<r>,<g>,<b>,<auto>*XX\n
 ```
 
-Sent whenever the LED color, master intensity, or auto-adjust state changes, whether from an external `$TCCL`/`$TCCLA` command, an internal view (e.g. AM/PM indicator), or automatic brightness adjustment. Format is identical to the `L` command response. See the L command for field descriptions.
+Sent whenever the LED color, intensity, or auto-adjust state changes, whether from an external `$TCCL`/`$TCCLA` command, an internal view (for example, AM/PM indicator), or automatic brightness adjustment. Format is identical to the `L` command response. See the L command for field descriptions.
 
 ### Temperature Change
 

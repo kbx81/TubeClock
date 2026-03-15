@@ -85,6 +85,8 @@ static uint8_t _rxPayloadLength[2] = {0, 0};
 static volatile uint8_t _rxFillBuffer = 0;
 // Flag indicating a complete command is ready in the non-fill buffer
 static volatile bool _rxCommandReady = false;
+// Flag indicating the last received command had a checksum mismatch
+static volatile bool _rxChecksumError = false;
 
 static RxState _rxState = RxState::RxIdle;
 static uint8_t _rxHeaderIndex = 0;
@@ -157,6 +159,7 @@ enum class NotificationType : uint8_t {
   // --- Timer/alarm ---
   CmdTimerStatus,  // R command response: timer state + value
   CmdAlarmClear,   // RA command response: alarm clear acknowledgement
+  CmdAlarmTime,    // A command response: alarm slot time (get/set)
   AlarmActive,     // Unsolicited: any alarm went active (rising edge)
 
   // Diagnostics command responses (D command)
@@ -166,6 +169,9 @@ enum class NotificationType : uint8_t {
   CmdDiagRtc,           // Active RTC type + startup result
   CmdDiagSettingsLoad,  // Settings load source at boot
   CmdDiagGps,           // GPS connection/fix status + satellite count
+
+  CmdError,            // Error response for unrecognized/malformed commands
+  CmdChecksumError,    // Error response for commands with invalid checksums
 };
 
 struct QueueEntry {
@@ -176,6 +182,7 @@ struct QueueEntry {
     bool saveOk;         // CmdSettingSaved
     uint8_t bootSubCmd;  // CmdBootloader (0/1/2)
     bool wasActive;      // CmdAlarmClear
+    char errorCategory;  // CmdError: unrecognized category char, or '?' if unknown
   } data;
 };
 
@@ -196,6 +203,7 @@ static uint16_t _prevAdcVddA = 0;
 static uint16_t _prevAdcVbatt = 0;
 static RgbLed _prevLed;
 static bool _prevLedAutoAdjust = false;
+static bool _prevLedPreCorrected = false;
 static bool _prevAlarmActive = false;
 static bool _prevGpsConnected = false;
 static bool _prevGpsValid = false;
@@ -348,6 +356,8 @@ static void _txSendLedStatus() {
   _txAppendDecimal(led.getGreen() / 16, 1);
   _txAppendChar(',');
   _txAppendDecimal(led.getBlue() / 16, 1);
+  _txAppendChar(',');
+  _txAppendChar(DisplayManager::getStatusLedPreCorrected() ? '0' : '1');
   _txAppendChar(',');
   _txAppendChar(Application::getLedIntensityAutoAdjust() ? '1' : '0');
   _txSendResponse();
@@ -593,6 +603,17 @@ static void _txProcessQueue() {
       _txSendResponse();
       break;
 
+    case NotificationType::CmdError:
+      _txBeginResponse("E");
+      _txAppendChar(entry.data.errorCategory);
+      _txSendResponse();
+      break;
+
+    case NotificationType::CmdChecksumError:
+      _txBeginResponse("ECHK");
+      _txSendResponse();
+      break;
+
     case NotificationType::CmdSettingValue:
       _txBeginResponse("S");
       _txAppendDecimal(entry.data.settingNum, 1);
@@ -650,6 +671,18 @@ static void _txProcessQueue() {
       _txAppendChar(entry.data.wasActive ? '1' : '0');
       _txSendResponse();
       break;
+
+    case NotificationType::CmdAlarmTime: {
+      DateTime dt = Application::getSettingsPtr()->getTime(static_cast<Settings::Slot>(entry.data.settingNum));
+      _txBeginResponse("A");
+      _txAppendChar(static_cast<char>('1' + entry.data.settingNum));
+      _txAppendChar(',');
+      _txAppendDecimal(dt.hour(), 2);
+      _txAppendDecimal(dt.minute(), 2);
+      _txAppendDecimal(dt.second(), 2);
+      _txSendResponse();
+      break;
+    }
 
     case NotificationType::AlarmActive:
       _txBeginResponse("RALM");
@@ -748,8 +781,10 @@ static void _rxProcessByte(char rxChar) {
             _rxFillBuffer ^= 1;
             _rxCommandReady = true;
           }
+        } else {
+          // Checksum mismatch -- signal an error response
+          _rxChecksumError = true;
         }
-        // else: checksum mismatch, silently discard
       }
       _rxState = RxState::RxIdle;
       break;
@@ -855,9 +890,11 @@ void process() {
   {
     RgbLed currentLed = DisplayManager::getStatusLed();
     bool ledAutoAdjust = Application::getLedIntensityAutoAdjust();
-    if (currentLed != _prevLed || ledAutoAdjust != _prevLedAutoAdjust) {
+    bool ledPreCorrected = DisplayManager::getStatusLedPreCorrected();
+    if (currentLed != _prevLed || ledAutoAdjust != _prevLedAutoAdjust || ledPreCorrected != _prevLedPreCorrected) {
       _prevLed = currentLed;
       _prevLedAutoAdjust = ledAutoAdjust;
+      _prevLedPreCorrected = ledPreCorrected;
       _enqueueNotification(NotificationType::Led);
     }
   }
@@ -912,6 +949,15 @@ void process() {
     Hardware::systemReset();  // noreturn; flag already set by BOOT2 handler
   }
 
+  if (_rxChecksumError) {
+    _rxChecksumError = false;
+    if (!_queueFull()) {
+      QueueEntry e;
+      e.type = NotificationType::CmdChecksumError;
+      _queueEnqueue(e);
+    }
+  }
+
   if (!_rxCommandReady) {
     return;
   }
@@ -958,6 +1004,10 @@ void notifySettingChanged(uint8_t settingNum) {
 // --- Command handler dispatch ---
 static void _handleCommand(const char *payload, uint8_t length) {
   if (length < 2) {
+    QueueEntry e;
+    e.type = NotificationType::CmdError;
+    e.data.errorCategory = '?';
+    _queueEnqueue(e);
     return;
   }
 
@@ -1232,14 +1282,20 @@ static void _handleCommand(const char *payload, uint8_t length) {
         }
         if (idx < length && payload[idx] == ',') {
           idx++;
-          if (idx < length) {
-            Application::setLedIntensityAutoAdjust(payload[idx] == '1');
+          int32_t gamma = _parseDecimal(payload, idx, length);
+          DisplayManager::setStatusLedPreCorrected(gamma == 0);
+          if (idx < length && payload[idx] == ',') {
+            idx++;
+            if (idx < length) {
+              Application::setLedIntensityAutoAdjust(payload[idx] == '1');
+            }
           }
         }
       }
 
-      // Sync _prevLed so process() doesn't fire a redundant notification
+      // Sync _prevLed/_prevLedPreCorrected so process() doesn't fire a redundant notification
       _prevLed = DisplayManager::getStatusLed();
+      _prevLedPreCorrected = DisplayManager::getStatusLedPreCorrected();
 
       // Always respond with current LED state
       _enqueueNotification(NotificationType::Led);
@@ -1339,6 +1395,43 @@ static void _handleCommand(const char *payload, uint8_t length) {
       break;
     }
 
+    // --- Alarm time ---
+    case 'A': {
+      if (length < 3) {
+        break;
+      }
+      uint8_t slotChar = payload[2];
+      if (slotChar < '1' || slotChar > '8') {
+        break;
+      }
+      uint8_t slotIdx = static_cast<uint8_t>(slotChar - '1');  // 0-based
+
+      if (length >= 10 && payload[3] == ',') {
+        // "$TCCA<n>,<HHMMSS>" -- set alarm time
+        uint8_t idx = 4;
+        int32_t hour   = _parseDecimal(payload, idx, idx + 2);
+        int32_t minute = _parseDecimal(payload, idx, idx + 2);
+        int32_t second = _parseDecimal(payload, idx, idx + 2);
+        if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59) {
+          DateTime dt;
+          dt.setTime(hour, minute, second);
+          Application::getSettingsPtr()->setTime(static_cast<Settings::Slot>(slotIdx), dt);
+          Application::refreshSettings();
+        } else {
+          break;  // reject invalid time
+        }
+      }
+
+      // Respond with current slot time (handles both get and set)
+      {
+        QueueEntry e;
+        e.type = NotificationType::CmdAlarmTime;
+        e.data.settingNum = slotIdx;
+        _queueEnqueue(e);
+      }
+      break;
+    }
+
     // --- Diagnostics ---
     case 'D': {
       if (length < 3) {
@@ -1382,8 +1475,13 @@ static void _handleCommand(const char *payload, uint8_t length) {
       break;
     }
 
-    default:
+    default: {
+      QueueEntry e;
+      e.type = NotificationType::CmdError;
+      e.data.errorCategory = payload[1];
+      _queueEnqueue(e);
       break;
+    }
   }
 }
 

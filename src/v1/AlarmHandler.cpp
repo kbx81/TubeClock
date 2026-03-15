@@ -118,8 +118,8 @@ uint16_t _getActiveTimeSlotAlarms(const DateTime &current, Settings *pSettings) 
       slot = pSettings->getTime(i);
       // set the alarm slot's date to today so we can compare them
       slot.setDate(current.year(false), current.month(false), current.day(false));
-      // if the time it was last acknowledged is before the alarm slot's time...
-      if (_ackTime[i] < slot) {
+      // if the alarm time has passed and hasn't been acknowledged since...
+      if ((slot <= current) && (_ackTime[i] < slot)) {
         // ...we have an active alarm
         activeAlarms |= (1 << i);
       }

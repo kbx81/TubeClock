@@ -201,7 +201,7 @@ as follows:
 - `A` applies (saves) the selected value
 - `E` exits to the main menu
 
-When this view is used for a group of related settings (e.g. RGB color channels
+When this view is used for a group of related settings (for example, RGB color channels
 or temperature sensor calibrations), the item number appears on tube 4 and
 `B`/`C` cycle through items rather than jumping to the minimum/maximum:
 
