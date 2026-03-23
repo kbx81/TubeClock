@@ -990,41 +990,65 @@ void _tscSetup() {
   TSC_CR |= TSC_CR_START;
 }
 
-// Set up USARTs
+// Set up USART1 (GPS/SerialRemote)
 //
-void _usartSetup() {
-  // Setup USART1 TX & RX pins as alternate function
+void _usart1Setup() {
   gpio_set_af(cUsart1TxPort, cUsart1TxAF, cUsart1TxPin);
   gpio_set_af(cUsart1RxPort, cUsart1RxAF, cUsart1RxPin);
-  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
-  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
-  // Setup USART2 TX, RX, and DE pins as alternate function
+  _usart[0].initialize(&_usartParams[0]);
+  _usart[0].configure(&_usartTransferParams[0]);
+  _usart[0].enableRxInterrupt();
+  usart_enable_error_interrupt(cGpsUsart);
+}
+
+// Set up USART2 (DMX)
+//
+void _usart2Setup() {
   gpio_set_af(cUsart2Port, cUsart2AF, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
   gpio_mode_setup(cUsart2Port, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart2RxPin | cUsart2TxPin | cUsart2DePin);
-  // Setup USART3 RX pin as alternate function (pull-up: USART idle = HIGH)
-  gpio_set_af(cUsart3RxPort, cUsart3RxAF, cUsart3RxPin);
-  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_AF, GPIO_PUPD_PULLUP, cUsart3RxPin);
-  // Setup USART4 TX pin as alternate function
-  gpio_set_af(cUsart4TxPort, cUsart4TxAF, cUsart4TxPin);
-  gpio_mode_setup(cUsart4TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart4TxPin);
-
-  // Configure all Usart instances
-  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++) {
-    _usart[usart].initialize(&_usartParams[usart]);
-    _usart[usart].configure(&_usartTransferParams[usart]);
-  }
-
-  // Enable relevant interrupts
-  _usart[0].enableRxInterrupt();  // USART1 GPS RX
-  usart_enable_error_interrupt(cGpsUsart);
+  _usart[1].initialize(&_usartParams[1]);
+  _usart[1].configure(&_usartTransferParams[1]);
   usart_enable_error_interrupt(cDmxUsart);
+  _usart[1].enable();
+}
+
+// Set up USART3 (serial remote RX) and USART4 (serial remote TX)
+//
+void _usartSerialRemoteSetup() {
+  gpio_set_af(cUsart3RxPort, cUsart3RxAF, cUsart3RxPin);
+  gpio_set_af(cUsart4TxPort, cUsart4TxAF, cUsart4TxPin);
+  _usart[2].initialize(&_usartParams[2]);
+  _usart[2].configure(&_usartTransferParams[2]);
+  _usart[3].initialize(&_usartParams[3]);
+  _usart[3].configure(&_usartTransferParams[3]);
   // NOTE: USART3 RX interrupt is enabled later by SerialRemote::initialize()
   // to avoid unhandled RXNE interrupts before the ISR handler is ready.
+}
 
-  // Enable all USARTs
-  for (uint8_t usart = 0; usart < cNumberOfUsarts; usart++) {
-    _usart[usart].enable();
-  }
+void usart1Enable() {
+  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1RxPin);
+  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart1TxPin);
+  _usart[0].enable();
+}
+
+void usart1Disable() {
+  gpio_mode_setup(cUsart1RxPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cUsart1RxPin);
+  gpio_mode_setup(cUsart1TxPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cUsart1TxPin);
+  _usart[0].disable();
+}
+
+void usartSerialRemoteEnable() {
+  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_AF, GPIO_PUPD_PULLUP, cUsart3RxPin);
+  gpio_mode_setup(cUsart4TxPort, GPIO_MODE_AF, GPIO_PUPD_NONE, cUsart4TxPin);
+  _usart[2].enable();
+  _usart[3].enable();
+}
+
+void usartSerialRemoteDisable() {
+  gpio_mode_setup(cUsart3RxPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cUsart3RxPin);
+  gpio_mode_setup(cUsart4TxPort, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, cUsart4TxPin);
+  _usart[2].disable();
+  _usart[3].disable();
 }
 
 void _incrementOnTimeSecondsCounter() {
@@ -1248,7 +1272,9 @@ void initialize() {
   _tscSetup();
 
   _spiSetup();
-  _usartSetup();
+  _usart1Setup();
+  _usart2Setup();
+  _usartSerialRemoteSetup();
   // _i2cSetup();
 
   DisplayManager::initialize();

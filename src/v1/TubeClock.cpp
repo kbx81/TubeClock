@@ -40,22 +40,6 @@
 
 using namespace kbxTubeClock;
 
-// Minimal terminate handler replacing libstdc++'s __verbose_terminate_handler.
-// The default pulls in __cxa_demangle (27 KB) and sprintf (23 KB) -- useless
-// on bare-metal where there's no console to print to anyway.
-namespace __gnu_cxx {
-void __verbose_terminate_handler() {
-  while (1) {
-  }
-}
-}  // namespace __gnu_cxx
-
-// Stub for the C runtime 'finish' routine. Called by __libc_fini_array during
-// shutdown, which is pulled in when static C++ objects with non-trivial
-// (virtual) destructors register via __cxa_atexit. The firmware never exits,
-// so this is never actually called.
-extern "C" void _fini() {}
-
 /* ADC DMA */
 void dma1_channel1_isr(void) { Hardware::dmaCh1Isr(); }
 

@@ -74,7 +74,9 @@ class Settings {
     StartupToToggle = 6,
     DmxExtended = 7,
     MSDsOff = 8,
-    TriggerEffectOnRotate = 9
+    TriggerEffectOnRotate = 9,
+    SerialRemoteOnUsart1 = 10,  ///< Enable unsolicited notifications on USART1 (GPS/shared)
+    SerialRemoteOnUsart4 = 11   ///< Enable unsolicited notifications on USART4
   };
 
   /// @brief Enums for time slots
@@ -108,16 +110,16 @@ class Settings {
   ///
   enum class SettingTransform : uint8_t {
     None = 0,
-    PlusOne,      ///< stored 0-based, displayed 1-based (e.g. DmxAddress: stored 0-504, shown 1-512)
-    TimeZone,     ///< stored 0-112 (x15 min), displayed as signed ±HH:MM offset
-    Calibration   ///< stored 0-198, displayed as signed offset from midpoint 99
+    PlusOne,     ///< stored 0-based, displayed 1-based (e.g. DmxAddress: stored 0-504, shown 1-512)
+    TimeZone,    ///< stored 0-112 (x15 min), displayed as signed ±HH:MM offset
+    Calibration  ///< stored 0-198, displayed as signed offset from midpoint 99
   };
 
   /// @brief Describes valid range and display behavior of a setting
   ///
   struct SettingDescriptor {
-    uint16_t        maxOrMask;   ///< max value for numerics; bitmask for bitfields
-    uint8_t         minValue;    ///< minimum valid value (0 for most; 1 for months/ordinals)
+    uint16_t maxOrMask;          ///< max value for numerics; bitmask for bitfields
+    uint8_t minValue;            ///< minimum valid value (0 for most; 1 for months/ordinals)
     SettingTransform transform;  ///< how to interpret/display the value
   };
 
@@ -157,7 +159,8 @@ class Settings {
   ///
   void saveToSram();
 
-  /// @brief Invalidates the DS3234 SRAM copy of settings so it won't be used on next load; no-op if DS3234 not connected
+  /// @brief Invalidates the DS3234 SRAM copy of settings so it won't be used on next load; no-op if DS3234 not
+  /// connected
   ///
   void invalidateSram();
 

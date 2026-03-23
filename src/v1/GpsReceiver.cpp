@@ -47,14 +47,27 @@ enum GpsRxState : uint8_t {
 
 /// @brief GPS Receiver sentence type
 ///
-enum GpsRxType : uint8_t { GpsRMC = 0, GpsGSV = 1 };
+enum GpsRxType : uint8_t {
+  GpsRMC  = 0,
+  GpsGSV  = 1,  // GPS
+  GpsGLSV = 2,  // GLONASS
+  GpsGNSV = 3,  // combined (all constellations)
+  GpsGASV = 4,  // Galileo
+  GpsGBSV = 5,  // BeiDou
+};
 
 // the header on the string we expect to parse
 // $GPRMC,000012.800,V,,,,,0.00,0.00,060180,,,N*49
 // $GPRMC,230912.000,A,4055.5342,N,08341.7690,W,1.24,299.67,070519,,,D*71
+// $GNRMC used instead of $GPRMC when multiple constellations are active
 //
-static const char cGpsParseStrGSV[] = "$GPGSV,";
-static const char cGpsParseStrRMC[] = "$GPRMC,";
+static const char cGpsParseStrGSV[]  = "$GPGSV,";
+static const char cGpsParseStrGLSV[] = "$GLGSV,";
+static const char cGpsParseStrGNSV[] = "$GNGSV,";
+static const char cGpsParseStrGASV[] = "$GAGSV,";
+static const char cGpsParseStrGBSV[] = "$GBGSV,";
+static const char cGpsParseStrRMC[]  = "$GPRMC,";
+static const char cGpsParseStrGNRMC[] = "$GNRMC,";
 
 // the length of the string we expect to parse
 //
@@ -105,8 +118,12 @@ static int16_t _timeZoneOffsetInMinutes = 0;
 //
 static DateTime _gpsTime;
 
-// the current number of satellites seen by the GPS
+// per-constellation satellite counts and the displayed total
 //
+static uint8_t _numSatGps = 0;
+static uint8_t _numSatGlo = 0;
+static uint8_t _numSatGal = 0;
+static uint8_t _numSatBei = 0;
 static uint8_t _numSatellites = 0;
 
 // NMEA checksum state: running XOR accumulator and received checksum byte
@@ -120,9 +137,7 @@ static Usart *_gpsUsart = nullptr;
 
 // Decode one ASCII hex character to its 4-bit value
 //
-static uint8_t _hexNibble(const uint8_t c) {
-  return (c >= 'A') ? (c - 'A' + 10) : (c - '0');
-}
+static uint8_t _hexNibble(const uint8_t c) { return (c >= 'A') ? (c - 'A' + 10) : (c - '0'); }
 
 void initialize() {
   _gpsUsart = Hardware::getUsart(0);  // USART1
@@ -182,7 +197,8 @@ void rxIsr() {
           _rxState = GpsRxState::GpsRxTimeReceived;
           _rxCharCount = 0;
         }
-      } else if (_rxType == GpsRxType::GpsGSV) {
+      } else {
+        // GpsGSV, GpsGLSV, GpsGNSV all share the same comma-counting path
         if (rxChar == ',') {
           if (++_rxCharCount >= cGpsPreNumSatellitesCommaCount) {
             _rxState = GpsRxState::GpsRxNumSatellites;
@@ -261,6 +277,20 @@ void rxIsr() {
         ++_rxCharCount;
       } else {
         _numSatellites += rxChar - '0';
+        if (_rxType == GpsRxType::GpsGSV) {
+          _numSatGps = _numSatellites;
+          _numSatellites = _numSatGps + _numSatGlo + _numSatGal + _numSatBei;
+        } else if (_rxType == GpsRxType::GpsGLSV) {
+          _numSatGlo = _numSatellites;
+          _numSatellites = _numSatGps + _numSatGlo + _numSatGal + _numSatBei;
+        } else if (_rxType == GpsRxType::GpsGASV) {
+          _numSatGal = _numSatellites;
+          _numSatellites = _numSatGps + _numSatGlo + _numSatGal + _numSatBei;
+        } else if (_rxType == GpsRxType::GpsGBSV) {
+          _numSatBei = _numSatellites;
+          _numSatellites = _numSatGps + _numSatGlo + _numSatGal + _numSatBei;
+        }
+        // GpsGNSV: _numSatellites already holds the combined total
         _rxState = GpsRxState::GpsRxIdle;
         _rxCharCount = 0;
       }
@@ -275,9 +305,29 @@ void rxIsr() {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsGSV;
           _rxCharCount = 0;
+        } else if (memcmp(cGpsParseStrGLSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
+          _rxState = GpsRxState::GpsRxNmeaHeaderValid;
+          _rxType = GpsRxType::GpsGLSV;
+          _rxCharCount = 0;
+        } else if (memcmp(cGpsParseStrGNSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
+          _rxState = GpsRxState::GpsRxNmeaHeaderValid;
+          _rxType = GpsRxType::GpsGNSV;
+          _rxCharCount = 0;
+        } else if (memcmp(cGpsParseStrGASV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
+          _rxState = GpsRxState::GpsRxNmeaHeaderValid;
+          _rxType = GpsRxType::GpsGASV;
+          _rxCharCount = 0;
+        } else if (memcmp(cGpsParseStrGBSV, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
+          _rxState = GpsRxState::GpsRxNmeaHeaderValid;
+          _rxType = GpsRxType::GpsGBSV;
+          _rxCharCount = 0;
         } else if (memcmp(cGpsParseStrRMC, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
           _rxState = GpsRxState::GpsRxNmeaHeaderValid;
           _rxType = GpsRxType::GpsRMC;
+          _rxCharCount = 0;
+        } else if (memcmp(cGpsParseStrGNRMC, _rxHeaderChar, cGpsNmeaHeaderLength) == 0) {
+          _rxState = GpsRxState::GpsRxNmeaHeaderValid;
+          _rxType = GpsRxType::GpsRMC;  // identical structure to $GPRMC
           _rxCharCount = 0;
         } else  // nothing matched so just start over
         {

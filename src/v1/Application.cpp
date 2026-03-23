@@ -210,6 +210,19 @@ void initialize() {
   GpsReceiver::initialize();
   SerialRemote::initialize();
 
+  // Apply USART enable/disable from settings (must come after SerialRemote::initialize()
+  // so USART3 RX interrupt is armed before usartSerialRemoteEnable() activates the pin)
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::SerialRemoteOnUsart1)) {
+    Hardware::usart1Enable();
+  } else {
+    Hardware::usart1Disable();
+  }
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::SerialRemoteOnUsart4)) {
+    Hardware::usartSerialRemoteEnable();
+  } else {
+    Hardware::usartSerialRemoteDisable();
+  }
+
   // _currentTime = Hardware::getDateTime();
   _currentTime = Application::dateTime();
 
@@ -384,6 +397,18 @@ void refreshSettings() {
       _settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::AutoAdjustIntensity);
   setIntensityAutoAdjust(autoAdjust, true);
   _autoAdjustLedIntensity = autoAdjust;
+
+  // Apply USART enable/disable based on SerialNotify bits
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::SerialRemoteOnUsart1)) {
+    Hardware::usart1Enable();
+  } else {
+    Hardware::usart1Disable();
+  }
+  if (_settings.getSetting(Settings::Setting::SystemOptions, Settings::SystemOptionsBits::SerialRemoteOnUsart4)) {
+    Hardware::usartSerialRemoteEnable();
+  } else {
+    Hardware::usartSerialRemoteDisable();
+  }
 }
 
 void notifySettingsChanged() {
@@ -507,9 +532,7 @@ void setIntensityAutoAdjust(const bool enable, const bool quickAdjust) {
 
 bool getLedIntensityAutoAdjust() { return _autoAdjustLedIntensity; }
 
-void setLedIntensityAutoAdjust(const bool enable) {
-  _autoAdjustLedIntensity = enable;
-}
+void setLedIntensityAutoAdjust(const bool enable) { _autoAdjustLedIntensity = enable; }
 
 uint8_t getIntensity() { return _masterIntensity; }
 

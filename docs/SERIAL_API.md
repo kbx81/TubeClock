@@ -24,7 +24,7 @@ The clock uses three USARTs for the serial remote interface:
 
 **Recommended wiring:** Connect the external MCU's TX to USART3 RX (PB10) and the external MCU's RX to USART4 TX (PA0). This avoids contention with GPS traffic on USART1. USART1 may also be used for bidirectional communication if GPS is not connected.
 
-All responses are transmitted simultaneously on both USART1 TX and USART4 TX.
+When both interfaces are enabled, responses are transmitted simultaneously on USART1 TX and USART4 TX. Each interface can be independently enabled or disabled via `SystemOptions` bits 10–11 (see [SystemOptions Bit Flags](#systemoptions-bit-flags-setting-0)).
 
 ## Protocol Format
 
@@ -705,6 +705,8 @@ Example: `$TCSSERASE1*XX\n` — settings flash erased.
 | 7 | DmxExtended | DMX-512 extended mode |
 | 8 | MSDsOff | Turn off most-significant digits when zero |
 | 9 | TriggerEffectOnRotate | Trigger display effect on time/date/temperature toggling |
+| 10 | SerialRemoteOnUsart1 | Enable serial remote on USART1 (shared GPS channel) — enables TX and RX |
+| 11 | SerialRemoteOnUsart4 | Enable serial remote on USART4/USART3 (dedicated TX/RX pair) |
 
 ---
 
@@ -948,6 +950,8 @@ Example (connected, fix acquired, 8 satellites):
 ## Unsolicited Notifications
 
 The clock sends these notifications automatically when state changes occur, without a preceding command. Notifications are buffered in a transmit queue and sent when the TX path becomes idle (after both USART output channels finish transmitting the previous message). Unsolicited notification types are coalesced — at most one pending entry per type is kept in the queue, so only the latest state is sent when the queue drains. Key events are an exception and are never coalesced; each press and release is individually queued. If the queue is full (capacity 8), new entries are silently dropped. The external MCU can always poll for current state if a notification is missed.
+
+Each USART interface can be fully enabled or disabled via `SystemOptions` bits 10 (`SerialRemoteOnUsart1`) and 11 (`SerialRemoteOnUsart4`). Both bits are set by default. Clearing a bit disables the corresponding USART hardware — the interface stops receiving commands and transmitting responses entirely. Because the USART is physically disabled, all output (including command responses) is suppressed on that interface; USB CDC-ACM output is unaffected. The setting takes effect at startup and whenever settings are applied.
 
 ### Boot
 

@@ -50,6 +50,7 @@ OPENCM3_DIR=../../../../libopencm3
 # Custom linker script with reserved settings flash area
 LDSCRIPT = stm32f07xzb-tubeclock.ld
 # LDFLAGS += -Wl,--Map=$(BINARY).map
+LDFLAGS += -Wl,--no-warn-rwx-segments
 
 CXXSTD	 = -std=c++17
 CXXFLAGS += -fno-exceptions -fno-rtti
@@ -93,9 +94,12 @@ $(BUILD_DIR):
 stats: $(BINARY).bin
 	arm-none-eabi-size $(BINARY).elf
 
-.PHONY: clean
-clean:
+.PHONY: clean-builddir
+clean-builddir:
 	@#printf "  CLEAN\n"
 	$(Q)$(RM) -rf $(BUILD_DIR)
+
+# Add BUILD_DIR cleanup as a prerequisite without redefining the upstream recipe
+clean: clean-builddir
 
 -include $(OBJS:.o=.d)

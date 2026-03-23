@@ -82,8 +82,8 @@ static const uint8_t cNumberOfUsarts = 4;
 //
 static const uint32_t cUsart1BaudRate = 115200;
 static const uint32_t cUsart2BaudRate = 250000;
-static const uint32_t cUsart3BaudRate = 115200;
-static const uint32_t cUsart4BaudRate = 115200;
+static const uint32_t cUsart3BaudRate = 230400;
+static const uint32_t cUsart4BaudRate = cUsart3BaudRate;  // used as a pair; must have the same baud rate
 
 // USART1 data transfer parameters
 //
@@ -370,6 +370,16 @@ SpiMaster *getSpiMaster();
 /// @brief Gets a pointer to the specified USART interface
 /// @return pointer to requested USART interface
 Usart *getUsart(const uint8_t usart);
+
+/// @brief Enable/disable USART1 (GPS) and its associated GPIO pins
+///
+void usart1Enable();
+void usart1Disable();
+
+/// @brief Enable/disable the serial remote USART pair (USART3 RX + USART4 TX) and their GPIO pins
+///
+void usartSerialRemoteEnable();
+void usartSerialRemoteDisable();
 
 /// @brief Sets the given status LED to the given intensity/RgbLed
 ///

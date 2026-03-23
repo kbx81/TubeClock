@@ -64,142 +64,142 @@ struct SettingsProfile {
 #if SETTINGS_PROFILE == 0
 // Profile 0: Standard US/North America defaults (DST enabled, 12-hour, Fahrenheit)
 static const SettingsProfile cActiveProfile = {{
-    0b1011111111,   // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
-    0b11100000000,  // BeepStates
-    0b11100000000,  // BlinkStates
-    0b11111111,     // OnOffStates
-    1638,           // PMIndicatorRedValue
-    704,            // PMIndicatorGreenValue
-    164,            // PMIndicatorBlueValue
-    26,             // TimeDisplayDuration
-    2,              // DateDisplayDuration
-    2,              // TemperatureDisplayDuration
-    100,            // FadeDuration
-    3,              // DstBeginMonth (March)
-    2,              // DstBeginDowOrdinal (2nd occurrence)
-    11,             // DstEndMonth (November)
-    1,              // DstEndDowOrdinal (1st occurrence)
-    0,              // DstSwitchDayOfWeek (Sunday)
-    2,              // DstSwitchHour (2 AM)
-    500,            // EffectDuration
-    300,            // EffectFrequency
-    8,              // MinimumIntensity
-    3,              // BeeperVolume
-    4,              // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
-    79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
-    79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
-    79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    120,            // IdleTimeout (120 seconds)
-    2,              // DateFormat (MM.DD.YY)
-    32,             // TimeZone
-    0,              // ColonBehavior
-    60,             // TimerResetValue
-    0               // DmxAddress
+    0b111011111111,  // SystemOptions: 12hr, LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity; USART1+4
+    0b11100000000,   // BeepStates
+    0b11100000000,   // BlinkStates
+    0b11111111,      // OnOffStates
+    1638,            // PMIndicatorRedValue
+    704,             // PMIndicatorGreenValue
+    164,             // PMIndicatorBlueValue
+    26,              // TimeDisplayDuration
+    2,               // DateDisplayDuration
+    2,               // TemperatureDisplayDuration
+    100,             // FadeDuration
+    3,               // DstBeginMonth (March)
+    2,               // DstBeginDowOrdinal (2nd occurrence)
+    11,              // DstEndMonth (November)
+    1,               // DstEndDowOrdinal (1st occurrence)
+    0,               // DstSwitchDayOfWeek (Sunday)
+    2,               // DstSwitchHour (2 AM)
+    500,             // EffectDuration
+    300,             // EffectFrequency
+    8,               // MinimumIntensity
+    3,               // BeeperVolume
+    4,               // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+    79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
+    79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
+    79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    120,             // IdleTimeout (120 seconds)
+    2,               // DateFormat (MM.DD.YY)
+    32,              // TimeZone
+    0,               // ColonBehavior
+    60,              // TimerResetValue
+    0                // DmxAddress
 }};
 #elif SETTINGS_PROFILE == 1
 // Profile 1: European defaults (24-hour, Celsius, no DST handling)
 static const SettingsProfile cActiveProfile = {{
-    0b1011101100,   // SystemOptions: 24hr, Celsius, auto intensity
-    0b11100000000,  // BeepStates
-    0b11100000000,  // BlinkStates
-    0b11111111,     // OnOffStates
-    1638,           // PMIndicatorRedValue
-    704,            // PMIndicatorGreenValue
-    164,            // PMIndicatorBlueValue
-    26,             // TimeDisplayDuration
-    2,              // DateDisplayDuration
-    2,              // TemperatureDisplayDuration
-    100,            // FadeDuration
-    3,              // DstBeginMonth (not used)
-    2,              // DstBeginDowOrdinal
-    11,             // DstEndMonth (not used)
-    1,              // DstEndDowOrdinal
-    0,              // DstSwitchDayOfWeek
-    2,              // DstSwitchHour
-    500,            // EffectDuration
-    300,            // EffectFrequency
-    8,              // MinimumIntensity
-    3,              // BeeperVolume
-    4,              // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
-    79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
-    79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
-    79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    120,            // IdleTimeout (120 seconds)
-    1,              // DateFormat (DD.MM.YY)
-    56,             // TimeZone
-    0,              // ColonBehavior
-    60,             // TimerResetValue
-    0               // DmxAddress
+    0b111011101100,  // SystemOptions: 24hr, Celsius, auto intensity; notify on USART1+4
+    0b11100000000,   // BeepStates
+    0b11100000000,   // BlinkStates
+    0b11111111,      // OnOffStates
+    1638,            // PMIndicatorRedValue
+    704,             // PMIndicatorGreenValue
+    164,             // PMIndicatorBlueValue
+    26,              // TimeDisplayDuration
+    2,               // DateDisplayDuration
+    2,               // TemperatureDisplayDuration
+    100,             // FadeDuration
+    3,               // DstBeginMonth (not used)
+    2,               // DstBeginDowOrdinal
+    11,              // DstEndMonth (not used)
+    1,               // DstEndDowOrdinal
+    0,               // DstSwitchDayOfWeek
+    2,               // DstSwitchHour
+    500,             // EffectDuration
+    300,             // EffectFrequency
+    8,               // MinimumIntensity
+    3,               // BeeperVolume
+    4,               // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+    79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
+    79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
+    79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    120,             // IdleTimeout (120 seconds)
+    1,               // DateFormat (DD.MM.YY)
+    56,              // TimeZone
+    0,               // ColonBehavior
+    60,              // TimerResetValue
+    0                // DmxAddress
 }};
 #elif SETTINGS_PROFILE == 2
 // Profile 2: Minimal/Silent (no beeps, no effects, basic display)
 static const SettingsProfile cActiveProfile = {{
-    0b0000100000,   // SystemOptions: 24hr, auto intensity only
-    0b00000000000,  // BeepStates: all disabled
-    0b00000000000,  // BlinkStates: all disabled
-    0b11111111,     // OnOffStates
-    1638,           // PMIndicatorRedValue
-    704,            // PMIndicatorGreenValue
-    164,            // PMIndicatorBlueValue
-    26,             // TimeDisplayDuration
-    2,              // DateDisplayDuration
-    2,              // TemperatureDisplayDuration
-    50,             // FadeDuration (faster)
-    3,              // DstBeginMonth
-    2,              // DstBeginDowOrdinal
-    11,             // DstEndMonth
-    1,              // DstEndDowOrdinal
-    0,              // DstSwitchDayOfWeek
-    2,              // DstSwitchHour
-    0,              // EffectDuration (effects disabled)
-    0,              // EffectFrequency (effects disabled)
-    8,              // MinimumIntensity
-    0,              // BeeperVolume (silent)
-    4,              // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
-    79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
-    79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
-    79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    120,            // IdleTimeout (120 seconds)
-    0,              // DateFormat (YY.MM.DD)
-    56,             // TimeZone
-    0,              // ColonBehavior
-    60,             // TimerResetValue
-    0               // DmxAddress
+    0b110000100000,  // SystemOptions: 24hr, auto intensity only; notify on USART1+4
+    0b00000000000,   // BeepStates: all disabled
+    0b00000000000,   // BlinkStates: all disabled
+    0b11111111,      // OnOffStates
+    1638,            // PMIndicatorRedValue
+    704,             // PMIndicatorGreenValue
+    164,             // PMIndicatorBlueValue
+    26,              // TimeDisplayDuration
+    2,               // DateDisplayDuration
+    2,               // TemperatureDisplayDuration
+    50,              // FadeDuration (faster)
+    3,               // DstBeginMonth
+    2,               // DstBeginDowOrdinal
+    11,              // DstEndMonth
+    1,               // DstEndDowOrdinal
+    0,               // DstSwitchDayOfWeek
+    2,               // DstSwitchHour
+    0,               // EffectDuration (effects disabled)
+    0,               // EffectFrequency (effects disabled)
+    8,               // MinimumIntensity
+    0,               // BeeperVolume (silent)
+    4,               // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+    79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
+    79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
+    79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    120,             // IdleTimeout (120 seconds)
+    0,               // DateFormat (YY.MM.DD)
+    56,              // TimeZone
+    0,               // ColonBehavior
+    60,              // TimerResetValue
+    0                // DmxAddress
 }};
 #elif SETTINGS_PROFILE == 3
 // Profile 3: kbx's preferred defaults (DST enabled, 12-hour, Fahrenheit)
 static const SettingsProfile cActiveProfile = {{
-    0b1011111111,   // SystemOptions: 12hr, status LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity
-    0b11100000000,  // BeepStates
-    0b11100000000,  // BlinkStates
-    0b11111111,     // OnOffStates
-    1638,           // PMIndicatorRedValue
-    704,            // PMIndicatorGreenValue
-    164,            // PMIndicatorBlueValue
-    26,             // TimeDisplayDuration
-    2,              // DateDisplayDuration
-    2,              // TemperatureDisplayDuration
-    250,            // FadeDuration
-    3,              // DstBeginMonth (March)
-    2,              // DstBeginDowOrdinal (2nd occurrence)
-    11,             // DstEndMonth (November)
-    1,              // DstEndDowOrdinal (1st occurrence)
-    0,              // DstSwitchDayOfWeek (Sunday)
-    2,              // DstSwitchHour (2 AM)
-    800,            // EffectDuration
-    13,             // EffectFrequency
-    2,              // MinimumIntensity
-    2,              // BeeperVolume
-    4,              // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
-    79,             // TemperatureCalibrationDS3234 (79 = -2.0C)
-    79,             // TemperatureCalibrationDS1722 (79 = -2.0C)
-    79,             // TemperatureCalibrationLM74 (79 = -2.0C)
-    120,            // IdleTimeout (120 seconds)
-    0,              // DateFormat (YY.MM.DD)
-    32,             // TimeZone
-    0,              // ColonBehavior
-    60,             // TimerResetValue
-    0               // DmxAddress
+    0b111011111111,  // SystemOptions: 12hr, LED as AM/PM, hourly chime, DST, Fahrenheit, auto intensity; USART1+4
+    0b11100000000,   // BeepStates
+    0b11100000000,   // BlinkStates
+    0b11111111,      // OnOffStates
+    1638,            // PMIndicatorRedValue
+    704,             // PMIndicatorGreenValue
+    164,             // PMIndicatorBlueValue
+    26,              // TimeDisplayDuration
+    2,               // DateDisplayDuration
+    2,               // TemperatureDisplayDuration
+    250,             // FadeDuration
+    3,               // DstBeginMonth (March)
+    2,               // DstBeginDowOrdinal (2nd occurrence)
+    11,              // DstEndMonth (November)
+    1,               // DstEndDowOrdinal (1st occurrence)
+    0,               // DstSwitchDayOfWeek (Sunday)
+    2,               // DstSwitchHour (2 AM)
+    800,             // EffectDuration
+    13,              // EffectFrequency
+    2,               // MinimumIntensity
+    2,               // BeeperVolume
+    4,               // TemperatureCalibrationSTM32 (midpoint 99; 9 = -9.5C)
+    79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
+    79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
+    79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    120,             // IdleTimeout (120 seconds)
+    0,               // DateFormat (YY.MM.DD)
+    32,              // TimeZone
+    0,               // ColonBehavior
+    60,              // TimerResetValue
+    0                // DmxAddress
 }};
 #else
 #error "SETTINGS_PROFILE is out of range; update Settings.cpp to add a new profile"
@@ -210,7 +210,7 @@ const uint32_t Settings::cSettingsFlashAddress = reinterpret_cast<uint32_t>(&__s
 
 // Descriptor for each setting: max/mask, min value, display transform
 const Settings::SettingDescriptor Settings::cSettingDescriptors[] = {
-    {0x03ff, 0, Settings::SettingTransform::None},      // SystemOptions
+    {0x0fff, 0, Settings::SettingTransform::None},      // SystemOptions
     {0x07ff, 0, Settings::SettingTransform::None},      // BeepStates
     {0x07ff, 0, Settings::SettingTransform::None},      // BlinkStates
     {0x00ff, 0, Settings::SettingTransform::None},      // OnOffStates

@@ -170,8 +170,8 @@ enum class NotificationType : uint8_t {
   CmdDiagSettingsLoad,  // Settings load source at boot
   CmdDiagGps,           // GPS connection/fix status + satellite count
 
-  CmdError,            // Error response for unrecognized/malformed commands
-  CmdChecksumError,    // Error response for commands with invalid checksums
+  CmdError,          // Error response for unrecognized/malformed commands
+  CmdChecksumError,  // Error response for commands with invalid checksums
 };
 
 struct QueueEntry {
@@ -286,8 +286,15 @@ static void _txSendResponse() {
   _txAppendChar(_toHex(checksum & 0x0F));
   _txAppendChar('\n');
 
-  // Start TX on all output USARTs
+  // Start TX on enabled output USARTs (SerialRemoteOnUsart1/4 bits gate each interface)
+  static const Settings::SystemOptionsBits cUsartBits[cTxUsartCount] = {
+      Settings::SerialRemoteOnUsart1,  // USART1 (index 0)
+      Settings::SerialRemoteOnUsart4,  // USART4 (index 1)
+  };
   for (uint8_t i = 0; i < cTxUsartCount; i++) {
+    if (!Application::getSettingsPtr()->getSetting(Settings::SystemOptions, cUsartBits[i])) {
+      continue;
+    }
     _txIndex[i] = 0;
     _txActive[i] = true;
     // Write first byte and enable TXE interrupt
@@ -1409,7 +1416,7 @@ static void _handleCommand(const char *payload, uint8_t length) {
       if (length >= 10 && payload[3] == ',') {
         // "$TCCA<n>,<HHMMSS>" -- set alarm time
         uint8_t idx = 4;
-        int32_t hour   = _parseDecimal(payload, idx, idx + 2);
+        int32_t hour = _parseDecimal(payload, idx, idx + 2);
         int32_t minute = _parseDecimal(payload, idx, idx + 2);
         int32_t second = _parseDecimal(payload, idx, idx + 2);
         if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59) {

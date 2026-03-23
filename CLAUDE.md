@@ -93,10 +93,6 @@ Note: since all blend/scale parameters are typed `uint16_t` (max 65535), a value
 
 ### Static Objects with Virtual Destructors Require `_fini` Stub
 
-Static-duration objects with virtual destructors (common with polymorphic View classes) register via `__cxa_atexit`, which pulls in `__libc_fini_array`, which references `_fini`. On bare metal this symbol is not provided by the runtime. A stub is already present in `TubeClock.cpp`:
+Static-duration objects with virtual destructors (common with polymorphic View classes) register via `__cxa_atexit`, which pulls in `__libc_fini_array`, which references `_fini`. On bare metal this symbol is not provided by the runtime. A stub is present in `Stubs.cpp`, along with a minimal `__verbose_terminate_handler` and no-op syscall stubs (`_close`, `_lseek`, `_read`, `_write`) that suppress linker warnings about unimplemented newlib syscalls.
 
-```cpp
-extern "C" void _fini() {}
-```
-
-If new static polymorphic objects are added elsewhere and the linker complains about `_fini`, this is why. Do not add additional stubs — the one in `TubeClock.cpp` covers the whole binary.
+If new static polymorphic objects are added elsewhere and the linker complains about `_fini`, this is why. Do not add additional stubs — the ones in `Stubs.cpp` cover the whole binary.
