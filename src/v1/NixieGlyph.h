@@ -34,37 +34,37 @@ class NixieGlyph {
  public:
   /// Important constants
   ///
-  static const uint8_t cGlyphMaximumIntensity = 255;  // Maximum PWM intensity value
+  static constexpr uint8_t cGlyphMaximumIntensity = 255;  // Maximum PWM intensity value
 
   /// @brief Compare this NixieGlyph to another
   /// @param LED to compare with
   ///
-  bool operator==(const NixieGlyph &other) const;
-  bool operator!=(const NixieGlyph &other) const;
+  bool operator==(const NixieGlyph &other) const { return _intensity == other._intensity && _duration == other._duration; }
+  bool operator!=(const NixieGlyph &other) const { return _intensity != other._intensity || _duration != other._duration; }
 
   /// @brief Set the glyph to off (zero)
   ///
-  void setOff();
+  void setOff() { _intensity = 0; }
 
   /// @brief Set the intensity of the glyph element
   /// @param intensity value for glyph (0-255)
   ///
-  void setIntensity(const uint8_t intensity);
+  void setIntensity(const uint8_t intensity) { _intensity = intensity; }
 
   /// @brief Set the duration over which the glyph should change
   /// @param duration value for glyph
   ///
-  void setDuration(const uint32_t duration);
+  void setDuration(const uint32_t duration) { _duration = duration; }
 
   /// @brief Get the intensity of the glpyh element
   /// @return intensity value for glyph (0-255)
   ///
-  uint8_t getIntensity() const;
+  uint8_t getIntensity() const { return _intensity; }
 
   /// @brief Get the duration over which the glyph should change
   /// @return fade duration used by glyph
   ///
-  uint32_t getDuration() const;
+  uint32_t getDuration() const { return _duration; }
 
   /// @brief Sets the nixie glyph to a linear interpolation between two other glyphs
   /// @param currentTick Current tick in the fade

@@ -95,12 +95,12 @@ enum ExternalControl : uint8_t { NoActiveExtControlEnum, SerialExtControlEnum, D
 
 /// @brief Number of seconds in a day
 ///
-const uint16_t cSecondsInAnHour = 60 * 60;
-const uint32_t cSecondsInADay = cSecondsInAnHour * 24;
+constexpr uint16_t cSecondsInAnHour = 60 * 60;
+constexpr uint32_t cSecondsInADay = cSecondsInAnHour * 24;
 
 // DST offset in seconds
 //
-static const int16_t cDstOffsetSeconds = 60 * 60;
+constexpr int16_t cDstOffsetSeconds = 60 * 60;
 
 /// @brief Common colors used throughout
 ///

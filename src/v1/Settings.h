@@ -129,12 +129,12 @@ class Settings {
 
   /// @brief Midpoint value for signed temperature calibration encoding
   ///  stored = cCalibrationMidpoint + offsetCx10; offsetCx10 = stored - cCalibrationMidpoint
-  static const int16_t cCalibrationMidpoint = 99;
+  static constexpr int16_t cCalibrationMidpoint = 99;
 
   /// @brief Timezone encoding constants: stored value for UTC+0, and minutes per step
   ///  offsetMinutes = (stored - cTimeZoneUtcValue) * cTimeZoneStepMinutes
-  static const uint16_t cTimeZoneUtcValue = 56;
-  static const uint16_t cTimeZoneStepMinutes = 15;
+  static constexpr uint16_t cTimeZoneUtcValue    = 56;
+  static constexpr uint16_t cTimeZoneStepMinutes = 15;
 
   /// @brief Default constructor
   ///
@@ -147,12 +147,12 @@ class Settings {
   /// @brief Loads settings from FLASH
   /// @return true if success, false if failure & defaults were set
   ///
-  bool loadFromFlash();
+  [[nodiscard]] bool loadFromFlash();
 
   /// @brief Loads settings from DS3234 SRAM; validates CRC
   /// @return true if DS3234 connected and CRC valid, false otherwise (defaults set)
   ///
-  bool loadFromSram();
+  [[nodiscard]] bool loadFromSram();
 
   /// @brief Saves current settings to DS3234 SRAM; no-op if DS3234 not connected
   /// @note Caller must ensure _crc is valid (i.e. call after saveToFlash())
@@ -167,7 +167,7 @@ class Settings {
   /// @brief Checks whether DS3234 SRAM contains valid settings (CRC check only, does not modify *this)
   /// @return true if DS3234 connected and SRAM CRC valid
   ///
-  bool sramIsValid() const;
+  [[nodiscard]] bool sramIsValid() const;
 
   /// @brief Saves settings to FLASH
   /// @return result of writeFlash()
@@ -177,7 +177,7 @@ class Settings {
   /// @brief Saves settings to FLASH only if they differ from the stored copy
   /// @return true on success (written or already up to date), false on write error
   ///
-  bool saveToFlashIfChanged();
+  [[nodiscard]] bool saveToFlashIfChanged();
 
   /// @brief Returns a setting
   /// @return true if setting is enabled, false otherwise

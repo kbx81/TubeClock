@@ -39,6 +39,10 @@ Output binary files are generated in `../../build/v1/`:
 
 Typically, just use `make stats` which will automatically run `arm-none-eabi-size` post-build to determine the binary's composition. Avoid using `git stash` for before/after build comparisons; instead, run the build before making changes, then again afterwards to compare.
 
+## Version Constants in version.h
+
+`FIRMWARE_VERSION_MAJOR`, `FIRMWARE_VERSION_MINOR`, and `FIRMWARE_VERSION_PATCH` in `src/v1/version.h` **must remain `#define` macros** — do not convert them to `constexpr`. The build script `scripts/bump_build.sh` parses these values with `sed` to generate `version_build.h` (which holds the zero-padded string forms and the auto-incrementing build number). Converting to `constexpr` silently breaks the script, causing version_build.h to emit "00.00.00" and the device to display the wrong firmware version.
+
 ## Important Implementation Notes
 
 This is an embedded system with limited processing power/speed, storage (flash memory) and RAM. Implementations should be as lean as possible.

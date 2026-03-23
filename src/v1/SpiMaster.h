@@ -112,12 +112,12 @@ class SpiMaster {
   /// @brief Queues up a transfer via SPI via DMA
   /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck queueTransfer(SpiTransferReq *request);
+  [[nodiscard]] SpiReqAck queueTransfer(SpiTransferReq *request);
 
   /// @brief Transfers data in/out through the SPI via DMA
   /// @param request must have slave field set (done automatically by getTransferRequestBuffer)
   /// @return HwReqAck state of transfer request
-  SpiReqAck transfer(SpiTransferReq *request);
+  [[nodiscard]] SpiReqAck transfer(SpiTransferReq *request);
 
   /// @brief Indicates if a given slave's transfer has completed
   /// @return true if transfer is complete

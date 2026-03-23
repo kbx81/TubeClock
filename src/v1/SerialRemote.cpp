@@ -72,9 +72,9 @@ static const uint8_t cTxUsartCount = 2;
 //
 static const uint8_t cQueueSize = 8;
 
-// Maximum valid OperatingMode value (OperatingModeTestDisplay)
+// Maximum valid OperatingMode value (derived from last enum entry)
 //
-static const uint8_t cMaxOperatingMode = 41;
+static constexpr uint8_t cMaxOperatingMode = static_cast<uint8_t>(Application::OperatingModeTestDisplay);
 
 // --- RX state ---
 

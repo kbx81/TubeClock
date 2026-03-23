@@ -325,7 +325,7 @@ TempSensorType getTempSensorType();
 
 /// @brief Sets the temperature sensor type/source
 /// @return true if successful, false if the sensor is not available
-bool setTempSensorType(TempSensorType type);
+[[nodiscard]] bool setTempSensorType(TempSensorType type);
 
 /// @brief Returns true if the specified temperature sensor was detected at initialization
 ///
@@ -334,7 +334,7 @@ bool isTempSensorDetected(TempSensorType type);
 /// @brief Erases the FLASH area used for app data
 /// @return 0xff if startAddress is out of range, flash_get_status_flags() if
 ///  erase request failed, 0x40 if erase verification failed
-uint32_t eraseFlash(uint32_t startAddress);
+[[nodiscard]] uint32_t eraseFlash(uint32_t startAddress);
 
 /// @brief Reads the FLASH area used for app data
 ///
@@ -344,16 +344,16 @@ void readFlash(uint32_t startAddress, uint16_t numElements, uint8_t *outputData)
 /// @return 0xff if startAddress is out of range, flash_get_status_flags() if
 ///  erase request failed, 0x40 if erase verification failed,
 ///  (0x80 | flash_get_status_flags()) if programming failure
-uint32_t writeFlash(uint32_t startAddress, uint8_t *inputData, uint16_t numElements);
+[[nodiscard]] uint32_t writeFlash(uint32_t startAddress, uint8_t *inputData, uint16_t numElements);
 
 /// @brief Reads and/or writes data to/from specified I2C interface via DMA
 ///
-HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx, size_t numberRx);
+[[nodiscard]] HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx, size_t numberRx);
 
 /// @brief Reads and/or writes data to/from the I2C1 interface via DMA
 ///
-HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx, const bool autoEndXfer);
-HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx, const bool autoEndXfer);
+[[nodiscard]] HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx, const bool autoEndXfer);
+[[nodiscard]] HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx, const bool autoEndXfer);
 
 /// @brief Aborts a transfer initiated by i2cTransfer()
 ///

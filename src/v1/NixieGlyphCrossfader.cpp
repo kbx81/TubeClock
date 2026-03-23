@@ -23,8 +23,6 @@
 
 namespace kbxTubeClock {
 
-NixieGlyph NixieGlyphCrossfader::getActive() const { return _active; }
-
 void NixieGlyphCrossfader::startNewFade(const NixieGlyph &newTarget) {
   if (newTarget.getIntensity() == _target.getIntensity()) {
     // Intensity unchanged. If duration=0 is requested and a fade is still in

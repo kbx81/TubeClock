@@ -41,24 +41,6 @@ namespace kbxTubeClock {
 
 NixieGlyph::NixieGlyph(const uint8_t intensity, const uint32_t duration) : _duration(duration), _intensity(intensity) {}
 
-bool NixieGlyph::operator==(const NixieGlyph &other) const {
-  return _intensity == other._intensity && _duration == other._duration;
-}
-
-bool NixieGlyph::operator!=(const NixieGlyph &other) const {
-  return _intensity != other._intensity || _duration != other._duration;
-}
-
-void NixieGlyph::setOff() { _intensity = 0; }
-
-void NixieGlyph::setIntensity(const uint8_t intensity) { _intensity = intensity; }
-
-void NixieGlyph::setDuration(const uint32_t duration) { _duration = duration; }
-
-uint8_t NixieGlyph::getIntensity() const { return _intensity; }
-
-uint32_t NixieGlyph::getDuration() const { return _duration; }
-
 void NixieGlyph::setFromLinearInterpolation(uint32_t currentTick, uint32_t totalTicks, const NixieGlyph &start,
                                             const NixieGlyph &target) {
   // Early exit: if at or past target, snap to target intensity

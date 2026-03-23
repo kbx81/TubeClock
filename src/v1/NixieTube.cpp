@@ -82,23 +82,17 @@ void NixieTube::setGlyph(const uint8_t glyph) {
   }
 }
 
-void NixieTube::setIntensity(const uint8_t intensity) { setIntensity(_activeGlyph, intensity); }
-
 void NixieTube::setIntensity(const uint8_t glyph, const uint8_t intensity) {
   if (glyph < cGlyphsPerTube) {
     _intensity[glyph] = intensity;
   }
 }
 
-void NixieTube::setDuration(const uint32_t duration) { _duration = duration; }
-
 void NixieTube::setOff() {
   for (uint8_t glyph = 0; glyph < cGlyphsPerTube; glyph++) {
     _intensity[glyph] = 0;
   }
 }
-
-uint8_t NixieTube::getGlyph() const { return _activeGlyph; }
 
 NixieGlyph NixieTube::getGlyphRaw() const { return getGlyphRaw(_activeGlyph); }
 
@@ -109,8 +103,6 @@ NixieGlyph NixieTube::getGlyphRaw(const uint8_t glyph) const {
   return NixieGlyph(_intensity[_activeGlyph], _duration);
 }
 
-uint8_t NixieTube::getIntensity() const { return _intensity[_activeGlyph]; }
-
 uint8_t NixieTube::getIntensity(const uint8_t glyph) const {
   if (glyph < cGlyphsPerTube) {
     return _intensity[glyph];
@@ -118,8 +110,6 @@ uint8_t NixieTube::getIntensity(const uint8_t glyph) const {
 
   return _intensity[_activeGlyph];
 }
-
-uint32_t NixieTube::getDuration() const { return _duration; }
 
 void NixieTube::adjustIntensity(const uint8_t glyph, const uint16_t scaleFactor) {
   if (glyph < cGlyphsPerTube) {

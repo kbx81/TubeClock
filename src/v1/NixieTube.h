@@ -38,9 +38,9 @@ class NixieTube {
  public:
   /// Important constants
   ///
-  static const uint8_t  cGlyphsPerTube  = 10;
-  static const uint8_t  cPointsPerTube  = 2;
-  static const uint32_t cGlyph100Percent = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
+  static constexpr uint8_t  cGlyphsPerTube   = 10;
+  static constexpr uint8_t  cPointsPerTube   = 2;
+  static constexpr uint32_t cGlyph100Percent = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
 
   /// @brief Convert an integer percentage (0–100) to the fixed-point scale used by this class.
   /// @param p Percentage (0–100); pct(0) = 0, pct(50) ≈ 32767, pct(100) = 65535
@@ -62,13 +62,13 @@ class NixieTube {
   /// @param intensity value for glyph (0-255)
   /// @param glyph Glyph number to set
   ///
-  void setIntensity(const uint8_t intensity);
+  void setIntensity(const uint8_t intensity) { setIntensity(_activeGlyph, intensity); }
   void setIntensity(const uint8_t glyph, const uint8_t intensity);
 
   /// @brief Set the duration over which the tube should transition glyphs
   /// @param duration New value for glyph transitions
   ///
-  void setDuration(const uint32_t duration);
+  void setDuration(const uint32_t duration) { _duration = duration; }
 
   /// @brief Set the tube's active glyph to off (no glyphs illuminated)
   ///
@@ -77,7 +77,7 @@ class NixieTube {
   /// @brief Get the tube's currently active glpyh
   /// @return active glyph number
   ///
-  uint8_t getGlyph() const;
+  uint8_t getGlyph() const { return _activeGlyph; }
 
   /// @brief Get the tube's currently active glpyh as a NixieGlyph object
   /// @param glyph Glyph number to return
@@ -90,13 +90,13 @@ class NixieTube {
   /// @param glyph Glyph to get intensity of; returns active glyph if not supplied
   /// @return active glyph number
   ///
-  uint8_t getIntensity() const;
+  uint8_t getIntensity() const { return _intensity[_activeGlyph]; }
   uint8_t getIntensity(const uint8_t glyph) const;
 
   /// @brief Get the duration over which the tube should transition glyphs
   /// @return Duration used for this tube's glyph transitions
   ///
-  uint32_t getDuration() const;
+  uint32_t getDuration() const { return _duration; }
 
   /// @brief Adjusts a specific glyph's intensity by a scale factor (65536 = 100%, i.e. no change)
   /// @param glyph Glyph number to scale

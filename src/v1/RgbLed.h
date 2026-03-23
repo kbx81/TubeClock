@@ -36,8 +36,8 @@ class RgbLed {
  public:
   /// Important constants
   ///
-  static const uint32_t cLed100Percent = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
-  static const uint16_t cLedMaxIntensity = 4095;
+  static constexpr uint32_t cLed100Percent  = 65536;  ///< Fixed-point 100%: 65536 = 100%, 32768 = 50%
+  static constexpr uint16_t cLedMaxIntensity = 4095;
 
   /// @brief Convert an integer percentage (0–100) to the fixed-point scale used by this class.
   /// @param p Percentage (0–100); pct(0) = 0, pct(50) ≈ 32767, pct(100) = 65535
@@ -53,31 +53,33 @@ class RgbLed {
   /// @brief Set the intensity of the LED element
   /// @param intensity value for LED
   ///
-  void setRed(const uint16_t intensity);
-  void setGreen(const uint16_t intensity);
-  void setBlue(const uint16_t intensity);
-  void setRGB(const uint16_t intensityRed, const uint16_t intensityGreen, const uint16_t intensityBlue);
+  void setRed(const uint16_t intensity) { _red = intensity; }
+  void setGreen(const uint16_t intensity) { _green = intensity; }
+  void setBlue(const uint16_t intensity) { _blue = intensity; }
+  void setRGB(const uint16_t intensityRed, const uint16_t intensityGreen, const uint16_t intensityBlue) {
+    _red = intensityRed; _green = intensityGreen; _blue = intensityBlue;
+  }
 
   /// @brief Set the RGB LED to off (zero)
   ///
-  void setOff();
+  void setOff() { _red = 0; _green = 0; _blue = 0; }
 
   /// @brief Set the duration over which the LED should change
   /// @param duration value for LED
   ///
-  void setDuration(const uint32_t duration);
+  void setDuration(const uint32_t duration) { _duration = duration; }
 
   /// @brief Get the intensity of the LED element
   /// @return intensity value for LED
   ///
-  uint16_t getRed() const;
-  uint16_t getGreen() const;
-  uint16_t getBlue() const;
+  uint16_t getRed() const { return _red; }
+  uint16_t getGreen() const { return _green; }
+  uint16_t getBlue() const { return _blue; }
 
   /// @brief Get the duration over which the LED should change
   /// @return fade duration used by LED
   ///
-  uint32_t getDuration() const;
+  uint32_t getDuration() const { return _duration; }
 
   /// @brief Adjusts the RGB LED to a fraction of its original values.
   /// @param scaleFactor Scale factor: 0 = off, 32768 = 50%, 65535 = ~100%. Use pct() to convert from a percentage.
@@ -90,8 +92,8 @@ class RgbLed {
 
   /// @brief Set/get the master intensity of this LED (0–255 scale, applied by DisplayManager)
   ///
-  void setIntensity(uint8_t intensity);
-  uint8_t getIntensity() const;
+  void setIntensity(uint8_t intensity) { _intensity = intensity; }
+  uint8_t getIntensity() const { return _intensity; }
 
  private:
   /// 4096-step (12 bit) brightness table: gamma = 2.2

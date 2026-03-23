@@ -277,7 +277,7 @@ bool SpiMaster::transferComplete(const uint8_t slave) {
 bool SpiMaster::processQueue() {
   for (uint8_t slave = 0; slave < _nextSlave; slave++) {
     if (_transferRequest[slave].state == SpiReqAck::SpiReqAckQueued) {
-      transfer(&_transferRequest[slave]);
+      static_cast<void>(transfer(&_transferRequest[slave]));
       // return indicating a transfer was initiated
       return true;
     }

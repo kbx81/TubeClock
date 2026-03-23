@@ -53,7 +53,7 @@ bool MainMenuView::keyHandler(Keys::Key key) {
       (_selectedMode == static_cast<uint8_t>(Application::OperatingMode::OperatingModeTestDisplay) + 1)) {
     DisplayManager::writeStatusLed(Application::red);
 
-    Hardware::eraseFlash(Settings::cSettingsFlashAddress);
+    static_cast<void>(Hardware::eraseFlash(Settings::cSettingsFlashAddress));
     Application::getSettingsPtr()->invalidateSram();
     _selectedMode = 1;
 

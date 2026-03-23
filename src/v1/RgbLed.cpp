@@ -269,38 +269,6 @@ bool RgbLed::operator==(const RgbLed &other) const {
 
 bool RgbLed::operator!=(const RgbLed &other) const { return !(*this == other); }
 
-void RgbLed::setIntensity(const uint8_t intensity) { _intensity = intensity; }
-
-void RgbLed::setRed(const uint16_t intensityRed) { _red = intensityRed; }
-
-void RgbLed::setGreen(const uint16_t intensityGreen) { _green = intensityGreen; }
-
-void RgbLed::setBlue(const uint16_t intensityBlue) { _blue = intensityBlue; }
-
-void RgbLed::setRGB(const uint16_t intensityRed, const uint16_t intensityGreen, const uint16_t intensityBlue) {
-  _red = intensityRed;
-  _green = intensityGreen;
-  _blue = intensityBlue;
-}
-
-void RgbLed::setOff() {
-  _red = 0;
-  _green = 0;
-  _blue = 0;
-}
-
-void RgbLed::setDuration(const uint32_t duration) { _duration = duration; }
-
-uint8_t RgbLed::getIntensity() const { return _intensity; }
-
-uint16_t RgbLed::getRed() const { return _red; }
-
-uint16_t RgbLed::getGreen() const { return _green; }
-
-uint16_t RgbLed::getBlue() const { return _blue; }
-
-uint32_t RgbLed::getDuration() const { return _duration; }
-
 void RgbLed::adjustIntensity(uint16_t scaleFactor) {
   uint32_t top;
 

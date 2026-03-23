@@ -33,7 +33,7 @@ class NixieGlyphCrossfader {
   ///
   /// @return fader's current values with duration set to number of ticks elapsed
   ///
-  NixieGlyph getActive() const;
+  NixieGlyph getActive() const { return _active; }
 
   /// @brief Starts a new fade with (a) new target value(s)
   /// No-op if the target intensity is unchanged, EXCEPT: if duration=0 is
