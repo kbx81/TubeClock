@@ -248,6 +248,10 @@ static SpiMaster _spi1Master;
 //
 static Usart _usart[cNumberOfUsarts];
 
+// counter used by delay()
+//
+volatile static uint32_t _delayCounter = 0;
+
 // tracks when to take ADC samples
 //
 static uint16_t _adcSampleTimerLight = 0;
@@ -262,13 +266,17 @@ static uint32_t _adcFilteredTemp = 0;
 static uint32_t _adcFilteredVoltageVddA = 0;
 static uint32_t _adcFilteredVoltageBatt = 0;
 
+// Cached filtered decilux value (updated at ~2 Hz alongside _cachedLightLevel)
+//
+static uint32_t _cachedLightLevelDecilux = 0;
+
 // Cached light level result (0-4095) to avoid redundant calculation
 //
 static uint16_t _cachedLightLevel = 0;
 
-// Flag set by systickIsr when ADC filtered values are updated
+// Lux calibration factor: 1000 = 1.0x at datasheet typical (corrects for real-world sensitivity)
 //
-static volatile bool _adcValuesUpdated = false;
+static uint16_t _luxCalibrationFactor = 1000;
 
 // threshold above which we do not BLANK during display refreshes
 //  used when autoAdjustIntensities is true
@@ -293,10 +301,6 @@ static uint8_t _buttonStates = 0;
 // the button states the last time they were sampled
 //
 static uint8_t _buttonStatesPrevious = 0;
-
-// counter used by delay()
-//
-volatile static uint32_t _delayCounter = 0;
 
 // tracks how many times tx/rx requests were blocked because the I2C is busy
 //
@@ -341,6 +345,10 @@ static uint32_t _onTimeSecondsCounter = 0;
 // set true by _incrementOnTimeSecondsCounter(); cleared by refresh() after DS3234 SRAM write
 //
 static volatile bool _onTimeCounterDirty = false;
+
+// Flag set by systickIsr when ADC filtered values are updated
+//
+static volatile bool _adcValuesUpdated = false;
 
 // provides a way to calibrate the STM32 ADC temperature indication (Cx10)
 //
@@ -1295,6 +1303,9 @@ void initialize() {
   _adcFilteredVoltageVddA = (uint32_t) _bufferADC[cAdcVref] << cAdcFilterUpscale;
   _adcFilteredVoltageBatt = (uint32_t) _bufferADC[cAdcVbat] << cAdcFilterUpscale;
   _cachedLightLevel = _bufferADC[cAdcPhototransistor];
+  // Initialize filtered decilux from initial ADC reading
+  uint32_t initBase = (uint32_t) _cachedLightLevel * voltageVddARaw() / 258;
+  _cachedLightLevelDecilux = initBase * _luxCalibrationFactor / 1000;
 
   // Initialize TSC baseline and filter values
   // Start with mid-range baseline; will adapt quickly during first acquisitions
@@ -1548,6 +1559,28 @@ uint16_t lightLevel() {
 }
 
 uint16_t lightLevelRaw() { return _bufferADC[cAdcPhototransistor]; }
+
+uint32_t lightLevelDecilux() { return _cachedLightLevelDecilux; }
+
+uint32_t lightLevelDeciluxRaw() {
+  // Circuit: TEPT5600 emitter follower, R_emitter = 10kΩ
+  // Divisor 258 corresponds to the datasheet typical sensitivity (6.3µA/lx at
+  // VCE=5V, CIE illuminant A): 4095 × 63mV / 1000 = 257.985 ≈ 258.
+  // Real-world sensitivity is far below this due to spectral mismatch
+  // (non-incandescent sources), bin variation (up to 5x), and diffuse light.
+  // Calibration factor: 1000 = 1.0x (datasheet typical). Practical values are
+  // typically 300-2000 depending on bin, light source, and geometry.
+  //
+  // Overflow check: max base = 4095×3600/258 = 57,139
+  // 57,139 × 65,535 = 3,744,604,365 < 2^32. Safe.
+  // Final /1000 converts from millilux to decilux.
+  uint32_t base = (uint32_t) _bufferADC[cAdcPhototransistor] * voltageVddARaw() / 258;
+  return base * _luxCalibrationFactor / 1000;
+}
+
+void setLuxCalibration(uint16_t factor) { _luxCalibrationFactor = factor ? factor : 1; }
+
+uint16_t getLuxCalibration() { return _luxCalibrationFactor; }
 
 uint32_t onTimeSeconds() { return _onTimeSecondsCounter; }
 
@@ -2168,6 +2201,10 @@ void systickIsr() {
 
     // Update cached light level (downscale back to actual ADC range)
     _cachedLightLevel = _adcFilteredLight >> cAdcFilterUpscale;
+
+    // Update cached filtered decilux (two divisions at 2 Hz is negligible)
+    uint32_t filtBase = (uint32_t) _cachedLightLevel * voltageVddARaw() / 258;
+    _cachedLightLevelDecilux = filtBase * _luxCalibrationFactor / 1000;
 
     _adcValuesUpdated = true;
   }

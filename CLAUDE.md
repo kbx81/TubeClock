@@ -95,6 +95,10 @@ tube.adjustIntensityAll(NixieTube::pct(75)); // 75% of all glyph intensities
 
 Note: since all blend/scale parameters are typed `uint16_t` (max 65535), a value of exactly 65536 can never be passed. Guards like `if (x >= 65536)` are unreachable — do not add them.
 
+### `cViewDescriptor` and `menuItemDisplayNumber` Are Hardware-Visible
+
+`menuItemDisplayNumber` values in `cViewDescriptor[]` (Application.cpp) are displayed directly on the nixie tubes when navigating the clock's menu. They are not arbitrary internal identifiers — changing them changes what the user sees on the physical hardware. Do **not** renumber or reorder existing display numbers without explicit guidance from the developer. When inserting a new entry that requires shifting existing numbers, ask the developer first to confirm the new numbering scheme is acceptable.
+
 ### Static Objects with Virtual Destructors Require `_fini` Stub
 
 Static-duration objects with virtual destructors (common with polymorphic View classes) register via `__cxa_atexit`, which pulls in `__libc_fini_array`, which references `_fini`. On bare metal this symbol is not provided by the runtime. A stub is present in `Stubs.cpp`, along with a minimal `__verbose_terminate_handler` and no-op syscall stubs (`_close`, `_lseek`, `_read`, `_write`) that suppress linker warnings about unimplemented newlib syscalls.

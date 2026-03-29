@@ -156,7 +156,7 @@ The response includes the current operating mode number. If the view mode (sub-p
 | 25 | SetEffectFrequency | Display effect frequency |
 | 26 | SetMinimumIntensity | Minimum display intensity |
 | 27 | SetBeeperVolume | Beeper volume |
-| 28 | SetTempCalibration | Temperature calibration |
+| 28 | SetTempCalibration | Temperature calibration (settings 21–24) and lux calibration (setting 25) — 5-item group, sub-page selects which sensor |
 | 29 | SetIdleTimeout | Idle timeout |
 | 30 | SetDateFormat | Date format |
 | 31 | SetTimeZone | Time zone |
@@ -223,11 +223,14 @@ Hardware status queries and control.
 ```
 
 Returns three comma-separated decimal values:
-- **light**: Ambient light level (raw ADC, phototransistor)
+- **light**: Ambient light level in **decilux** (unfiltered; divide by 10 for lux). Based on
+  TEPT5600 sensitivity with a 10KΩ emitter resistor and `LuxCalibration` (setting 25).
+  Real-world sensitivity is typically 20–50× below the datasheet typical (6.3 µA/lx at VCE=5V,
+  CIE illuminant A) due to spectral mismatch, bin variation, and diffuse light geometry.
 - **vdda**: VddA supply voltage in millivolts
 - **vbatt**: Battery voltage in millivolts
 
-Example: `$TCSHADC1782,3300,2791*XX\n`
+Example: `$TCSHADC2280,3300,2791*XX\n`
 
 This response is also sent as an **unsolicited status notification** whenever a new ADC reading is obtained and at least one value has changed. See [ADC Update](#adc-update) in the Unsolicited Notifications section.
 
@@ -684,12 +687,13 @@ Example: `$TCSSERASE1*XX\n` — settings flash erased.
 | 22 | TemperatureCalibrationDS3234 | Temperature calibration offset (DS3234) |
 | 23 | TemperatureCalibrationDS1722 | Temperature calibration offset (DS1722) |
 | 24 | TemperatureCalibrationLM74 | Temperature calibration offset (LM74) |
-| 25 | IdleTimeout | Idle timeout (seconds, 10–600) |
-| 26 | DateFormat | Date format |
-| 27 | TimeZone | Time zone offset |
-| 28 | ColonBehavior | Colon/separator behavior during time display |
-| 29 | TimerResetValue | Timer/counter reset value |
-| 30 | DmxAddress | DMX-512 base address |
+| 25 | LuxCalibration | Ambient light sensor calibration factor (1000 = 1.0× at datasheet typical, defaults to 1000). Corrects for bin variation, light source spectrum, and geometry. To calibrate: `new_value = current_value × reference_lux / (reported_decilux / 10)`. Range: 1–65535. |
+| 26 | IdleTimeout | Idle timeout (seconds, 10–600) |
+| 27 | DateFormat | Date format |
+| 28 | TimeZone | Time zone offset |
+| 29 | ColonBehavior | Colon/separator behavior during time display |
+| 30 | TimerResetValue | Timer/counter reset value |
+| 31 | DmxAddress | DMX-512 base address |
 
 #### SystemOptions Bit Flags (Setting 0)
 
@@ -1026,7 +1030,7 @@ Sent when the display intensity changes due to automatic brightness adjustment. 
 <- $TCSHADC<light>,<vdda>,<vbatt>*XX\n
 ```
 
-Sent whenever new ADC readings are obtained and at least one value (light level, VddA, or VBatt) has changed. Format is identical to the `H/ADC` command response. See the H command for field descriptions.
+Sent whenever new ADC readings are obtained and at least one value (light level, VddA, or VBatt) has changed. The light value is in decilux; voltage values are in millivolts. Format is identical to the `H/ADC` command response. See the H command for field descriptions.
 
 ### RTTTL Playback Complete
 

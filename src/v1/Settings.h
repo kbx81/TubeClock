@@ -54,12 +54,13 @@ class Settings {
     TemperatureCalibrationDS3234 = 22,
     TemperatureCalibrationDS1722 = 23,
     TemperatureCalibrationLM74 = 24,
-    IdleTimeout = 25,
-    DateFormat = 26,
-    TimeZone = 27,
-    ColonBehavior = 28,
-    TimerResetValue = 29,
-    DmxAddress = 30
+    LuxCalibration = 25,
+    IdleTimeout = 26,
+    DateFormat = 27,
+    TimeZone = 28,
+    ColonBehavior = 29,
+    TimerResetValue = 30,
+    DmxAddress = 31
   };
 
   /// @brief Settings we keep
@@ -133,7 +134,7 @@ class Settings {
 
   /// @brief Timezone encoding constants: stored value for UTC+0, and minutes per step
   ///  offsetMinutes = (stored - cTimeZoneUtcValue) * cTimeZoneStepMinutes
-  static constexpr uint16_t cTimeZoneUtcValue    = 56;
+  static constexpr uint16_t cTimeZoneUtcValue = 56;
   static constexpr uint16_t cTimeZoneStepMinutes = 15;
 
   /// @brief Default constructor

@@ -109,7 +109,7 @@ static viewDescriptor const cViewDescriptor[] = {
     {31, ViewEnum::SetValueViewEnum, Settings::Setting::EffectFrequency, 1},
     {32, ViewEnum::SetValueViewEnum, Settings::Setting::MinimumIntensity, 1},
     {33, ViewEnum::SetValueViewEnum, Settings::Setting::BeeperVolume, 1},
-    {34, ViewEnum::SetValueViewEnum, Settings::Setting::TemperatureCalibrationSTM32, 4},
+    {34, ViewEnum::SetValueViewEnum, Settings::Setting::TemperatureCalibrationSTM32, 5},
     {35, ViewEnum::SetValueViewEnum, Settings::Setting::IdleTimeout, 1},
     {36, ViewEnum::SetValueViewEnum, Settings::Setting::DateFormat, 1},
     {37, ViewEnum::SetValueViewEnum, Settings::Setting::TimeZone, 1},
@@ -135,6 +135,35 @@ static uint32_t _maximumIdleCount = 0;
 //   (refreshSettings() sets _maximumIdleCount and setOperatingMode() resets this to 0)
 volatile static uint32_t _idleCounter = 1;
 
+// Ambient light auto-brightness constants (decilux = lux × 10)
+//
+static constexpr uint32_t cLuxMinDlux = 100;   // 10 lux: at or below → minimum intensity
+static constexpr uint32_t cLuxMaxDlux = 2400;  // 240 lux: at or above → full intensity
+static constexpr uint32_t cLuxRangeDlux = cLuxMaxDlux - cLuxMinDlux;
+
+// Fixed-point reciprocal for normalization: maps [0, cLuxRangeDlux] → [0, 255]
+// (Q16, rounded). Avoids runtime division in the intensity update path.
+//
+static constexpr uint32_t cLuxRangeRecip = (255UL * 65536 + cLuxRangeDlux / 2) / cLuxRangeDlux;
+
+// Gamma curve LUT (gamma ≈ 0.55): maps normalized lux index (0-255) to intensity
+// weight (0-255). The weight is then scaled to [_minimumIntensity, 255].
+// Generated with: round(255 × (i/255)^0.55) for i in 0..255
+//
+static const uint8_t cGammaALS[256] = {
+    0,   12,  18,  22,  26,  29,  32,  35,  38,  41,  43,  45,  47,  50,  52,  54,  56,  58,  59,  61,  63,  65,
+    66,  68,  70,  71,  73,  74,  76,  77,  79,  80,  81,  83,  84,  86,  87,  88,  90,  91,  92,  93,  95,  96,
+    97,  98,  99,  101, 102, 103, 104, 105, 106, 107, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
+    121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 138, 139, 140, 141,
+    142, 143, 144, 145, 146, 146, 147, 148, 149, 150, 151, 152, 152, 153, 154, 155, 156, 157, 157, 158, 159, 160,
+    161, 161, 162, 163, 164, 165, 165, 166, 167, 168, 168, 169, 170, 171, 172, 172, 173, 174, 175, 175, 176, 177,
+    178, 178, 179, 180, 180, 181, 182, 183, 183, 184, 185, 186, 186, 187, 188, 188, 189, 190, 190, 191, 192, 193,
+    193, 194, 195, 195, 196, 197, 197, 198, 199, 199, 200, 201, 201, 202, 203, 203, 204, 205, 205, 206, 207, 207,
+    208, 209, 209, 210, 211, 211, 212, 212, 213, 214, 214, 215, 216, 216, 217, 218, 218, 219, 219, 220, 221, 221,
+    222, 222, 223, 224, 224, 225, 226, 226, 227, 227, 228, 229, 229, 230, 230, 231, 232, 232, 233, 233, 234, 235,
+    235, 236, 236, 237, 237, 238, 239, 239, 240, 240, 241, 242, 242, 243, 243, 244, 244, 245, 246, 246, 247, 247,
+    248, 248, 249, 249, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255};
+
 // minimum intensity (0-255 scale)
 //
 static uint8_t _minimumIntensity = 1;
@@ -142,6 +171,13 @@ static uint8_t _minimumIntensity = 1;
 // master display intensity (0-255 scale)
 //
 static uint8_t _masterIntensity = _minimumIntensity;
+
+// Intensity ramp rate limiter: controls how often _masterIntensity is stepped.
+// At SysTick = 1kHz, a period of 30 ticks = 30ms per step, so a 12-count
+// change takes ~360ms — visible as a smooth fade, not an abrupt jump.
+//
+static constexpr uint8_t cIntensityRampPeriod = 50;
+static uint8_t _intensityRampCounter = 0;
 
 // important daylight savings dates & times
 //
@@ -383,6 +419,7 @@ void refreshSettings() {
   Hardware::setTemperatureCalibration(Hardware::TempSensorType::LM74,
                                       (int16_t) _settings.getRawSetting(Settings::Setting::TemperatureCalibrationLM74) -
                                           Settings::cCalibrationMidpoint);
+  Hardware::setLuxCalibration(_settings.getRawSetting(Settings::Setting::LuxCalibration));
 
   _maximumIdleCount = (uint32_t) _settings.getRawSetting(Settings::Setting::IdleTimeout) * 1000;
   DisplayManager::setDisplayBlanking(false);
@@ -478,17 +515,35 @@ bool isDst(const DateTime &currentTime) {
   return (currentTime >= _dstStart && currentTime < _dstEnd);
 }
 
-// Updates the "master" intensity for the display based on lightLevel()
+// Updates the "master" intensity for the display based on filtered ambient light.
+// Uses a gamma curve (LUT) to map calibrated decilux to intensity (0-255).
 //
 void _updateIntensityPercentage(const bool quick = false) {
-  // Convert light level (0-4095) to intensity (0-255).
-  // >> 4 maps identically to the exact formula at the endpoints and differs by
-  // at most 1 count in the middle, which the ±2 deadband below absorbs.
-  uint16_t currentIntensity = Hardware::lightLevel() >> 4;
+  uint16_t currentIntensity;
+  uint32_t dlux = Hardware::lightLevelDecilux();
 
-  // Enforce minimum intensity
-  if (currentIntensity < _minimumIntensity) {
+  if (dlux <= cLuxMinDlux) {
     currentIntensity = _minimumIntensity;
+  } else if (dlux >= cLuxMaxDlux) {
+    currentIntensity = 255;
+  } else {
+    // Normalize to 8.8 fixed-point (0-255.xx) using precomputed reciprocal
+    uint32_t normQ16 = (dlux - cLuxMinDlux) * cLuxRangeRecip;
+    uint8_t idx = normQ16 >> 16;
+    if (idx > 254) {
+      idx = 254;  // clamp so idx+1 stays in bounds
+    }
+    uint8_t frac = (normQ16 >> 8) & 0xFF;
+
+    // Interpolate between adjacent LUT entries for smooth low-end transitions
+    // (first entries jump 0→12→18→22... — interpolation fills in the gaps)
+    uint8_t a = cGammaALS[idx];
+    uint8_t b = cGammaALS[idx + 1];
+    uint8_t gammaOut = a + (((uint16_t) (b - a) * frac + 128) >> 8);
+
+    // Scale to [_minimumIntensity, 255]
+    uint8_t range = 255 - _minimumIntensity;
+    currentIntensity = _minimumIntensity + ((uint16_t) range * gammaOut + 128) / 255;
   }
 
   if (quick) {
@@ -498,18 +553,20 @@ void _updateIntensityPercentage(const bool quick = false) {
       DisplayManager::setStatusLedIntensity(currentIntensity);
     }
   } else {
-    // Smooth mode with deadband and adaptive step size
+    // Rate-limited smooth ramp: step by 1 every cIntensityRampPeriod ticks.
+    // At 1kHz SysTick with period=30, a 12-count change takes ~360ms.
+    if (++_intensityRampCounter < cIntensityRampPeriod) {
+      return;
+    }
+    _intensityRampCounter = 0;
+
     int16_t error = currentIntensity - _masterIntensity;
 
     // Deadband of ±2 counts prevents hunting/flickering from noise
     if (error > 2) {
-      // Adaptive step: larger steps when far from target, smaller when close
-      // This gives fast initial response with smooth final approach
-      uint8_t step = (error > 20) ? 2 : 1;
-      _masterIntensity += step;
+      _masterIntensity += (error > 20) ? 2 : 1;
     } else if (error < -2) {
-      uint8_t step = (error < -20) ? 2 : 1;
-      _masterIntensity -= step;
+      _masterIntensity -= (error < -20) ? 2 : 1;
     }
     // Within deadband: do nothing (prevents flickering)
     if (_autoAdjustLedIntensity) {

@@ -89,6 +89,7 @@ static const SettingsProfile cActiveProfile = {{
     79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    1000,            // LuxCalibration (1000 = 1.0x datasheet typical)
     120,             // IdleTimeout (120 seconds)
     2,               // DateFormat (MM.DD.YY)
     32,              // TimeZone
@@ -124,6 +125,7 @@ static const SettingsProfile cActiveProfile = {{
     79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    1000,            // LuxCalibration (1000 = 1.0x datasheet typical)
     120,             // IdleTimeout (120 seconds)
     1,               // DateFormat (DD.MM.YY)
     56,              // TimeZone
@@ -159,6 +161,7 @@ static const SettingsProfile cActiveProfile = {{
     79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    1000,            // LuxCalibration (1000 = 1.0x datasheet typical)
     120,             // IdleTimeout (120 seconds)
     0,               // DateFormat (YY.MM.DD)
     56,              // TimeZone
@@ -194,6 +197,7 @@ static const SettingsProfile cActiveProfile = {{
     79,              // TemperatureCalibrationDS3234 (79 = -2.0C)
     79,              // TemperatureCalibrationDS1722 (79 = -2.0C)
     79,              // TemperatureCalibrationLM74 (79 = -2.0C)
+    465,             // LuxCalibration (1000 = 1.0x)
     120,             // IdleTimeout (120 seconds)
     0,               // DateFormat (YY.MM.DD)
     32,              // TimeZone
@@ -235,6 +239,7 @@ const Settings::SettingDescriptor Settings::cSettingDescriptors[] = {
     {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS3234
     {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationDS1722
     {198, 0, Settings::SettingTransform::Calibration},  // TemperatureCalibrationLM74
+    {65535, 1, Settings::SettingTransform::None},       // LuxCalibration (1000 = 1.0x; range 1-65535)
     {600, 10, Settings::SettingTransform::None},        // IdleTimeout (10-600 seconds)
     {2, 0, Settings::SettingTransform::None},           // DateFormat
     {112, 0, Settings::SettingTransform::TimeZone},     // TimeZone (0-112, x15 min, displayed ±HH:MM)

@@ -245,6 +245,29 @@ uint16_t lightLevel();
 ///
 uint16_t lightLevelRaw();
 
+/// @brief Returns the filtered illuminance estimate in decilux (lux × 10)
+/// @note  Updated at ~2 Hz from IIR-filtered ADC readings.
+///
+uint32_t lightLevelDecilux();
+
+/// @brief Returns the raw (unfiltered) illuminance estimate in decilux (lux × 10)
+/// @note  Base formula uses TEPT5600 datasheet typical sensitivity (6.3µA/lx,
+///        VCE=5V, CIE illuminant A) with 10kΩ emitter resistor.
+///        Real-world sensitivity is typically 20-50x lower (spectral mismatch,
+///        bin variation, diffuse light). LuxCalibration corrects for this.
+///
+uint32_t lightLevelDeciluxRaw();
+
+/// @brief Sets the lux calibration factor (1000 = 1.0x at datasheet typical)
+/// @note  Practical values are typically 300-2000 depending on TEPT5600 bin,
+///        light source spectrum, and sensor geometry.
+///
+void setLuxCalibration(uint16_t factor);
+
+/// @brief Returns the current lux calibration factor
+///
+uint16_t getLuxCalibration();
+
 /// @brief Returns the time HV has been on in seconds
 ///
 uint32_t onTimeSeconds();
@@ -348,12 +371,14 @@ void readFlash(uint32_t startAddress, uint16_t numElements, uint8_t *outputData)
 
 /// @brief Reads and/or writes data to/from specified I2C interface via DMA
 ///
-[[nodiscard]] HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx, size_t numberRx);
+[[nodiscard]] HwReqAck i2cTransfer(const uint8_t addr, const uint8_t *bufferTx, size_t numberTx, uint8_t *bufferRx,
+                                   size_t numberRx);
 
 /// @brief Reads and/or writes data to/from the I2C1 interface via DMA
 ///
 [[nodiscard]] HwReqAck i2cReceive(const uint8_t addr, uint8_t *bufferRx, const size_t numberRx, const bool autoEndXfer);
-[[nodiscard]] HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx, const bool autoEndXfer);
+[[nodiscard]] HwReqAck i2cTransmit(const uint8_t addr, const uint8_t *bufferTx, const size_t numberTx,
+                                   const bool autoEndXfer);
 
 /// @brief Aborts a transfer initiated by i2cTransfer()
 ///

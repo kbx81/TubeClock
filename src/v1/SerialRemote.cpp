@@ -332,7 +332,7 @@ static void _txSendPageStatus() {
 // --- Helper: send current ADC values ---
 static void _txSendAdcStatus() {
   _txBeginResponse("HADC");
-  _txAppendDecimal(Hardware::lightLevelRaw(), 1);
+  _txAppendDecimal(Hardware::lightLevelDeciluxRaw(), 1);
   _txAppendChar(',');
   _txAppendDecimal(Hardware::voltageVddARaw(), 1);
   _txAppendChar(',');

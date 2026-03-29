@@ -27,7 +27,7 @@ namespace kbxTubeClock {
 
 SetValueView::SetValueView()
     : _descriptor{0, 0, Settings::SettingTransform::None},
-      _value{0, 0, 0, 0},
+      _value{0, 0, 0, 0, 0},
       _relatedSetting(Settings::Setting::TimerResetValue),
       _numSettings(1),
       _selectedItem(0) {}
@@ -109,7 +109,8 @@ bool SetValueView::keyHandler(Keys::Key key) {
     }
 
     if (key == Keys::Key::D) {
-      if (_value[_selectedItem] > _descriptor.minValue) {
+      const Settings::SettingDescriptor &desc = Settings::cSettingDescriptors[_relatedSetting + _selectedItem];
+      if (_value[_selectedItem] > desc.minValue) {
         _value[_selectedItem]--;
       } else {
         tick = false;
@@ -117,7 +118,8 @@ bool SetValueView::keyHandler(Keys::Key key) {
     }
 
     if (key == Keys::Key::U) {
-      if (_value[_selectedItem] < _descriptor.maxOrMask) {
+      const Settings::SettingDescriptor &desc = Settings::cSettingDescriptors[_relatedSetting + _selectedItem];
+      if (_value[_selectedItem] < desc.maxOrMask) {
         _value[_selectedItem]++;
       } else {
         tick = false;
@@ -182,8 +184,9 @@ void SetValueView::loop() {
 
   uint8_t itemNumber = static_cast<uint8_t>(_selectedItem) + 1;
   Display tcDisp;
+  const Settings::SettingDescriptor &desc = Settings::cSettingDescriptors[_relatedSetting + _selectedItem];
 
-  if (_descriptor.transform == Settings::SettingTransform::Calibration) {
+  if (desc.transform == Settings::SettingTransform::Calibration) {
     int16_t signedValue = static_cast<int16_t>(_value[_selectedItem]) - Settings::cCalibrationMidpoint;
     bool negative = (signedValue < 0);
     uint16_t absValue = negative ? static_cast<uint16_t>(-signedValue) : static_cast<uint16_t>(signedValue);
